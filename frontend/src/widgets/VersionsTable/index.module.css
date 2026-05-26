@@ -1,0 +1,13 @@
+table {
+  background: #111;
+  color: white;
+}
+
+th, td {
+  padding: 10px;
+  border-bottom: 1px solid #333;
+}
+
+tr:hover {
+  background: #1a1a1a;
+}

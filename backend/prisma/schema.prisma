@@ -1,0 +1,416 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+//////////////////////
+// ENUMS
+//////////////////////
+
+enum Platform {
+  JAVA
+  BEDROCK
+}
+
+enum ProjectType {
+  //////////////////////////////////////////////////
+  // JAVA
+  //////////////////////////////////////////////////
+
+  PLUGIN
+  MOD
+  MODPACK
+  SHADER
+  DATA_PACK
+  RESOURCE_PACK
+  WORLD
+
+  //////////////////////////////////////////////////
+  // BEDROCK
+  //////////////////////////////////////////////////
+
+  ADDON
+  TEXTURE
+  SCRIPT
+
+  //////////////////////////////////////////////////
+  // OTHER
+  //////////////////////////////////////////////////
+
+  CUSTOM
+}
+
+enum Loader {
+  FORGE
+  NEOFORGE
+  FABRIC
+  QUILT
+  LITELOADER
+  PAPER
+  SPIGOT
+  PURPUR
+  BUKKIT
+  FOLIA
+}
+
+enum ModStatus {
+  DRAFT
+  PENDING
+  PUBLISHED
+  REJECTED
+  ARCHIVED
+}
+
+enum Visibility {
+  PUBLIC
+  UNLISTED
+  PRIVATE
+}
+
+//////////////////////
+// USER
+//////////////////////
+
+model User {
+  id          Int          @id @default(autoincrement())
+  role        String       @default("user")
+
+  username String @unique
+  email    String @unique
+  password String
+
+  avatar String?
+  bio    String?
+
+  isVerified Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  mods      Mod[]
+  likes     ModLike[]
+  favorites Favorite[]
+  comments  Comment[]
+
+  following Follow[] @relation("following")
+  followers Follow[] @relation("followers")
+
+  teamMembers TeamMember[]
+  userRoles    UserRole[]
+  userFeatures UserFeature[]
+
+  @@index([username])
+}
+
+//////////////////////
+// TEAM
+//////////////////////
+
+model Team {
+  id   Int    @id @default(autoincrement())
+  name String
+  invites TeamInvite[]
+
+  members TeamMember[]
+  mods    Mod[]
+}
+
+model TeamMember {
+  id     Int @id @default(autoincrement())
+  userId Int
+  teamId Int
+
+  role   String
+  scopes String[]
+
+  user User @relation(fields: [userId], references: [id])
+  team Team @relation(fields: [teamId], references: [id])
+
+  @@unique([userId, teamId])
+}
+
+model TeamInvite {
+  id        Int      @id @default(autoincrement())
+  teamId    Int
+  email     String
+  role      String
+
+  token     String   @unique
+  expiresAt DateTime
+
+  createdAt DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id])
+}
+
+
+//////////////////////
+// User Role
+//////////////////////
+model Role {
+  id    Int    @id @default(autoincrement())
+  name  String @unique
+
+  scopes String[] // permisos
+
+  members UserRole[]
+}
+
+model UserRole {
+  id     Int @id @default(autoincrement())
+  userId Int
+  roleId Int
+
+  user User @relation(fields: [userId], references: [id])
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, roleId])
+}
+
+//////////////////////
+// Flag
+//////////////////////
+model FeatureFlag {
+  id    Int    @id @default(autoincrement())
+  key   String @unique // "no_ads", "beta_access"
+
+  users UserFeature[]
+}
+
+model UserFeature {
+  id        Int @id @default(autoincrement())
+  userId    Int
+  featureId Int
+
+  user    User        @relation(fields: [userId], references: [id])
+  feature FeatureFlag @relation(fields: [featureId], references: [id])
+
+  @@unique([userId, featureId])
+}
+
+//////////////////////
+// MOD
+//////////////////////
+
+model Mod {
+  id          Int         @id @default(autoincrement())
+  icon        String?
+  title       String
+  slug        String      @unique
+  description String
+  content     String?
+  summary     String?
+
+  authorId    Int
+  author      User        @relation(fields: [authorId], references: [id])
+  teamId      Int?
+  team        Team?       @relation(fields: [teamId], references: [id])
+
+  sourceUrl   String?
+  issuesUrl   String?
+  discordUrl  String?
+  websiteUrl  String?
+  wikiUrl     String?
+  donationUrl String?
+
+  platform    Platform
+  type        ProjectType @default(MOD)
+  categories  String[]
+  loader      Loader?
+
+  status      ModStatus   @default(PENDING)
+  visibility  Visibility  @default(PUBLIC)
+  featured    Boolean     @default(false)
+  verified    Boolean     @default(false)
+  license String?
+
+  views       Int         @default(0)
+  downloads   Int         @default(0)
+  likesCount      Int     @default(0)
+  favoritesCount  Int     @default(0)
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  deletedAt   DateTime?
+
+  versions    ModVersion[]
+  images      ModImage[]
+  comments    Comment[]
+  tags        ModTag[]
+
+  likes     ModLike[]
+  favorites Favorite[]
+
+  @@index([slug])
+  @@index([authorId])
+  @@index([createdAt])
+  @@index([likesCount])
+  @@index([views])
+  @@index([downloads])
+  @@index([platform, type])
+  @@index([categories])
+  @@index([loader])
+}
+
+//////////////////////
+// VERSIONES
+//////////////////////
+
+model ModVersion {
+  id               Int     @id @default(autoincrement())
+  modId            Int
+  version          String
+  minecraftVersion String
+  loader           Loader?
+
+  changelog String?
+
+  createdAt DateTime @default(now())
+
+  mod       Mod            @relation(fields: [modId], references: [id])
+  downloads DownloadLink[]
+  files     ModFile[]
+
+  @@index([modId])
+}
+
+model DownloadLink {
+  id           Int    @id @default(autoincrement())
+  modVersionId Int
+  url          String
+  platform     String
+
+  modVersion ModVersion @relation(fields: [modVersionId], references: [id])
+}
+
+model ModFile {
+  id           Int @id @default(autoincrement())
+  modVersionId Int
+
+  filename    String
+  displayName String
+  url         String
+  size        Int
+  type        String
+  downloads     Int      @default(0)
+
+  sha1          String?
+  sha512        String?
+
+  releaseType String // beta | release
+
+  createdAt DateTime @default(now())
+  isPrimary Boolean  @default(false)
+
+  modVersion ModVersion @relation(fields: [modVersionId], references: [id])
+}
+
+//////////////////////
+// IMÁGENES
+//////////////////////
+
+model ModImage {
+  id    Int    @id @default(autoincrement())
+  modId Int
+  thumb String
+  url   String
+  order Int    @default(0)
+
+  mod     Mod     @relation(fields: [modId], references: [id])
+  isCover Boolean @default(false)
+
+  @@index([modId])
+}
+
+//////////////////////
+// TAGS
+//////////////////////
+
+model Tag {
+  id   Int    @id @default(autoincrement())
+  name String @unique
+
+  mods ModTag[]
+
+  @@index([name])
+}
+
+model ModTag {
+  modId Int
+  tagId Int
+
+  mod Mod @relation(fields: [modId], references: [id])
+  tag Tag @relation(fields: [tagId], references: [id])
+
+  @@id([modId, tagId])
+}
+
+//////////////////////
+// COMENTARIOS
+//////////////////////
+
+model Comment {
+  id     Int @id @default(autoincrement())
+  modId  Int
+  userId Int
+
+  content String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deleted Boolean @default(false)
+
+  mod  Mod  @relation(fields: [modId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([modId])
+  @@index([userId])
+}
+
+//////////////////////
+// LIKES
+//////////////////////
+
+model ModLike {
+  userId Int
+  modId  Int
+
+  user User @relation(fields: [userId], references: [id])
+  mod  Mod  @relation(fields: [modId], references: [id])
+
+  @@id([userId, modId])
+  @@index([modId])
+}
+
+//////////////////////
+// FAVORITOS ⭐
+//////////////////////
+
+model Favorite {
+  userId Int
+  modId  Int
+
+  user User @relation(fields: [userId], references: [id])
+  mod  Mod  @relation(fields: [modId], references: [id])
+
+  @@id([userId, modId])
+  @@index([modId])
+}
+
+//////////////////////
+// FOLLOW SYSTEM 👤
+//////////////////////
+
+model Follow {
+  followerId  Int
+  followingId Int
+
+  follower  User @relation("followers", fields: [followerId], references: [id])
+  following User @relation("following", fields: [followingId], references: [id])
+
+  @@id([followerId, followingId])
+}

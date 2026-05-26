@@ -1,0 +1,138 @@
+.navbar {
+  position: fixed;
+
+  top: 0;
+  left: 0;
+  right: 0;
+
+  height: 72px;
+
+  background: rgba(15, 15, 15, 0.9);
+
+  backdrop-filter: blur(12px);
+
+  border-bottom: 1px solid #222;
+
+  z-index: 1000;
+}
+
+.inner {
+  height: 72px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 20px;
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+
+.logo {
+  font-size: 20px;
+  font-weight: 700;
+
+  color: white;
+  text-decoration: none;
+}
+
+.nav {
+  display: flex;
+  gap: 16px;
+}
+
+.nav a {
+  color: #b3b3b3;
+  text-decoration: none;
+
+  transition: 0.2s;
+}
+
+.nav a:hover {
+  color: white;
+}
+
+.search {
+  flex: 1;
+  max-width: 500px;
+
+  height: 42px;
+
+  background: #181818;
+
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+
+  display: flex;
+  align-items: center;
+
+  gap: 10px;
+
+  padding: 0 14px;
+
+  color: #888;
+}
+
+.search input {
+  flex: 1;
+
+  background: transparent;
+  border: none;
+  outline: none;
+
+  color: white;
+}
+
+.results {
+  position: absolute;
+  top: 110%;
+  left: 0;
+  width: 100%;
+
+  background: #1b1b1b;
+  border: 1px solid #2b2b2b;
+  border-radius: 14px;
+
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  max-height: 420px;
+
+  z-index: 40;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.createButton {
+  background: white;
+  color: black;
+
+  padding: 10px 14px;
+
+  border-radius: 10px;
+
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.auth {
+  display: flex;
+  gap: 10px;
+}
+
+.auth a {
+  color: white;
+  text-decoration: none;
+}
+
+.register {
+  opacity: 0.7;
+}

@@ -1,0 +1,46 @@
+.button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  border: none;
+
+  background: #1f1f1f;
+
+  color: #d0d0d0;
+
+  padding: 10px 14px;
+
+  border-radius: 12px;
+
+  cursor: pointer;
+
+  transition:
+    transform 0.15s ease,
+    background 0.2s ease,
+    color 0.2s ease;
+
+  font-weight: 600;
+}
+
+.button:hover {
+  background: #2b2b2b;
+
+  transform: translateY(-1px);
+}
+
+.button:active {
+  transform: scale(0.96);
+}
+
+.active {
+  background: rgba(255, 70, 70, 0.15);
+
+  color: #ff6b6b;
+}
+
+.button:disabled {
+  opacity: 0.7;
+
+  cursor: default;
+}

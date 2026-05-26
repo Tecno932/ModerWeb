@@ -1,0 +1,23 @@
+.select {
+  height: 42px;
+
+  border-radius: 10px;
+
+  border: 1px solid #2f2f2f;
+
+  background: #151515;
+
+  color: white;
+
+  padding: 0 12px;
+
+  min-width: 180px;
+
+  transition: 0.2s;
+}
+
+.select:focus {
+  outline: none;
+
+  border-color: #4ade80;
+}

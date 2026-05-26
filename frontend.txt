@@ -1,0 +1,9194 @@
+src/
+.env
+VITE_API_URL=http://192.168.0.110:3000
+---
+App.tsx
+
+---
+main.tsx
+import React from "react";
+import ReactDOM from "react-dom/client";
+import { RouterProvider } from "react-router-dom";
+import { router } from "./router";
+import { ToastProvider } from "@/shared/components/ToastProvider";
+
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { AuthProvider } from "./context/AuthContext";
+import UploadCenter from "@/features/uploads/components/UploadCenter";
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 2,
+      gcTime: 1000 * 60 * 10, // ✅ antes cacheTime
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
+
+ReactDOM.createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>
+        <AuthProvider>
+
+          <RouterProvider router={router} />
+
+          <UploadCenter />
+
+        </AuthProvider>
+      </ToastProvider>
+    </QueryClientProvider>
+  </React.StrictMode>
+);
+---
+app/layouts/AppLayout/
+AppLayout.tsx
+import { Outlet } from "react-router-dom";
+
+import Navbar from "@/widgets/navbar/Navbar";
+
+import styles from "./AppLayout.module.css";
+
+export default function AppLayout() {
+  return (
+    <div className={styles.layout}>
+      <Navbar />
+
+      <main className={styles.content}>
+        <Outlet />
+      </main>
+    </div>
+  );
+}
+---
+AppLayout.module.css
+.layout {
+  min-height: 100vh;
+
+  background: #0f0f0f;
+  color: white;
+}
+
+.content {
+  padding-top: 72px;
+}
+---
+router/
+ProtectedRouter.tsx
+import {
+  Navigate,
+  Outlet,
+} from "react-router-dom";
+
+import { useAuth } from "@/context/AuthContext";
+
+export default function ProtectedRoute() {
+  const { user } = useAuth();
+
+  if (!user) {
+    return (
+      <Navigate
+        to="/login"
+        replace
+      />
+    );
+  }
+
+  return <Outlet />;
+}
+---
+context/
+AuthContext.tsx
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+
+interface User {
+  id: number;
+
+  username?: string;
+
+  avatar?: string;
+
+  email?: string;
+}
+
+interface AuthContextType {
+  user: User | null;
+}
+
+const AuthContext =
+  createContext<AuthContextType>({
+    user: null,
+  });
+
+export function AuthProvider({
+  children,
+}: any) {
+  const [user, setUser] =
+    useState<User | null>(
+      null
+    );
+
+  useEffect(() => {
+    const token =
+      localStorage.getItem(
+        "token"
+      );
+
+    if (!token) return;
+
+    try {
+      const payload = JSON.parse(
+        atob(token.split(".")[1])
+      );
+
+      setUser({
+        id: payload.userId,
+
+        username:
+          payload.username,
+
+        avatar: payload.avatar,
+
+        email: payload.email,
+      });
+    } catch {
+      setUser(null);
+    }
+  }, []);
+
+  return (
+    <AuthContext.Provider
+      value={{ user }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export const useAuth = () =>
+  useContext(AuthContext);
+
+export function logout() {
+  console.log(
+    "👋 Logout manual"
+  );
+
+  localStorage.removeItem(
+    "token"
+  );
+
+  localStorage.removeItem(
+    "user"
+  );
+
+  window.location.href =
+    "/login";
+}
+---
+dto/
+mod-search.dto.ts
+export interface ModSearchDto {
+  page?: number;
+
+  limit?: number;
+
+  query?: string;
+
+  platform?: string;
+
+  loader?: string;
+
+  sort?: "newest" | "popular";
+}
+---
+entities/StrictMode
+enums.ts
+export const PLATFORM_OPTIONS = [
+  { value: "JAVA", label: "Java" },
+  { value: "BEDROCK", label: "Bedrock" },
+];
+
+export const LOADER_OPTIONS = [
+  { value: "FABRIC", label: "Fabric" },
+  { value: "FORGE", label: "Forge" },
+  { value: "NEOFORGE", label: "NeoForge" },
+  { value: "QUILT", label: "Quilt" },
+  { value: "LITELOADER", label: "LiteLoader" },
+];
+
+export const PROJECT_TYPE_OPTIONS = [
+  { value: "PLUGIN", label: "Plugin" },
+  { value: "MOD", label: "Mod" },
+  { value: "MODPACK", label: "Modpack" },
+  { value: "ADDON", label: "Addon" },
+  { value: "SHADER", label: "Shader" },
+  { value: "DATA_PACK", label: "Data Pack" },
+  { value: "RESOURCE_PACK", label: "Resource Pack" },
+  { value: "MAP", label: "Map" },
+  { value: "CUSTOM", label: "Custom" },
+];
+
+export const CATEGORIES = [
+  { value: "ADVENTURE", label: "Adventure" },
+  { value: "RPG", label: "RPG" },
+  { value: "MMO", label: "MMO" },
+  { value: "EXPLORATION", label: "Exploration" },
+  { value: "HORROR", label: "Horror" },
+  { value: "MAGIC", label: "Magic" },
+  { value: "MINI_GAME", label: "Mini Game" },
+  { value: "SKYBLOCK", label: "Skyblock" },
+  { value: "TECH", label: "Tech" },
+  { value: "VANILLA_PLUS", label: "Vanilla Plus" },
+];
+---
+feactures/auth
+api.ts
+const API_URL = "http://192.168.0.110:3000";
+
+export const login = async (data: { email: string; password: string }) => {
+  const res = await fetch(`${API_URL}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) throw new Error("Error en login");
+
+  return res.json();
+};
+
+export const register = async (data: {
+  email: string;
+  password: string;
+  username: string;
+}) => {
+  const res = await fetch(`${API_URL}/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const data = await res.json();
+    console.log("❌ BACKEND ERROR:", data);
+    throw new Error(data.error || "Error en register");
+  }
+
+  return res.json();
+};
+---
+hooks.ts
+import { useMutation } from "@tanstack/react-query";
+import { login, register } from "./api";
+
+export function useLogin() {
+  return useMutation({
+    mutationFn: login,
+  });
+}
+
+export function useRegister() {
+  return useMutation({
+    mutationFn: register,
+  });
+}
+---
+feactures/create-mod/
+hooks.ts
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { createMod } from "../mods/api";
+
+export function useCreateMod() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: createMod,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["mods"] });
+    },
+  });
+}
+---
+feactures/create-mod/api/
+createMod.api.ts
+import { apiFetch } from "@/shared/api/client";
+
+export async function createMod(
+  formData: FormData
+) {
+  return apiFetch("/mods", {
+    method: "POST",
+    body: formData,
+  });
+}
+---
+feactures/create-mod/components/
+createmodform.tsx
+import { useState } from "react";
+import { useCreateMod } from "../hooks";
+
+import StepBasicInfo from "../pages/StepBasicInfo";
+import StepMediaInfo from "../pages/StepMediaContent";
+
+export default function CreateModForm() {
+  const { mutateAsync, isPending } = useCreateMod();
+
+  const [step, setStep] = useState(1);
+
+  const [data, setData] = useState({
+    //////////////////////////////////////////////////
+    // BASIC
+    //////////////////////////////////////////////////
+
+    title: "",
+
+    summary: "",
+
+    description: "",
+
+    content: "",
+
+    license: "",
+
+    //////////////////////////////////////////////////
+    // LINKS
+    //////////////////////////////////////////////////
+
+    sourceUrl: "",
+
+    issuesUrl: "",
+
+    discordUrl: "",
+
+    websiteUrl: "",
+
+    wikiUrl: "",
+
+    donationUrl: "",
+
+    //////////////////////////////////////////////////
+    // META
+    //////////////////////////////////////////////////
+
+    platform: "",
+
+    loader: "",
+
+    type: "",
+
+    visibility: "PUBLIC",
+
+    //////////////////////////////////////////////////
+    // ARRAYS
+    //////////////////////////////////////////////////
+
+    categories: [] as string[],
+
+    tags: [] as string[],
+
+    //////////////////////////////////////////////////
+    // FILES
+    //////////////////////////////////////////////////
+
+    icon: null as File | null,
+
+    gallery: [] as File[],
+  });
+
+  ////////////////////////////////////////
+  // NAVIGATION
+  ////////////////////////////////////////
+
+  const nextStep = () => {
+    // Validación básica (podés mejorar con Zod después)
+    if (!data.title || !data.description || !data.type || !data.platform) {
+      alert("Completa los campos obligatorios ⚠️");
+      return;
+    }
+
+    setStep(2);
+  };
+
+  const prevStep = () => {
+    setStep(1);
+  };
+
+  ////////////////////////////////////////
+  // SUBMIT FINAL
+  ////////////////////////////////////////
+
+  const handleSubmit = async () => {
+    try {
+      const formData = new FormData();
+
+      // Campos simples
+      formData.append("title", data.title);
+      formData.append("description", data.description);
+      formData.append("content", data.content);
+
+      formData.append("platform", data.platform);
+      formData.append("loader", data.loader || "");
+      formData.append("type", data.type);
+
+      // Arrays
+      formData.append("categories", JSON.stringify(data.categories));
+      formData.append("tags", JSON.stringify(data.tags));
+
+      // icon
+      if (data.icon) {
+        formData.append("icon", data.icon);
+      }
+
+      // Gallery
+      data.gallery.forEach((file) => {
+        formData.append("gallery", file);
+      });
+
+      await mutateAsync(formData);
+
+      alert("🚀 Mod creado correctamente");
+
+      // Reset opcional
+      setStep(1);
+      setData({
+        title: "",
+        description: "",
+        content: "",
+        platform: "",
+        loader: "",
+        type: "",
+        categories: [],
+        tags: [],
+        icon: null,
+        gallery: [],
+      });
+
+    } catch (error) {
+      console.error(error);
+      alert("❌ Error al crear el mod");
+    }
+  };
+
+  ////////////////////////////////////////
+  // UI
+  ////////////////////////////////////////
+
+  return (
+    <div>
+
+      {/* STEP INDICATOR */}
+      <div style={{ marginBottom: 20 }}>
+        <span style={{ marginRight: 10 }}>
+          {step === 1 ? "🟢" : "⚪"} Basic Info
+        </span>
+        <span>
+          {step === 2 ? "🟢" : "⚪"} Media & Description
+        </span>
+      </div>
+
+      {/* STEP 1 */}
+      {step === 1 && (
+        <StepBasicInfo
+          data={data}
+          setData={setData}
+          next={nextStep}
+        />
+      )}
+
+      {/* STEP 2 */}
+      {step === 2 && (
+        <div>
+          <StepMediaInfo
+            data={data}
+            setData={setData}
+            submit={handleSubmit}
+          />
+
+          <button onClick={prevStep} style={{ marginTop: 10 }}>
+            ← Volver
+          </button>
+        </div>
+      )}
+
+      {/* LOADING */}
+      {isPending && <p>Creando mod...</p>}
+    </div>
+  );
+}
+---
+feactures/create-mod/hooks/
+useCreateMod.ts
+import {
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
+
+import { createMod } from "../api/createMod.api";
+
+export function useCreateMod() {
+  const qc =
+    useQueryClient();
+
+  return useMutation({
+    mutationFn: createMod,
+
+    onSuccess: () => {
+      qc.invalidateQueries({
+        queryKey: ["mods"],
+      });
+    },
+  });
+}
+---
+feactures/create-mod/pages/
+StepBasicInfo.tsx
+import { useState } from "react";
+import {
+  PLATFORM_OPTIONS,
+  LOADER_OPTIONS,
+  PROJECT_TYPE_OPTIONS,
+  CATEGORIES,
+} from "@/entities/mod/enums";
+
+type Props = {
+  data: any;
+  setData: (data: any) => void;
+  next: () => void;
+};
+
+export default function StepBasicInfo({ data, setData, next }: Props) {
+  const [tagInput, setTagInput] = useState("");
+
+  const addTag = () => {
+    if (tagInput && !data.tags.includes(tagInput)) {
+      setData({ ...data, tags: [...data.tags, tagInput] });
+      setTagInput("");
+    }
+  };
+
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+
+  const toggleCategory = (value: string) => {
+    const exists = data.categories.includes(value);
+
+    if (exists) {
+      setData({
+        ...data,
+        categories: data.categories.filter((c: string) => c !== value),
+      });
+    } else {
+      setData({
+        ...data,
+        categories: [...data.categories, value],
+      });
+    }
+  };
+
+  return (
+    <div>
+      <h2>Basic Info</h2>
+
+      <input
+        placeholder="Project name"
+        value={data.title}
+        onChange={(e) => setData({ ...data, title: e.target.value })}
+      />
+
+      <textarea
+        placeholder="Summary"
+
+        value={data.summary}
+
+        onChange={(e) =>
+          setData({
+            ...data,
+            summary: e.target.value,
+          })
+        }
+      />
+
+      <textarea
+        placeholder="Description"
+
+        value={data.description}
+
+        onChange={(e) =>
+          setData({
+            ...data,
+            description: e.target.value,
+          })
+        }
+      />
+
+      <input
+        type="text"
+
+        placeholder="License (MIT, GPL-3.0...)"
+
+        value={data.license}
+
+        onChange={(e) =>
+          setData({
+            ...data,
+            license: e.target.value,
+          })
+        }
+      />
+
+      <select
+        value={data.visibility}
+
+        onChange={(e) =>
+          setData({
+            ...data,
+            visibility: e.target.value,
+          })
+        }
+      >
+        <option value="PUBLIC">
+          Public
+        </option>
+
+        <option value="UNLISTED">
+          Unlisted
+        </option>
+
+        <option value="PRIVATE">
+          Private
+        </option>
+      </select>
+
+      {/* ICON */}
+      <input
+        type="file"
+        accept="image/*"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+
+          if (!file) return;
+
+          setData({
+            ...data,
+            icon: file,
+          });
+
+          setCoverPreview(
+            URL.createObjectURL(file)
+          );
+        }}
+      />
+
+      {coverPreview && <img src={coverPreview} width={150} />}
+
+      {/* TYPE */}
+      <select
+        value={data.type}
+        onChange={(e) => setData({ ...data, type: e.target.value })}
+      >
+        <option value="">Tipo</option>
+        {PROJECT_TYPE_OPTIONS.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+
+      {/* PLATFORM */}
+      <select
+        value={data.platform}
+        onChange={(e) => setData({ ...data, platform: e.target.value })}
+      >
+        <option value="">Plataforma</option>
+        {PLATFORM_OPTIONS.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+
+      {/* LOADER */}
+      <select
+        value={data.loader}
+        onChange={(e) => setData({ ...data, loader: e.target.value })}
+      >
+        <option value="">Loader</option>
+        {LOADER_OPTIONS.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+
+      {/* CATEGORIES MULTI */}
+      <div>
+        <p>Categorías:</p>
+          <select
+            value={data.categories[0] || ""}
+            onChange={(e) =>
+              setData({ ...data, categories: [e.target.value] })
+            }
+          >
+            <option value="">Categoría</option>
+            {CATEGORIES.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+      </div>
+
+      {/* TAGS */}
+      <div>
+        <input
+          value={tagInput}
+          onChange={(e) => setTagInput(e.target.value)}
+          placeholder="Tag..."
+        />
+        <button type="button" onClick={addTag}>
+          +
+        </button>
+
+        <div>
+          {data.tags.map((t: string) => (
+            <span key={t}>{t}</span>
+          ))}
+        </div>
+      </div>
+
+      <button onClick={next}>Siguiente →</button>
+    </div>
+  );
+}
+---
+StepMediaContent.tsx
+import { useEditor, EditorContent } from "@tiptap/react";
+import styles from "./mediainfo.module.css";
+
+import StarterKit from "@tiptap/starter-kit";
+import Underline from "@tiptap/extension-underline";
+import Link from "@tiptap/extension-link";
+import Placeholder from "@tiptap/extension-placeholder";
+import Image from "@tiptap/extension-image";
+
+type Props = {
+  data: any;
+  setData: (data: any) => void;
+  submit: () => void;
+};
+
+export default function StepMediaInfo({ data, setData, submit }: Props) {
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Underline,
+      Image,
+      Link.configure({ openOnClick: false }),
+      Placeholder.configure({
+        placeholder: "Escribe algo increíble sobre tu mod...",
+      }),
+    ],
+    content: data.content || "",
+    onUpdate({ editor }) {
+      setData({ ...data, content: editor.getHTML() });
+    },
+    editorProps: {
+      handleDrop(view, event) {
+        const files = event.dataTransfer?.files;
+        if (!files || files.length === 0) return false;
+
+        const file = files[0];
+        if (!file.type.startsWith("image/")) return false;
+
+        const reader = new FileReader();
+        reader.onload = () => {
+          const node = view.state.schema.nodes.image.create({
+            src: reader.result,
+          });
+
+          const transaction = view.state.tr.replaceSelectionWith(node);
+          view.dispatch(transaction);
+        };
+
+        reader.readAsDataURL(file);
+        return true;
+      },
+    },
+  });
+
+  if (!editor) return null;
+
+  ////////////////////////////////////////
+  // LINK
+  ////////////////////////////////////////
+  const addLink = () => {
+    const url = prompt("URL:");
+    if (!url) return;
+
+    editor.chain().focus().setLink({ href: url }).run();
+  };
+
+  ////////////////////////////////////////
+  // IMAGE UPLOAD (EDITOR)
+  ////////////////////////////////////////
+  const addImage = (file: File) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      editor
+        .chain()
+        .focus()
+        .setImage({ src: reader.result as string })
+        .run();
+    };
+
+    reader.readAsDataURL(file);
+  };
+
+  ////////////////////////////////////////
+  // GALLERY
+  ////////////////////////////////////////
+  const handleGallery = (files: File[]) => {
+    setData({ ...data, gallery: files });
+  };
+
+  return (
+    <div className={styles.wrapper}>
+      <h2 className={styles.title}>Media & Description</h2>
+
+      {/* GALLERY */}
+      <div className={styles.gallery}>
+        <input
+          type="file"
+          multiple
+          onChange={(e) => {
+            const files = Array.from(e.target.files || []);
+            handleGallery(files);
+          }}
+        />
+
+        <div className={styles.previewGrid}>
+          {data.gallery?.map((file: File, i: number) => (
+            <img
+              key={i}
+              src={URL.createObjectURL(file)}
+              className={styles.previewImage}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* TOOLBAR FLOAT */}
+      <div className={styles.toolbar}>
+        <button
+          className={editor.isActive("bold") ? styles.active : ""}
+          onClick={() => editor.chain().focus().toggleBold().run()}
+        >
+          B
+        </button>
+
+        <button
+          className={editor.isActive("italic") ? styles.active : ""}
+          onClick={() => editor.chain().focus().toggleItalic().run()}
+        >
+          I
+        </button>
+
+        <button
+          className={editor.isActive("underline") ? styles.active : ""}
+          onClick={() => editor.chain().focus().toggleUnderline().run()}
+        >
+          U
+        </button>
+
+        <button onClick={addLink}>🔗</button>
+
+        <button
+          onClick={() =>
+            editor.chain().focus().toggleHeading({ level: 1 }).run()
+          }
+        >
+          H1
+        </button>
+
+        <button
+          onClick={() =>
+            editor.chain().focus().toggleHeading({ level: 2 }).run()
+          }
+        >
+          H2
+        </button>
+
+        <button onClick={() => editor.chain().focus().toggleBulletList().run()}>
+          •
+        </button>
+
+        <button onClick={() => editor.chain().focus().toggleOrderedList().run()}>
+          1.
+        </button>
+
+        <button onClick={addLink}>🔗</button>
+
+        <button
+          onClick={() => editor.chain().focus().unsetLink().run()}
+        >
+          ❌
+        </button>
+
+        {/* IMAGE BUTTON */}
+        <label className={styles.imageUpload}>
+          🖼️
+          <input
+            type="file"
+            hidden
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) addImage(file);
+            }}
+          />
+        </label>
+
+        <button
+          onClick={() =>
+            editor.chain().focus().clearNodes().unsetAllMarks().run()
+          }
+        >
+          🧹
+        </button>
+      </div>
+
+      {/* EDITOR */}
+      <div className={styles.editor}>
+        <EditorContent editor={editor} />
+      </div>
+
+      <button className={styles.submit} onClick={submit}>
+        🚀 Crear Mod
+      </button>
+    </div>
+  );
+}
+---
+feactures/create-mod/types/
+export interface CreateModFormData {
+  title: string;
+
+  summary: string;
+
+  description: string;
+
+  content: string;
+
+  license: string;
+
+  sourceUrl: string;
+  issuesUrl: string;
+  discordUrl: string;
+  websiteUrl: string;
+  wikiUrl: string;
+  donationUrl: string;
+
+  platform: string;
+
+  type: string;
+
+  loader: string;
+
+  visibility: string;
+
+  categories: string[];
+
+  tags: string[];
+
+  icon: File | null;
+
+  gallery: File[];
+}
+---
+feactures/favorite/components/
+favoriteButton.tsx
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import fav from "@/assets/icons/favorite.png";
+import favColor from "@/assets/icons/favoritecolor.png";
+
+export default function FavoriteButton({ modId }: any) {
+  const token = localStorage.getItem("token");
+  const queryClient = useQueryClient();
+
+  const { data } = useQuery({
+    queryKey: ["favorite", modId],
+    queryFn: async () => {
+      if (!token) return { favorited: false };
+
+      const res = await fetch(`http://192.168.0.110:3000/mods/${modId}/favorite`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      return res.json();
+    },
+    initialData: { favorited: false },
+    enabled: !!token,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      if (!token) throw new Error("No auth");
+
+      await fetch(`http://192.168.0.110:3000/mods/${modId}/favorite`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    },
+
+    onMutate: async () => {
+      const prev = data?.favorited;
+
+      queryClient.setQueryData(["favorite", modId], {
+        favorited: !prev,
+      });
+    },
+
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["favorite", modId] });
+    },
+  });
+
+  const handleClick = () => {
+    if (!token) {
+      alert("Logueate");
+      return;
+    }
+
+    mutation.mutate();
+  };
+
+  const favorited = data?.favorited;
+
+  return (
+  <button onClick={handleClick}>
+    <img
+      src={favorited ? favColor : fav}
+      width={20}
+    />
+  </button>
+  );
+}
+---
+feactures/interactions/
+api.ts
+import { apiFetch } from "@/shared/api/client";
+
+import type { ModInteractions } from "./types";
+
+export function getInteractions(
+  modId: number
+) {
+  return apiFetch<ModInteractions>(
+    `/mods/${modId}/interactions`
+  );
+}
+
+export function toggleLike(
+  modId: number
+) {
+  return apiFetch(
+    `/mods/${modId}/like`,
+    {
+      method: "POST",
+    }
+  );
+}
+
+export function toggleFavorite(
+  modId: number
+) {
+  return apiFetch(
+    `/mods/${modId}/favorite`,
+    {
+      method: "POST",
+    }
+  );
+}
+---
+hook.ts
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+
+import {
+  getInteractions,
+  toggleFavorite,
+  toggleLike,
+} from "./api";
+
+import { queryKeys } from "@/shared/lib/queryKeys";
+
+//////////////////////////////////////////////////////
+// GET INTERACTIONS
+//////////////////////////////////////////////////////
+
+export function useInteractions(
+  modId: number
+) {
+  return useQuery({
+    queryKey:
+      queryKeys.mods.interactions(
+        modId
+      ),
+
+    queryFn: () =>
+      getInteractions(modId),
+  });
+}
+
+//////////////////////////////////////////////////////
+// LIKE
+//////////////////////////////////////////////////////
+
+export function useToggleLike(
+  modId: number,
+  slug: string
+) {
+  const queryClient =
+    useQueryClient();
+
+  return useMutation({
+    mutationFn: () =>
+      toggleLike(modId),
+
+    //////////////////////////////////////////////////
+    // OPTIMISTIC
+    //////////////////////////////////////////////////
+
+    onMutate: async () => {
+      //////////////////////////////////////////////////
+      // DETAIL CACHE KEY
+      //////////////////////////////////////////////////
+
+      const detailKey =
+        queryKeys.mods.detail(
+          slug
+        );
+
+      //////////////////////////////////////////////////
+      // CANCEL
+      //////////////////////////////////////////////////
+
+      await queryClient.cancelQueries({
+        queryKey: detailKey,
+      });
+
+      //////////////////////////////////////////////////
+      // PREVIOUS
+      //////////////////////////////////////////////////
+
+      const previous =
+        queryClient.getQueryData<any>(
+          detailKey
+        );
+
+      //////////////////////////////////////////////////
+      // OPTIMISTIC UPDATE
+      //////////////////////////////////////////////////
+
+      queryClient.setQueryData(
+        detailKey,
+        (old: any) => {
+          if (!old) return old;
+
+          const liked =
+            !old.interactions
+              ?.liked;
+
+          return {
+            ...old,
+
+            interactions: {
+              ...old.interactions,
+
+              liked,
+            },
+
+            stats: {
+              ...old.stats,
+
+              likes: liked
+                ? old.stats.likes +
+                  1
+                : Math.max(
+                    0,
+                    old.stats.likes -
+                      1
+                  ),
+            },
+          };
+        }
+      );
+
+      return { previous };
+    },
+
+    //////////////////////////////////////////////////
+    // ROLLBACK
+    //////////////////////////////////////////////////
+
+    onError: (
+      _err,
+      _vars,
+      context
+    ) => {
+      queryClient.setQueryData(
+        queryKeys.mods.detail(
+          slug
+        ),
+
+        context?.previous
+      );
+    },
+
+    //////////////////////////////////////////////////
+    // FINAL SYNC
+    //////////////////////////////////////////////////
+
+    onSuccess: (data) => {
+      queryClient.setQueryData(
+        queryKeys.mods.detail(
+          slug
+        ),
+
+        (old: any) => {
+          if (!old) return old;
+
+          return {
+            ...old,
+
+            interactions: {
+              ...old.interactions,
+
+              liked:
+                data.liked,
+            },
+
+            stats: {
+              ...old.stats,
+
+              likes:
+                data.likesCount,
+            },
+          };
+        }
+      );
+    },
+  });
+}
+
+//////////////////////////////////////////////////////
+// FAVORITE
+//////////////////////////////////////////////////////
+
+export function useToggleFavorite(
+  modId: number,
+  slug: string
+) {
+  const queryClient =
+    useQueryClient();
+
+  return useMutation({
+    mutationFn: () =>
+      toggleFavorite(modId),
+
+    //////////////////////////////////////////////////
+    // OPTIMISTIC
+    //////////////////////////////////////////////////
+
+    onMutate: async () => {
+      const detailKey =
+        queryKeys.mods.detail(
+          slug
+        );
+
+      await queryClient.cancelQueries({
+        queryKey: detailKey,
+      });
+
+      const previous =
+        queryClient.getQueryData<any>(
+          detailKey
+        );
+
+      queryClient.setQueryData(
+        detailKey,
+        (old: any) => {
+          if (!old) return old;
+
+          const favorited =
+            !old.interactions
+              ?.favorited;
+
+          return {
+            ...old,
+
+            interactions: {
+              ...old.interactions,
+
+              favorited,
+            },
+
+            stats: {
+              ...old.stats,
+
+              favorites:
+                favorited
+                  ? old.stats
+                      .favorites +
+                    1
+                  : Math.max(
+                      0,
+                      old.stats
+                        .favorites -
+                        1
+                    ),
+            },
+          };
+        }
+      );
+
+      return { previous };
+    },
+
+    //////////////////////////////////////////////////
+    // ROLLBACK
+    //////////////////////////////////////////////////
+
+    onError: (
+      _err,
+      _vars,
+      context
+    ) => {
+      queryClient.setQueryData(
+        queryKeys.mods.detail(
+          slug
+        ),
+
+        context?.previous
+      );
+    },
+
+    //////////////////////////////////////////////////
+    // FINAL SYNC
+    //////////////////////////////////////////////////
+
+    onSuccess: (data) => {
+      queryClient.setQueryData(
+        queryKeys.mods.detail(
+          slug
+        ),
+
+        (old: any) => {
+          if (!old) return old;
+
+          return {
+            ...old,
+
+            interactions: {
+              ...old.interactions,
+
+              favorited:
+                data.favorited,
+            },
+
+            stats: {
+              ...old.stats,
+
+              favorites:
+                data.favoritesCount,
+            },
+          };
+        }
+      );
+    },
+  });
+}
+---
+types.ts
+export interface ModInteractions {
+  liked: boolean;
+  favorited: boolean;
+
+  likesCount: number;
+  favoritesCount: number;
+}
+---
+feactures/interactions/components/
+LikeButton.tsx
+import { Heart } from "lucide-react";
+
+import {
+  useInteractions,
+  useToggleLike,
+} from "../hooks";
+
+import styles from "./LikeButton.module.css";
+
+type Props = {
+  modId: number;
+  slug: string;
+};
+
+export default function LikeButton({
+  modId,
+  slug,
+}: Props) {
+  const { data } =
+    useInteractions(modId);
+
+  const mutation =
+    useToggleLike(
+      modId,
+      slug
+    );
+
+  const liked =
+    data?.liked || false;
+
+  const likes =
+    data?.likesCount || 0;
+
+  return (
+    <button
+      className={`${styles.button} ${
+        liked ? styles.active : ""
+      }`}
+      onClick={() =>
+        mutation.mutate()
+      }
+      disabled={
+        mutation.isPending
+      }
+    >
+      <Heart size={16} />
+
+      <span>{likes}</span>
+    </button>
+  );
+}
+---
+FavoriteButton.tsx
+import { Star } from "lucide-react";
+
+import {
+  useInteractions,
+  useToggleFavorite,
+} from "../hooks";
+
+import styles from "./FavoriteButton.module.css";
+
+type Props = {
+  modId: number;
+  slug: string;
+};
+
+export default function FavoriteButton({
+  modId,
+  slug,
+}: Props) {
+  const { data } =
+    useInteractions(modId);
+
+  const mutation =
+    useToggleFavorite(
+      modId,
+      slug
+    );
+
+  const favorited =
+    data?.favorited || false;
+
+  const favorites =
+    data?.favoritesCount || 0;
+
+  return (
+    <button
+      className={`${styles.button} ${
+        favorited
+          ? styles.active
+          : ""
+      }`}
+      onClick={() =>
+        mutation.mutate()
+      }
+      disabled={
+        mutation.isPending
+      }
+    >
+      <Star size={16} />
+
+      <span>{favorites}</span>
+    </button>
+  );
+}
+---
+LikeButton.module.css
+.button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  border: none;
+
+  background: #1f1f1f;
+
+  color: #d0d0d0;
+
+  padding: 10px 14px;
+
+  border-radius: 12px;
+
+  cursor: pointer;
+
+  transition:
+    transform 0.15s ease,
+    background 0.2s ease,
+    color 0.2s ease;
+
+  font-weight: 600;
+}
+
+.button:hover {
+  background: #2b2b2b;
+
+  transform: translateY(-1px);
+}
+
+.button:active {
+  transform: scale(0.96);
+}
+
+.active {
+  background: rgba(255, 70, 70, 0.15);
+
+  color: #ff6b6b;
+}
+
+.button:disabled {
+  opacity: 0.7;
+
+  cursor: default;
+}
+---
+favoriteButton.module.css
+.button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  border: none;
+
+  background: #1f1f1f;
+
+  color: #d0d0d0;
+
+  padding: 10px 14px;
+
+  border-radius: 12px;
+
+  cursor: pointer;
+
+  transition:
+    transform 0.15s ease,
+    background 0.2s ease,
+    color 0.2s ease;
+
+  font-weight: 600;
+}
+
+.button:hover {
+  background: #2b2b2b;
+
+  transform: translateY(-1px);
+}
+
+.button:active {
+  transform: scale(0.96);
+}
+
+.active {
+  background: rgba(255, 210, 70, 0.15);
+
+  color: #ffd43b;
+}
+
+.button:disabled {
+  opacity: 0.7;
+
+  cursor: default;
+}
+---
+feactures/like/
+api.ts
+const API = "http://192.168.0.110:3000";
+
+export async function toggleLike(modId: number, token: string) {
+  const res = await fetch(`${API}/mods/${modId}/like`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) throw new Error("Like error");
+
+  return res.json();
+}
+
+export async function getLiked(modId: number, token: string) {
+  const res = await fetch(`${API}/mods/${modId}/like`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return res.json();
+}
+---
+hooks.ts
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { toggleLike, getLiked } from "./api";
+
+export function useLiked(modId: number, token: string | null) {
+  return useQuery({
+    queryKey: ["liked", modId],
+    queryFn: () => getLiked(modId, token!),
+    enabled: !!token,
+  });
+}
+
+export function useToggleLike(modId: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ token }: { token: string }) =>
+      toggleLike(modId, token),
+
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["mod"] });
+
+      const previous = queryClient.getQueryData<any>(["mod"]);
+
+      // 🔥 optimistic update
+      queryClient.setQueryData(["mod"], (old: any) => {
+        if (!old) return old;
+
+        return {
+          ...old,
+          likesCount: old.likesCount + 1,
+        };
+      });
+
+      return { previous };
+    },
+
+    onError: (_err, _vars, context) => {
+      queryClient.setQueryData(["mod"], context?.previous);
+    },
+
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["mod"] });
+      queryClient.invalidateQueries({ queryKey: ["liked"] });
+    },
+  });
+}
+---
+feactures/like/components/
+LikeButton.tsx
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import likeColor from "@/assets/icons/likecolor.png";
+import like from "@/assets/icons/like.png";
+
+type Props = {
+  modId: number;
+  initialCount: number;
+};
+
+export default function LikeButton({ modId, initialCount }: Props) {
+  const token = localStorage.getItem("token");
+  const queryClient = useQueryClient();
+
+  // 🧠 estado real desde backend
+  const { data } = useQuery({
+    queryKey: ["like", modId],
+    queryFn: async () => {
+      const res = await fetch(`http://192.168.0.110:3000/mods/${modId}/like`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) return { liked: false };
+
+      return res.json();
+    },
+    enabled: !!token,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  // 🧠 contador desde cache global
+  const mod = queryClient.getQueryData<any>(["mod", modId]);
+  const count = mod?.likesCount ?? initialCount;
+
+  // 🔁 toggle
+  const mutation = useMutation({
+    mutationFn: async () => {
+      await fetch(`http://192.168.0.110:3000/mods/${modId}/like`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+    },
+
+    onMutate: () => {
+      const prevLiked = data?.liked;
+
+      // ⚡ estado instantáneo
+      queryClient.setQueryData(["like", modId], {
+        liked: !prevLiked,
+      });
+
+      // ⚡ contador instantáneo
+      queryClient.setQueryData(["mod", modId], (old: any) => {
+        if (!old) return old;
+
+        return {
+          ...old,
+          likesCount: prevLiked
+            ? old.likesCount - 1
+            : old.likesCount + 1,
+        };
+      });
+    },
+
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["like", modId] });
+      queryClient.invalidateQueries({ queryKey: ["mod", modId] });
+    },
+  });
+
+  const handleClick = () => {
+    if (!token) {
+      alert("Logueate");
+      return;
+    }
+
+    mutation.mutate();
+  };
+
+  const liked = data?.liked ?? false;
+
+  return (
+    <button onClick={handleClick}>
+      <img
+        src={liked ? likeColor : like}
+        width={20}
+      />
+      {" "}
+      {count}
+    </button>
+  );
+}
+---
+feactures/mods/
+api.ts
+import { apiFetch } from "@/shared/api/client";
+
+//////////////////////////////////////////////////////
+// TYPES
+//////////////////////////////////////////////////////
+
+export type GetModsParams = {
+  page?: number;
+
+  limit?: number;
+
+  query?: string;
+
+  platform?: string;
+
+  loader?: string;
+
+  sort?: string;
+};
+
+//////////////////////////////////////////////////////
+// GET MODS
+//////////////////////////////////////////////////////
+
+export function getMods(
+  params?: GetModsParams
+) {
+  const search =
+    new URLSearchParams();
+
+  //////////////////////////////////////////////////
+  // PAGINATION
+  //////////////////////////////////////////////////
+
+  search.set(
+    "page",
+    String(params?.page || 1)
+  );
+
+  if (params?.limit) {
+    search.set(
+      "limit",
+      String(params.limit)
+    );
+  }
+
+  //////////////////////////////////////////////////
+  // SEARCH
+  //////////////////////////////////////////////////
+
+  if (params?.query) {
+    search.set(
+      "query",
+      params.query
+    );
+  }
+
+  //////////////////////////////////////////////////
+  // FILTERS
+  //////////////////////////////////////////////////
+
+  if (params?.platform) {
+    search.set(
+      "platform",
+      params.platform
+    );
+  }
+
+  if (params?.loader) {
+    search.set(
+      "loader",
+      params.loader
+    );
+  }
+
+  //////////////////////////////////////////////////
+  // SORT
+  //////////////////////////////////////////////////
+
+  if (params?.sort) {
+    search.set(
+      "sort",
+      params.sort
+    );
+  }
+
+  return apiFetch(
+    `/mods?${search.toString()}`
+  );
+}
+
+//////////////////////////////////////////////////////
+// GET MOD
+//////////////////////////////////////////////////////
+
+export function getMod(
+  slug: string
+) {
+  return apiFetch(
+    `/mods/${slug}`
+  );
+}
+
+//////////////////////////////////////////////////////
+// CREATE MOD
+//////////////////////////////////////////////////////
+
+export async function createMod(
+  formData: FormData
+) {
+  const token =
+    localStorage.getItem("token");
+
+  const res = await fetch(
+    `${
+      import.meta.env
+        .VITE_API_URL
+    }/mods`,
+    {
+      method: "POST",
+
+      body: formData,
+
+      headers: {
+        ...(token
+          ? {
+              Authorization: `Bearer ${token}`,
+            }
+          : {}),
+      },
+    }
+  );
+
+  const data = await res
+    .json()
+    .catch(() => null);
+
+  if (!res.ok) {
+    throw new Error(
+      data?.error ||
+        "Error creando mod"
+    );
+  }
+
+  return data;
+}
+---
+hooks.ts
+import { useQuery } from "@tanstack/react-query";
+
+import {
+  getMod,
+  getMods,
+  type GetModsParams,
+} from "./api";
+
+import { queryKeys } from "@/shared/lib/queryKeys";
+
+//////////////////////////////////////////////////////
+// MODS LIST
+//////////////////////////////////////////////////////
+
+export function useMods(
+  params?: GetModsParams
+) {
+  return useQuery({
+    queryKey:
+      queryKeys.mods.list(
+        params
+      ),
+
+    queryFn: () =>
+      getMods(params),
+  });
+}
+
+//////////////////////////////////////////////////////
+// MOD DETAIL
+//////////////////////////////////////////////////////
+
+export function useMod(
+  slug: string
+) {
+  return useQuery({
+    queryKey:
+      queryKeys.mods.detail(
+        slug
+      ),
+
+    queryFn: () =>
+      getMod(slug),
+
+    staleTime:
+      1000 * 60 * 2,
+  });
+}
+---
+feactures/mods/page/
+ModPage.tsx
+import { useParams } from "react-router-dom";
+import { useMod } from "../hooks";
+
+import ModHeader from "@/widgets/ModHeader";
+import ModGallery from "@/widgets/ModGallery";
+import VersionsTable from "@/widgets/VersionsTable";
+import { useVersions } from "@/features/upload-version/hooks";
+import UploadVersionForm from "@/features/upload-version/components/UploadVersionForm";
+
+import Skeleton from "@/shared/ui/Skeleton";
+import ErrorState from "@/shared/ui/ErrorState";
+
+import { useAuth } from "@/context/AuthContext";
+
+export default function ModPage() {
+  const { slug } = useParams();
+  const { user } = useAuth();
+
+  const { data, isLoading, error } = useMod(slug!);
+  console.log("MOD DATA:", data);
+
+  const { data: versions } =
+    useVersions(data?.id || "");
+
+  if (isLoading)
+    return (
+      <div style={{ padding: 20 }}>
+        <Skeleton height={40} />
+        <Skeleton height={200} />
+        <Skeleton height={100} />
+      </div>
+    );
+
+  if (error) return <ErrorState message="No se pudo cargar el mod" />;
+  if (!data) return <div>Mod no encontrado</div>;
+
+  const isOwner = user?.id === data.authorId;
+
+  return (
+    <div style={{ maxWidth: 1100, margin: "0 auto", padding: 20 }}>
+      <ModHeader mod={data} />
+
+      <div style={{ marginTop: 20 }}>
+        <ModGallery images={data.images} />
+      </div>
+
+      <div style={{ marginTop: 20 }}>
+        <p>{data.description}</p>
+      </div>
+
+      {data.content && (
+        <div style={{ marginTop: 20 }}>
+          <div dangerouslySetInnerHTML={{ __html: data.content }} />
+        </div>
+      )}
+
+      <div style={{ marginTop: 30 }}>
+      <VersionsTable
+        versions={versions || []}
+        modId={data.id}
+        isOwner={isOwner}
+      />
+      </div>
+      
+      {isOwner && (
+        <div style={{ marginTop: 40 }}>
+          <h2>Subir nueva versión</h2>
+          {data?.id && <UploadVersionForm modId={data.id} />}
+        </div>
+      )}
+    </div>
+  );
+}
+---
+feactures/search/
+SearchBar.tsx
+import {
+  useEffect,
+  useState,
+} from "react";
+
+import {
+  useSearchParams,
+} from "react-router-dom";
+
+import styles from "./SearchBar.module.css";
+
+export default function SearchBar() {
+  const [params, setParams] =
+    useSearchParams();
+
+  const [value, setValue] =
+    useState(
+      params.get("q") || ""
+    );
+
+  //////////////////////////////////////////////////
+  // DEBOUNCE
+  //////////////////////////////////////////////////
+
+  useEffect(() => {
+    const timeout =
+      setTimeout(() => {
+        const next =
+          new URLSearchParams(
+            params
+          );
+
+        if (value) {
+          next.set("q", value);
+        } else {
+          next.delete("q");
+        }
+
+        setParams(next);
+      }, 400);
+
+    return () =>
+      clearTimeout(timeout);
+  }, [value]);
+
+  return (
+    <input
+      value={value}
+      onChange={(e) =>
+        setValue(
+          e.target.value
+        )
+      }
+      placeholder="Search mods..."
+      className={styles.input}
+    />
+  );
+}
+---
+SearchBar.module.css
+.input {
+  width: 100%;
+
+  height: 52px;
+
+  border: 1px solid #2f2f2f;
+
+  background: #161616;
+
+  border-radius: 14px;
+
+  padding: 0 18px;
+
+  color: white;
+
+  font-size: 16px;
+
+  outline: none;
+
+  transition: 0.2s;
+}
+
+.input:focus {
+  border-color: #4d7cff;
+
+  box-shadow:
+    0 0 0 4px
+    rgba(77, 124, 255, 0.15);
+}
+---
+feactures/search/components/
+SearchControls.tsx
+import SearchInput from "./SearchInput";
+
+import SearchTypeFilter from "./SearchTypeFilter";
+
+import {
+  JAVA_TYPES,
+  JAVA_CATEGORIES,
+} from "../config/javaFilters";
+
+import {
+  BEDROCK_TYPES,
+  BEDROCK_CATEGORIES,
+} from "../config/bedrockFilters";
+
+import { useSearchFilters } from "../hooks/useSearchFilters";
+
+import styles from "./SearchControls.module.css";
+
+type Props = {
+  platform:
+    | "JAVA"
+    | "BEDROCK";
+};
+
+export default function SearchControls({
+  platform,
+}: Props) {
+  //////////////////////////////////////////////////
+  // FILTER STATE
+  //////////////////////////////////////////////////
+
+  const {
+    query,
+    type,
+    category,
+    setFilter,
+  } = useSearchFilters();
+
+  //////////////////////////////////////////////////
+  // CONFIG
+  //////////////////////////////////////////////////
+
+  const isJava =
+    platform ===
+    "JAVA";
+
+  const types = isJava
+    ? JAVA_TYPES
+    : BEDROCK_TYPES;
+
+  const categories = isJava
+    ? JAVA_CATEGORIES[type] || []
+    : BEDROCK_CATEGORIES[type] ||
+      [];
+
+  //////////////////////////////////////////////////
+  // RENDER
+  //////////////////////////////////////////////////
+
+  return (
+    <div className={styles.wrapper}>
+      {/* SEARCH */}
+
+      <SearchInput
+        value={query}
+        onChange={(v) =>
+          setFilter(
+            "query",
+            v
+          )
+        }
+      />
+
+      {/* TYPE */}
+
+      <div className={styles.section}>
+        <h3>Type</h3>
+
+        <SearchTypeFilter
+          options={types}
+          value={type}
+          onChange={(v) =>
+            setFilter(
+              "type",
+              v
+            )
+          }
+        />
+      </div>
+
+      {/* CATEGORY */}
+
+      {!!categories.length && (
+        <div
+          className={styles.section}
+        >
+          <h3>
+            Categories
+          </h3>
+
+          <SearchTypeFilter
+            options={categories}
+            value={category}
+            onChange={(v) =>
+              setFilter(
+                "category",
+                v
+              )
+            }
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+---
+SearchControll.module.css
+.wrapper {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 16px;
+
+  margin-bottom: 32px;
+}
+
+.filters {
+  display: flex;
+
+  gap: 12px;
+
+  flex-wrap: wrap;
+}
+---
+searchInput.tsx
+import styles from "./SearchInput.module.css";
+
+type Props = {
+  value: string;
+
+  onChange: (
+    value: string
+  ) => void;
+};
+
+export default function SearchInput({
+  value,
+  onChange,
+}: Props) {
+  return (
+    <input
+      className={styles.input}
+      type="text"
+      placeholder="Search mods..."
+      value={value}
+      onChange={(e) =>
+        onChange(e.target.value)
+      }
+    />
+  );
+}
+---
+SearchInput.module.css
+.input {
+  width: 100%;
+
+  height: 48px;
+
+  border: 1px solid #2f2f2f;
+
+  background: #151515;
+
+  color: white;
+
+  border-radius: 12px;
+
+  padding: 0 16px;
+
+  font-size: 15px;
+
+  transition: 0.2s;
+}
+
+.input:focus {
+  outline: none;
+
+  border-color: #4ade80;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(74, 222, 128, 0.15);
+}
+---
+SearchTypeFilter.tsx
+import styles from "./Filter.module.css";
+
+type Props = {
+  options: string[];
+
+  value: string;
+
+  onChange: (
+    value: string
+  ) => void;
+};
+
+export default function SearchTypeFilter({
+  options,
+  value,
+  onChange,
+}: Props) {
+  return (
+    <div className={styles.group}>
+      {options.map((type) => (
+        <label key={type}>
+          <input
+            type="checkbox"
+            checked={value === type}
+            onChange={() =>
+              onChange(type)
+            }
+          />
+
+          {type || "all"}
+        </label>
+      ))}
+    </div>
+  );
+}
+---
+feactures/search/config/
+bedrockFilter.ts
+export const BEDROCK_TYPES =
+  [
+    "all",
+    "addon",
+    "map",
+    "texture",
+    "script",
+  ];
+
+export const BEDROCK_CATEGORIES: Record<
+  string,
+  string[]
+> = {
+  all: [],
+
+  addon: [
+    "weapons",
+    "armor",
+    "magic",
+    "technology",
+    "survival",
+  ],
+
+  map: [
+    "adventure",
+    "parkour",
+    "puzzle",
+    "survival",
+  ],
+
+  texture: [
+    "realistic",
+    "pvp",
+    "shader",
+    "x16",
+    "x32",
+    "x64",
+  ],
+
+  script: [],
+};
+---
+javaFilter.ts
+export const JAVA_TYPES = [
+  "all",
+  "plugin",
+  "addon",
+  "mod",
+  "modpack",
+  "datapack",
+  "shader",
+  "resourcepack",
+  "world",
+];
+
+export const JAVA_CATEGORIES: Record<
+  string,
+  string[]
+> = {
+  all: [],
+
+  plugin: [
+    "admin tools",
+    "anti griefing",
+    "chat",
+    "economy",
+    "fun",
+    "teleport",
+  ],
+
+  mod: [
+    "adventure rpg",
+    "api",
+    "armor",
+    "technology",
+    "magic",
+    "performance",
+    "world gen",
+  ],
+
+  shader: [
+    "fantasy",
+    "realistic",
+    "vanilla",
+  ],
+
+  modpack: [
+    "adventure rpg",
+    "expert",
+    "skyblock",
+    "tech",
+  ],
+};
+---
+searchConfig.ts
+export const JAVA_TYPES = [
+  "all",
+  "bukkit-plugin",
+  "addon",
+  "mod",
+  "modpack",
+  "data-pack",
+  "shader",
+  "resource-pack",
+  "world",
+];
+
+export const BEDROCK_TYPES = [
+  "all",
+  "addon",
+  "map",
+  "texture",
+  "script",
+];
+
+//////////////////////////////////////////////////////
+// JAVA CATEGORIES
+//////////////////////////////////////////////////////
+
+export const JAVA_CATEGORIES: Record<
+  string,
+  string[]
+> = {
+  all: [],
+
+  "bukkit-plugin": [
+    "admin tools",
+    "anti-griefing tools",
+    "chat related",
+    "developer tools",
+    "economy",
+    "fixes",
+    "fun",
+    "information",
+    "mechanics",
+    "miscellaneous",
+    "roleplay",
+    "teleport",
+    "website administration",
+    "world generator",
+  ],
+
+  world: [
+    "adventure",
+    "creation",
+    "mini game",
+    "parkour",
+    "puzzle",
+    "survival",
+    "roleplay",
+    "modded world",
+  ],
+
+  "resource-pack": [
+    "x512",
+    "x256",
+    "x128",
+    "x64",
+    "x32",
+    "x16",
+    "x8",
+    "animated",
+    "font pack",
+    "medieval",
+    "miscellaneous",
+    "mod support",
+    "modern",
+    "traditional",
+  ],
+
+  "data-pack": [
+    "adventure",
+    "fantasy",
+    "library",
+    "magic",
+    "miscellaneous",
+    "mod support",
+    "tech",
+    "utility",
+  ],
+
+  addon: [
+    "resource pack",
+    "scenarios",
+    "world",
+  ],
+
+  mod: [
+    "addon",
+    "adventure rpg",
+    "api",
+    "armor",
+    "tools",
+    "weapons",
+    "bug fixes",
+    "cosmetic",
+    "creative mode",
+    "education",
+    "food",
+    "horror",
+    "magic",
+    "map",
+    "mcreator",
+    "miscellaneous",
+    "performance",
+    "redstone",
+    "server utility",
+    "storage",
+    "technology",
+    "world gen",
+  ],
+
+  modpack: [
+    "adventure rpg",
+    "combat",
+    "expert",
+    "exploration",
+    "extra large",
+    "hardcore",
+    "horror",
+    "magic",
+    "map based",
+    "mini game",
+    "multiplayer",
+    "skyblock",
+    "tech",
+    "vanilla+",
+  ],
+
+  shader: [
+    "fantasy",
+    "realistic",
+    "vanilla",
+  ],
+};
+
+//////////////////////////////////////////////////////
+// BEDROCK CATEGORIES
+//////////////////////////////////////////////////////
+
+export const BEDROCK_CATEGORIES: Record<
+  string,
+  string[]
+> = {
+  all: [],
+
+  addon: [
+    "weapons",
+    "armor",
+    "tools",
+    "cosmetics",
+    "horror",
+    "fantasy",
+    "food",
+    "magic",
+    "creation addon",
+    "creations",
+    "multiplayer",
+    "roleplay",
+    "performance",
+    "skins",
+    "survival",
+    "technology",
+    "utility",
+    "vanilla+",
+  ],
+
+  map: [
+    "adventure",
+    "creation",
+    "custom terrain",
+    "minigame",
+    "parkour",
+    "puzzle",
+    "pvp",
+    "redstone",
+    "survival",
+    "roleplay",
+  ],
+
+  texture: [
+    "gui",
+    "miscellaneous",
+    "pvp",
+    "realistic",
+    "shader",
+    "simplistic",
+    "themed",
+    "x128",
+    "x64",
+    "x32",
+    "x16",
+  ],
+
+  script: [],
+};
+
+//////////////////////////////////////////////////////
+// JAVA LOADERS
+//////////////////////////////////////////////////////
+
+export const JAVA_LOADERS = [
+  "forge",
+  "neoforge",
+  "fabric",
+  "quilt",
+];
+---
+feactures/search/data/
+searchConfig.ts
+export const JAVA_TYPES = [
+  "mod",
+  "modpack",
+  "plugin",
+  "shader",
+  "resourcepack",
+  "datapack",
+  "world",
+];
+
+export const BEDROCK_TYPES = [
+  "addon",
+  "map",
+  "texture",
+  "script",
+];
+
+//////////////////////////////////////////////////
+// JAVA CATEGORIES
+//////////////////////////////////////////////////
+
+export const JAVA_CATEGORIES: Record<
+  string,
+  string[]
+> = {
+  mod: [
+    "adventure-rpg",
+    "api",
+    "armor-tools-weapons",
+    "bug-fixes",
+    "cosmetic",
+    "creative",
+    "education",
+    "food",
+    "horror",
+    "magic",
+    "map",
+    "mcreator",
+    "miscellaneous",
+    "performance",
+    "redstone",
+    "server-utility",
+    "storage",
+    "technology",
+    "worldgen",
+  ],
+
+  modpack: [
+    "adventure-rpg",
+    "combat",
+    "expert",
+    "exploration",
+    "extra-large",
+    "hardcore",
+    "horror",
+    "magic",
+    "map-based",
+    "minigame",
+    "multiplayer",
+    "skyblock",
+    "tech",
+    "vanilla-plus",
+  ],
+
+  plugin: [
+    "admin-tools",
+    "anti-griefing",
+    "chat",
+    "developer-tools",
+    "economy",
+    "fun",
+    "information",
+    "mechanics",
+    "miscellaneous",
+    "roleplay",
+    "teleport",
+    "website-administration",
+    "world-generator",
+  ],
+
+  shader: [
+    "fantasy",
+    "realistic",
+    "vanilla",
+  ],
+
+  resourcepack: [
+    "x512",
+    "x256",
+    "x128",
+    "x64",
+    "x32",
+    "x16",
+    "x8",
+    "animated",
+    "font-pack",
+    "medieval",
+    "miscellaneous",
+    "mod-support",
+    "modern",
+    "traditional",
+  ],
+
+  datapack: [
+    "adventure",
+    "fantasy",
+    "library",
+    "magic",
+    "miscellaneous",
+    "mod-support",
+    "tech",
+    "utility",
+  ],
+
+  world: [
+    "adventure",
+    "creation",
+    "minigame",
+    "parkour",
+    "puzzle",
+    "survival",
+    "roleplay",
+    "modded-world",
+  ],
+};
+
+//////////////////////////////////////////////////
+// BEDROCK CATEGORIES
+//////////////////////////////////////////////////
+
+export const BEDROCK_CATEGORIES: Record<
+  string,
+  string[]
+> = {
+  addon: [
+    "weapons",
+    "armor",
+    "tools",
+    "cosmetics",
+    "horror",
+    "fantasy",
+    "food",
+    "magic",
+    "building",
+    "multiplayer",
+    "roleplay",
+    "performance",
+    "skins",
+    "survival",
+    "technology",
+    "utility",
+    "vanilla-plus",
+  ],
+
+  map: [
+    "adventure",
+    "creation",
+    "custom-terrain",
+    "minigame",
+    "parkour",
+    "puzzle",
+    "pvp",
+    "redstone",
+    "survival",
+    "roleplay",
+  ],
+
+  texture: [
+    "gui",
+    "miscellaneous",
+    "pvp",
+    "realistic",
+    "shader",
+    "simplistic",
+    "themed",
+    "x128",
+    "x64",
+    "x32",
+    "x16",
+  ],
+
+  script: [],
+};
+
+//////////////////////////////////////////////////
+// LOADERS
+//////////////////////////////////////////////////
+
+export const JAVA_LOADERS = [
+  "forge",
+  "neoforge",
+  "fabric",
+  "quilt",
+];
+
+//////////////////////////////////////////////////
+// VERSIONS
+//////////////////////////////////////////////////
+
+export const JAVA_VERSIONS = [
+  "1.21.5",
+  "1.21.4",
+  "1.21.1",
+  "1.20.6",
+  "1.20.4",
+  "1.20.1",
+  "1.19.4",
+  "1.19.2",
+  "1.18.2",
+  "1.16.5",
+  "1.12.2",
+];
+
+//////////////////////////////////////////////////
+// LABEL FORMATTER
+//////////////////////////////////////////////////
+
+export function formatLabel(
+  value: string
+) {
+  return value
+    .replaceAll("-", " ")
+    .replace(
+      /\b\w/g,
+      (l) => l.toUpperCase()
+    );
+}
+---
+feactures/search/hooks/
+useSearchFilter.ts
+import {
+  useSearchParams,
+} from "react-router-dom";
+
+export function useSearchFilters() {
+  const [
+    params,
+    setParams,
+  ] = useSearchParams();
+
+  function setFilter(
+    key: string,
+    value: string
+  ) {
+    const next =
+      new URLSearchParams(
+        params
+      );
+
+    if (!value || value === "all") {
+      next.delete(key);
+    } else {
+      next.set(key, value);
+    }
+
+    setParams(next);
+  }
+
+  return {
+    query:
+      params.get("query") || "",
+
+    type:
+      params.get("type") || "all",
+
+    category:
+      params.get("category") ||
+      "",
+
+    loader:
+      params.get("loader") || "",
+
+    version:
+      params.get("version") ||
+      "",
+
+    sort:
+      params.get("sort") ||
+      "newest",
+
+    setFilter,
+  };
+}
+---
+feactures/search/lib/
+useDebounce.ts
+import {
+  useEffect,
+  useState,
+} from "react";
+
+export function useDebounce<T>(
+  value: T,
+  delay = 400
+) {
+  const [debounced, setDebounced] =
+    useState(value);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebounced(value);
+    }, delay);
+
+    return () =>
+      clearTimeout(timer);
+  }, [value, delay]);
+
+  return debounced;
+}
+---
+feactures/upload-version/
+hooks.ts
+import { useMutation, useQuery, } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  createVersion,
+  uploadFileR2,
+  getVersions,
+  deleteVersion,
+  updateVersion,
+} from "@/features/versions/api";
+
+////////////////////////////////////////////////////////
+// CREATE VERSION
+////////////////////////////////////////////////////////
+
+export function useCreateVersion() {
+  const queryClient =
+    useQueryClient();
+
+  return useMutation({
+    mutationFn: createVersion,
+
+    ////////////////////////////////////////////////////
+    // OPTIMISTIC UPDATE
+    ////////////////////////////////////////////////////
+
+    onMutate: async (
+      newVersion
+    ) => {
+      const queryKey = [
+        "mod",
+        newVersion.modId,
+        "versions",
+      ];
+
+      //////////////////////////////////////////////////
+      // CANCEL REFETCHES
+      //////////////////////////////////////////////////
+
+      await queryClient.cancelQueries(
+        {
+          queryKey,
+        }
+      );
+
+      //////////////////////////////////////////////////
+      // PREVIOUS DATA
+      //////////////////////////////////////////////////
+
+      const previousVersions =
+        queryClient.getQueryData(
+          queryKey
+        );
+
+      //////////////////////////////////////////////////
+      // OPTIMISTIC VERSION
+      //////////////////////////////////////////////////
+
+      const optimisticVersion = {
+        id:
+          "temp-" +
+          Date.now(),
+
+        version:
+          newVersion.version,
+
+        minecraftVersion:
+          newVersion.minecraftVersion,
+
+        loader:
+          newVersion.loader,
+
+        createdAt:
+          new Date().toISOString(),
+
+        downloads: 0,
+
+        files: [],
+      };
+
+      //////////////////////////////////////////////////
+      // UPDATE CACHE
+      //////////////////////////////////////////////////
+
+      queryClient.setQueryData(
+        queryKey,
+        (
+          old: any[] = []
+        ) => [
+          optimisticVersion,
+          ...old,
+        ]
+      );
+
+      //////////////////////////////////////////////////
+      // CONTEXT
+      //////////////////////////////////////////////////
+
+      return {
+        previousVersions,
+      };
+    },
+
+    ////////////////////////////////////////////////////
+    // ROLLBACK
+    ////////////////////////////////////////////////////
+
+    onError: (
+      _err,
+      variables,
+      context
+    ) => {
+      queryClient.setQueryData(
+        [
+          "mod",
+          variables.modId,
+          "versions",
+        ],
+
+        context?.previousVersions
+      );
+    },
+
+    ////////////////////////////////////////////////////
+    // REFETCH REAL DATA
+    ////////////////////////////////////////////////////
+
+    onSettled: (
+      _data,
+      _error,
+      variables
+    ) => {
+      queryClient.invalidateQueries(
+        {
+          queryKey: [
+            "mod",
+            variables.modId,
+            "versions",
+          ],
+        }
+      );
+    },
+  });
+}
+
+////////////////////////////////////////////////////////
+// DELETE VERSION
+////////////////////////////////////////////////////////
+
+export function useDeleteVersion(
+  modId: string | number
+) {
+  const queryClient =
+    useQueryClient();
+
+  return useMutation({
+    mutationFn: deleteVersion,
+
+    ////////////////////////////////////////////////////
+    // OPTIMISTIC DELETE
+    ////////////////////////////////////////////////////
+
+    onMutate: async (
+      versionId
+    ) => {
+      const queryKey = [
+        "mod",
+        modId,
+        "versions",
+      ];
+
+      await queryClient.cancelQueries(
+        {
+          queryKey,
+        }
+      );
+
+      const previousVersions =
+        queryClient.getQueryData<
+          any[]
+        >(queryKey);
+
+      queryClient.setQueryData(
+        queryKey,
+
+        (
+          old: any[] = []
+        ) =>
+          old.filter(
+            (v) =>
+              v.id !== versionId
+          )
+      );
+
+      return {
+        previousVersions,
+      };
+    },
+
+    ////////////////////////////////////////////////////
+    // ROLLBACK
+    ////////////////////////////////////////////////////
+
+    onError: (
+      _err,
+      _variables,
+      context
+    ) => {
+      queryClient.setQueryData(
+        [
+          "mod",
+          modId,
+          "versions",
+        ],
+
+        context?.previousVersions
+      );
+    },
+
+    ////////////////////////////////////////////////////
+    // SYNC
+    ////////////////////////////////////////////////////
+
+    onSettled: () => {
+      queryClient.invalidateQueries(
+        {
+          queryKey: [
+            "mod",
+            modId,
+            "versions",
+          ],
+        }
+      );
+    },
+  });
+}
+
+////////////////////////////////////////////////////////
+// UPDATE VERSION
+////////////////////////////////////////////////////////
+
+export function useUpdateVersion(
+  modId: string | number
+) {
+  const queryClient =
+    useQueryClient();
+
+  return useMutation({
+    mutationFn: updateVersion,
+
+    ////////////////////////////////////////////////////
+    // OPTIMISTIC UPDATE
+    ////////////////////////////////////////////////////
+
+    onMutate: async (
+      updated
+    ) => {
+      const queryKey = [
+        "mod",
+        modId,
+        "versions",
+      ];
+
+      await queryClient.cancelQueries(
+        {
+          queryKey,
+        }
+      );
+
+      const previousVersions =
+        queryClient.getQueryData<
+          any[]
+        >(queryKey);
+
+      queryClient.setQueryData(
+        queryKey,
+
+        (
+          old: any[] = []
+        ) =>
+          old.map((v) =>
+            v.id ===
+            updated.versionId
+              ? {
+                  ...v,
+                  version:
+                    updated.version,
+                }
+              : v
+          )
+      );
+
+      return {
+        previousVersions,
+      };
+    },
+
+    ////////////////////////////////////////////////////
+    // ROLLBACK
+    ////////////////////////////////////////////////////
+
+    onError: (
+      _err,
+      _variables,
+      context
+    ) => {
+      queryClient.setQueryData(
+        [
+          "mod",
+          modId,
+          "versions",
+        ],
+
+        context?.previousVersions
+      );
+    },
+
+    ////////////////////////////////////////////////////
+    // SYNC
+    ////////////////////////////////////////////////////
+
+    onSettled: () => {
+      queryClient.invalidateQueries(
+        {
+          queryKey: [
+            "mod",
+            modId,
+            "versions",
+          ],
+        }
+      );
+    },
+  });
+}
+
+////////////////////////////////////////////////////////
+// UPLOAD FILE
+////////////////////////////////////////////////////////
+
+export function useUploadFile() {
+  return useMutation({
+    mutationFn: (data: {
+      versionId: number;
+      
+      file: File;
+
+      onProgress?: (
+        progress: number
+      ) => void;
+    }) => uploadFileR2(data),
+  });
+}
+
+////////////////////////////////////////////////////////
+// GET VERSIONS
+////////////////////////////////////////////////////////
+
+export function useVersions(
+  modId: string | number
+) {
+  return useQuery({
+    queryKey: [
+      "mod",
+      modId,
+      "versions",
+    ],
+
+    queryFn: () =>
+      getVersions(modId),
+
+    enabled: !!modId,
+  });
+}
+---
+feactures/upload-version/components/
+UploadVersionForm.tsx
+import { useState } from "react";
+
+import { useQueryClient } from "@tanstack/react-query";
+
+import { useCreateVersion } from "../hooks";
+
+import { useUploadStore } from "@/features/uploads/store/upload.store";
+
+import { useToast } from "@/shared/components/ToastProvider";
+
+const LOADERS = [
+  "FABRIC",
+  "FORGE",
+  "NEOFORGE",
+  "QUILT",
+  "LITELOADER",
+];
+
+type Props = {
+  modId: string | number;
+};
+
+export default function UploadVersionForm({
+  modId,
+}: Props) {
+  //////////////////////////////////////////////////////
+  // STATE
+  //////////////////////////////////////////////////////
+
+  const [file, setFile] =
+    useState<File | null>(null);
+
+  //////////////////////////////////////////////////////
+  // QUERY
+  //////////////////////////////////////////////////////
+
+  const queryClient =
+    useQueryClient();
+
+  //////////////////////////////////////////////////////
+  // MUTATIONS
+  //////////////////////////////////////////////////////
+
+  const {
+    mutateAsync:
+      createVersionMutation,
+
+    isPending:
+      isCreatingVersion,
+  } = useCreateVersion();
+
+  //////////////////////////////////////////////////////
+  // UPLOAD STORE
+  //////////////////////////////////////////////////////
+
+  const addFiles =
+    useUploadStore(
+      (s) => s.addFiles
+    );
+
+  //////////////////////////////////////////////////////
+  // TOAST
+  //////////////////////////////////////////////////////
+
+  const { addToast } = useToast();
+
+  //////////////////////////////////////////////////////
+  // SUBMIT
+  //////////////////////////////////////////////////////
+
+  const handleSubmit = async (
+    e: React.FormEvent<HTMLFormElement>
+  ) => {
+    e.preventDefault();
+
+    if (!file) {
+      addToast(
+        "Seleccioná un archivo"
+      );
+
+      return;
+    }
+
+    const form = e.currentTarget;
+
+    const formData = new FormData(
+      form
+    );
+
+    ////////////////////////////////////////////////////
+    // OPTIMISTIC VERSION
+    ////////////////////////////////////////////////////
+
+    const optimisticId =
+      -Date.now();
+
+    const optimisticVersion = {
+      id: optimisticId,
+
+      version:
+        formData.get(
+          "version"
+        ) as string,
+
+      minecraftVersion:
+        formData.get(
+          "minecraftVersion"
+        ) as string,
+
+      loader:
+        (formData.get(
+          "loader"
+        ) as string) || undefined,
+
+      changelog:
+        (formData.get(
+          "changelog"
+        ) as string) || undefined,
+
+      createdAt:
+        new Date().toISOString(),
+
+      files: [
+        {
+          id: optimisticId,
+
+          filename:
+            file.name,
+
+          size: file.size,
+
+          downloads: 0,
+
+          releaseType:
+            "release",
+        },
+      ],
+
+      isUploading: true,
+    };
+
+    ////////////////////////////////////////////////////
+    // INSERT OPTIMISTIC VERSION
+    ////////////////////////////////////////////////////
+
+    queryClient.setQueryData(
+      ["mod", modId, "versions"],
+      (old: any) => {
+        if (!old) {
+          return [
+            optimisticVersion,
+          ];
+        }
+
+        return [
+          optimisticVersion,
+          ...old,
+        ];
+      }
+    );
+
+    try {
+      //////////////////////////////////////////////////
+      // 1️⃣ CREATE VERSION
+      //////////////////////////////////////////////////
+
+      const version =
+        await createVersionMutation({
+          modId,
+
+          version:
+            formData.get(
+              "version"
+            ) as string,
+
+          minecraftVersion:
+            formData.get(
+              "minecraftVersion"
+            ) as string,
+
+          loader:
+            (formData.get(
+              "loader"
+            ) as string) ||
+            undefined,
+
+          changelog:
+            (formData.get(
+              "changelog"
+            ) as string) ||
+            undefined,
+        });
+
+      //////////////////////////////////////////////////
+      // 2️⃣ ADD TO UPLOAD QUEUE
+      //////////////////////////////////////////////////
+
+      addFiles(version.id, [file]);
+
+      //////////////////////////////////////////////////
+      // 3️⃣ REFRESH REAL DATA
+      //////////////////////////////////////////////////
+
+      await queryClient.invalidateQueries(
+        {
+          queryKey: [
+            "mod",
+            modId,
+            "versions",
+          ],
+        }
+      );
+
+      //////////////////////////////////////////////////
+      // SUCCESS
+      //////////////////////////////////////////////////
+
+      addToast(
+        "Versión subida 🚀"
+      );
+
+      form.reset();
+
+      setFile(null);
+
+    } catch (err) {
+      console.error(err);
+
+      //////////////////////////////////////////////////
+      // ROLLBACK
+      //////////////////////////////////////////////////
+
+      queryClient.setQueryData(
+        [
+          "mod",
+          modId,
+          "versions",
+        ],
+        (old: any) =>
+          old?.filter(
+            (v: any) =>
+              v.id !==
+              optimisticId
+          )
+      );
+
+      addToast(
+        "Error al subir versión ❌"
+      );
+    }
+  };
+
+  //////////////////////////////////////////////////////
+  // UI
+  //////////////////////////////////////////////////////
+
+  const isLoading =
+    isCreatingVersion;
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      style={{
+        display: "flex",
+
+        flexDirection: "column",
+
+        gap: 12,
+
+        marginBottom: 20,
+      }}
+    >
+      <input
+        name="version"
+        placeholder="Versión del mod"
+        required
+      />
+
+      <input
+        name="minecraftVersion"
+        placeholder="Versión de Minecraft"
+        required
+      />
+
+      <select name="loader">
+        <option value="">
+          Sin loader
+        </option>
+
+        {LOADERS.map((l) => (
+          <option
+            key={l}
+            value={l}
+          >
+            {l}
+          </option>
+        ))}
+      </select>
+
+      <textarea
+        name="changelog"
+        placeholder="Changelog"
+        rows={4}
+      />
+
+      <input
+        type="file"
+
+        accept=".jar,.zip"
+
+        onChange={(e) =>
+          setFile(
+            e.target.files?.[0] ||
+              null
+          )
+        }
+
+        required
+      />
+
+      <button
+        type="submit"
+
+        disabled={
+          isLoading || !file
+        }
+      >
+        {isLoading
+          ? "Creando versión..."
+          : "Subir versión"}
+      </button>
+    </form>
+  );
+}
+---
+feactures/uploads/components
+uploaditem.tsx
+import type {
+  UploadItem as UploadItemType,
+} from "@/features/uploads/store/upload.store";
+
+type Props = {
+  upload: UploadItemType;
+
+  onCancel: (
+    id: string
+  ) => void;
+
+  onRetry: (
+    id: string
+  ) => void;
+};
+
+export default function UploadItem({
+  upload,
+  onCancel,
+  onRetry,
+}: Props) {
+  //////////////////////////////////////////////////////
+  // COLORS
+  //////////////////////////////////////////////////////
+
+  const progressColor =
+    upload.status === "error"
+      ? "#ff4d4f"
+      : upload.status === "done"
+      ? "#52c41a"
+      : upload.status ===
+        "cancelled"
+      ? "#666"
+      : "#1677ff";
+
+  //////////////////////////////////////////////////////
+  // UI
+  //////////////////////////////////////////////////////
+
+  return (
+    <div
+      style={{
+        opacity:
+          upload.isRemoving
+            ? 0
+            : 1,
+
+        transform:
+          upload.isRemoving
+            ? "translateY(10px)"
+            : "translateY(0)",
+
+        transition:
+          "all 0.3s ease",
+
+        background: "#181818",
+
+        border:
+          "1px solid #2a2a2a",
+
+        borderRadius: 14,
+
+        padding: 12,
+
+        marginBottom: 12,
+      }}
+    >
+      ////////////////////////////////////////////////////
+      // HEADER
+      ////////////////////////////////////////////////////
+
+      <div
+        style={{
+          display: "flex",
+
+          justifyContent:
+            "space-between",
+
+          gap: 12,
+        }}
+      >
+        <span
+          style={{
+            maxWidth: 220,
+
+            overflow: "hidden",
+
+            textOverflow:
+              "ellipsis",
+
+            whiteSpace: "nowrap",
+
+            fontSize: 14,
+          }}
+        >
+          {upload.filename}
+        </span>
+
+        <span
+          style={{
+            fontSize: 13,
+
+            opacity: 0.7,
+          }}
+        >
+          {upload.progress}%
+        </span>
+      </div>
+
+      ////////////////////////////////////////////////////
+      // PROGRESS BAR
+      ////////////////////////////////////////////////////
+
+      <div
+        style={{
+          height: 8,
+
+          background: "#222",
+
+          borderRadius: 999,
+
+          overflow: "hidden",
+
+          marginTop: 8,
+        }}
+      >
+        <div
+          style={{
+            width: `${upload.progress}%`,
+
+            height: "100%",
+
+            transition:
+              "width 0.2s ease",
+
+            background:
+              progressColor,
+          }}
+        />
+      </div>
+
+      ////////////////////////////////////////////////////
+      // FOOTER
+      ////////////////////////////////////////////////////
+
+      <div
+        style={{
+          display: "flex",
+
+          justifyContent:
+            "space-between",
+
+          alignItems: "center",
+
+          marginTop: 8,
+        }}
+      >
+        <small
+          style={{
+            opacity: 0.7,
+
+            textTransform:
+              "capitalize",
+          }}
+        >
+          {upload.status}
+        </small>
+
+        <div
+          style={{
+            display: "flex",
+
+            gap: 8,
+          }}
+        >
+          {upload.status ===
+            "uploading" && (
+            <button
+              onClick={() =>
+                onCancel(
+                  upload.id
+                )
+              }
+            >
+              Cancel
+            </button>
+          )}
+
+          {(upload.status ===
+            "error" ||
+            upload.status ===
+              "cancelled") && (
+            <button
+              onClick={() =>
+                onRetry(
+                  upload.id
+                )
+              }
+            >
+              Retry
+            </button>
+          )}
+        </div>
+      </div>
+
+      ////////////////////////////////////////////////////
+      // ERROR
+      ////////////////////////////////////////////////////
+
+      {upload.error && (
+        <div
+          style={{
+            marginTop: 8,
+
+            color: "#ff4d4f",
+
+            fontSize: 12,
+          }}
+        >
+          {upload.error}
+        </div>
+      )}
+    </div>
+  );
+}
+---
+UploadSection.tsx
+import UploadItem from "./UploadItem";
+
+import type {
+  UploadItem as UploadItemType,
+} from "../store/upload.store";
+
+type Props = {
+  title: string;
+
+  uploads: UploadItemType[];
+
+  onCancel: (
+    id: string
+  ) => void;
+
+  onRetry: (
+    id: string
+  ) => void;
+};
+
+export default function UploadSection({
+  title,
+  uploads,
+  onCancel,
+  onRetry,
+}: Props) {
+  //////////////////////////////////////////////////////
+  // EMPTY
+  //////////////////////////////////////////////////////
+
+  if (!uploads.length) {
+    return null;
+  }
+
+  //////////////////////////////////////////////////////
+  // UI
+  //////////////////////////////////////////////////////
+
+  return (
+    <div
+      style={{
+        marginBottom: 20,
+      }}
+    >
+      <h4
+        style={{
+          marginBottom: 10,
+
+          opacity: 0.8,
+        }}
+      >
+        {title}
+      </h4>
+
+      <div
+        style={{
+          display: "flex",
+
+          flexDirection:
+            "column",
+
+          gap: 12,
+        }}
+      >
+        {uploads.map((upload) => (
+          <UploadItem
+            key={upload.id}
+
+            upload={upload}
+
+            onCancel={
+              onCancel
+            }
+
+            onRetry={
+              onRetry
+            }
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+---
+uploadcenter.tsx
+import { useState } from "react";
+
+import {
+  useUploadStore,
+} from "../store/upload.store";
+
+import UploadSection from "./UploadSection";
+
+export default function UploadCenter() {
+  //////////////////////////////////////////////////////
+  // STORE
+  //////////////////////////////////////////////////////
+
+  const uploads =
+    useUploadStore(
+      (s) => s.uploads
+    );
+
+  const cancelUpload =
+    useUploadStore(
+      (s) => s.cancelUpload
+    );
+
+  const retryUpload =
+    useUploadStore(
+      (s) => s.retryUpload
+    );
+
+  //////////////////////////////////////////////////////
+  // UI STATE
+  //////////////////////////////////////////////////////
+
+  const [minimized, setMinimized] =
+    useState(false);
+
+  //////////////////////////////////////////////////////
+  // EMPTY
+  //////////////////////////////////////////////////////
+
+  if (!uploads.length) {
+    return null;
+  }
+
+  //////////////////////////////////////////////////////
+  // GROUPS
+  //////////////////////////////////////////////////////
+
+  const uploading =
+    uploads.filter(
+      (u) =>
+        u.status ===
+          "uploading" ||
+        u.status === "queued"
+    );
+
+  const completed =
+    uploads.filter(
+      (u) =>
+        u.status === "done"
+    );
+
+  const failed =
+    uploads.filter(
+      (u) =>
+        u.status === "error" ||
+        u.status ===
+          "cancelled"
+    );
+
+  //////////////////////////////////////////////////////
+  // ACTIVE COUNT
+  //////////////////////////////////////////////////////
+
+  const activeCount =
+    uploading.length;
+
+  //////////////////////////////////////////////////////
+  // UI
+  //////////////////////////////////////////////////////
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+
+        right: 20,
+
+        bottom: 20,
+
+        width: 380,
+
+        background: "#111",
+
+        border:
+          "1px solid #333",
+
+        borderRadius: 18,
+
+        padding: 16,
+
+        zIndex: 9999,
+
+        boxShadow:
+          "0 10px 30px rgba(0,0,0,0.4)",
+      }}
+    >
+      ////////////////////////////////////////////////////
+      // HEADER
+      ////////////////////////////////////////////////////
+
+      <button
+        onClick={() =>
+          setMinimized(
+            !minimized
+          )
+        }
+
+        style={{
+          width: "100%",
+
+          background:
+            "transparent",
+
+          border: "none",
+
+          color: "white",
+
+          cursor: "pointer",
+
+          display: "flex",
+
+          justifyContent:
+            "space-between",
+
+          alignItems: "center",
+
+          marginBottom:
+            minimized
+              ? 0
+              : 16,
+        }}
+      >
+        <h3
+          style={{
+            margin: 0,
+          }}
+        >
+          Uploads
+        </h3>
+
+        <div>
+          {activeCount} active{" "}
+
+          {minimized
+            ? "▲"
+            : "▼"}
+        </div>
+      </button>
+
+      ////////////////////////////////////////////////////
+      // COLLAPSED
+      ////////////////////////////////////////////////////
+
+      {!minimized && (
+        <div
+          style={{
+            maxHeight: 500,
+
+            overflowY: "auto",
+
+            paddingRight: 4,
+          }}
+        >
+          <UploadSection
+            title="⬆ Uploading"
+
+            uploads={
+              uploading
+            }
+
+            onCancel={
+              cancelUpload
+            }
+
+            onRetry={
+              retryUpload
+            }
+          />
+
+          <UploadSection
+            title="✅ Completed"
+
+            uploads={
+              completed
+            }
+
+            onCancel={
+              cancelUpload
+            }
+
+            onRetry={
+              retryUpload
+            }
+          />
+
+          <UploadSection
+            title="❌ Failed"
+
+            uploads={failed}
+
+            onCancel={
+              cancelUpload
+            }
+
+            onRetry={
+              retryUpload
+            }
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+---
+feactures/uploads/service
+multipart-upload.service.ts
+import {
+  getUploadSession,
+  saveUploadSession,
+  removeUploadSession,
+} from "./upload-session.service";
+
+////////////////////////////////////////////////////////
+// CONFIG
+////////////////////////////////////////////////////////
+
+const CHUNK_SIZE =
+  8 * 1024 * 1024;
+
+const MAX_PARALLEL_UPLOADS = 4;
+
+////////////////////////////////////////////////////////
+// TYPES
+////////////////////////////////////////////////////////
+
+type UploadPart = {
+  ETag: string;
+
+  PartNumber: number;
+};
+
+type ChunkTask = {
+  chunk: Blob;
+
+  partNumber: number;
+};
+
+////////////////////////////////////////////////////////
+// RETRY CONFIG
+////////////////////////////////////////////////////////
+
+const MAX_RETRIES = 3;
+
+const RETRY_DELAY = 1000;
+
+////////////////////////////////////////////////////////
+// SLEEP
+////////////////////////////////////////////////////////
+
+function sleep(ms: number) {
+  return new Promise((resolve) =>
+    setTimeout(resolve, ms)
+  );
+}
+
+////////////////////////////////////////////////////////
+// UPLOAD CHUNK WITH RETRY
+////////////////////////////////////////////////////////
+
+async function uploadChunkWithRetry({
+  url,
+  chunk,
+  retries = MAX_RETRIES,
+}: {
+  url: string;
+
+  chunk: Blob;
+
+  retries?: number;
+}) {
+  let lastError: unknown;
+
+  for (
+    let attempt = 1;
+    attempt <= retries;
+    attempt++
+  ) {
+    try {
+      const response = await fetch(
+        url,
+        {
+          method: "PUT",
+
+          body: chunk,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `Chunk upload failed (${response.status})`
+        );
+      }
+
+      return response;
+    } catch (err) {
+      lastError = err;
+
+      console.error(
+        `Chunk retry ${attempt}/${retries}`,
+        err
+      );
+
+      //////////////////////////////////////////////////
+      // WAIT BEFORE RETRY
+      //////////////////////////////////////////////////
+
+      if (attempt < retries) {
+        await sleep(RETRY_DELAY);
+      }
+    }
+  }
+
+  throw lastError;
+}
+
+////////////////////////////////////////////////////////
+// SPLIT FILE
+////////////////////////////////////////////////////////
+
+function splitFile(
+  file: File
+) {
+  const chunks: ChunkTask[] = [];
+
+  let start = 0;
+
+  let partNumber = 1;
+
+  while (start < file.size) {
+    const end =
+      start + CHUNK_SIZE;
+
+    chunks.push({
+      chunk: file.slice(
+        start,
+        end
+      ),
+
+      partNumber,
+    });
+
+    start = end;
+
+    partNumber++;
+  }
+
+  return chunks;
+}
+
+////////////////////////////////////////////////////////
+// MULTIPART UPLOAD
+////////////////////////////////////////////////////////
+
+export async function multipartUpload({
+  file,
+  onProgress,
+}: {
+  file: File;
+
+  onProgress?: (
+    progress: number
+  ) => void;
+}) {
+  //////////////////////////////////////////////////////
+  // TOKEN
+  //////////////////////////////////////////////////////
+
+  const token =
+    localStorage.getItem(
+      "token"
+    );
+
+  //////////////////////////////////////////////////////
+  // EXISTING SESSION?
+  //////////////////////////////////////////////////////
+
+  let existingSession =
+    getUploadSession(file);
+
+  let uploadId =
+    existingSession?.uploadId;
+
+  let key =
+    existingSession?.key;
+
+  let uploadedParts:
+    UploadPart[] =
+    existingSession?.uploadedParts ||
+    [];
+
+  //////////////////////////////////////////////////////
+  // START NEW MULTIPART
+  //////////////////////////////////////////////////////
+
+  if (!uploadId || !key) {
+    const startRes =
+      await fetch(
+        `${import.meta.env.VITE_API_URL}/uploads/start`,
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+
+            Authorization:
+              `Bearer ${token}`,
+          },
+
+          body: JSON.stringify({
+            filename:
+              file.name,
+
+            type: file.type,
+          }),
+        }
+      );
+
+    if (!startRes.ok) {
+      throw new Error(
+        "Error starting upload"
+      );
+    }
+
+    const data =
+      await startRes.json();
+
+    uploadId =
+      data.uploadId;
+
+    key = data.key;
+
+    ////////////////////////////////////////////////////
+    // SAVE SESSION
+    ////////////////////////////////////////////////////
+
+    saveUploadSession({
+      uploadId: uploadId!,
+      key: key!,
+
+      filename:
+        file.name,
+
+      size: file.size,
+
+      uploadedParts: [],
+    });
+  }
+
+  //////////////////////////////////////////////////////
+  // SPLIT CHUNKS
+  //////////////////////////////////////////////////////
+
+  const allChunks =
+    splitFile(file);
+
+  //////////////////////////////////////////////////////
+  // FILTER ALREADY UPLOADED
+  //////////////////////////////////////////////////////
+
+  const uploadedPartNumbers =
+    new Set(
+      uploadedParts.map(
+        (p) =>
+          p.PartNumber
+      )
+    );
+
+  const pendingChunks =
+    allChunks.filter(
+      (chunk) =>
+        !uploadedPartNumbers.has(
+          chunk.partNumber
+        )
+    );
+
+  //////////////////////////////////////////////////////
+  // INITIAL PROGRESS
+  //////////////////////////////////////////////////////
+
+  let uploadedChunks =
+    uploadedParts.length;
+
+  onProgress?.(
+    Math.round(
+      (uploadedChunks /
+        allChunks.length) *
+        100
+    )
+  );
+
+  //////////////////////////////////////////////////////
+  // WORKER
+  //////////////////////////////////////////////////////
+
+  async function worker() {
+    while (
+      pendingChunks.length > 0
+    ) {
+      const current =
+        pendingChunks.shift();
+
+      if (!current) {
+        return;
+      }
+
+      ////////////////////////////////////////////////
+      // GET PART URL
+      ////////////////////////////////////////////////
+
+      const urlRes =
+        await fetch(
+          `${import.meta.env.VITE_API_URL}/uploads/part-url`,
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+
+              Authorization:
+                `Bearer ${token}`,
+            },
+
+            body: JSON.stringify({
+              uploadId,
+
+              key,
+
+              partNumber:
+                current.partNumber,
+            }),
+          }
+        );
+
+      if (!urlRes.ok) {
+        throw new Error(
+          "Error getting part URL"
+        );
+      }
+
+      const { url } =
+        await urlRes.json();
+
+      ////////////////////////////////////////////////
+      // UPLOAD CHUNK
+      ////////////////////////////////////////////////
+
+    const uploadRes =
+      await uploadChunkWithRetry({
+        url,
+
+        chunk: current.chunk,
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error(
+          `Chunk ${current.partNumber} failed`
+        );
+      }
+
+      ////////////////////////////////////////////////
+      // ETAG
+      ////////////////////////////////////////////////
+
+      const etag =
+        uploadRes.headers.get(
+          "ETag"
+        );
+
+      if (!etag) {
+        throw new Error(
+          "Missing ETag"
+        );
+      }
+
+      ////////////////////////////////////////////////
+      // SAVE PART
+      ////////////////////////////////////////////////
+
+      const uploadedPart = {
+        ETag: etag,
+
+        PartNumber:
+          current.partNumber,
+      };
+
+      uploadedParts.push(
+        uploadedPart
+      );
+
+      ////////////////////////////////////////////////
+      // SAVE SESSION
+      ////////////////////////////////////////////////
+
+      saveUploadSession({
+        uploadId:
+          uploadId!,
+
+        key: key!,
+
+        filename:
+          file.name,
+
+        size: file.size,
+
+        uploadedParts,
+      });
+
+      ////////////////////////////////////////////////
+      // PROGRESS
+      ////////////////////////////////////////////////
+
+      uploadedChunks++;
+
+      const progress =
+        Math.round(
+          (uploadedChunks /
+            allChunks.length) *
+            100
+        );
+
+      onProgress?.(progress);
+    }
+  }
+
+  //////////////////////////////////////////////////////
+  // START WORKERS
+  //////////////////////////////////////////////////////
+
+  const workers =
+    Array.from(
+      {
+        length:
+          MAX_PARALLEL_UPLOADS,
+      },
+      () => worker()
+    );
+
+  await Promise.all(workers);
+
+  //////////////////////////////////////////////////////
+  // SORT PARTS
+  //////////////////////////////////////////////////////
+
+  uploadedParts.sort(
+    (a, b) =>
+      a.PartNumber -
+      b.PartNumber
+  );
+
+  //////////////////////////////////////////////////////
+  // COMPLETE
+  //////////////////////////////////////////////////////
+
+  const completeRes =
+    await fetch(
+      `${import.meta.env.VITE_API_URL}/uploads/complete`,
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type":
+            "application/json",
+
+          Authorization:
+            `Bearer ${token}`,
+        },
+
+        body: JSON.stringify({
+          uploadId,
+
+          key,
+
+          parts:
+            uploadedParts,
+        }),
+      }
+    );
+
+  if (!completeRes.ok) {
+    throw new Error(
+      "Error completing upload"
+    );
+  }
+
+  //////////////////////////////////////////////////////
+  // REMOVE SESSION
+  //////////////////////////////////////////////////////
+
+  removeUploadSession(file);
+
+  //////////////////////////////////////////////////////
+  // DONE
+  //////////////////////////////////////////////////////
+
+  return {
+    key,
+  };
+}
+---
+upload-db.service.ts
+import { openDB } from "idb";
+
+const DB_NAME = "uploads-db";
+
+const STORE_NAME = "files";
+
+////////////////////////////////////////////////////////
+// DB
+////////////////////////////////////////////////////////
+
+const dbPromise = openDB(
+  DB_NAME,
+  1,
+  {
+    upgrade(db) {
+      if (
+        !db.objectStoreNames.contains(
+          STORE_NAME
+        )
+      ) {
+        db.createObjectStore(
+          STORE_NAME
+        );
+      }
+    },
+  }
+);
+
+////////////////////////////////////////////////////////
+// SAVE FILE
+////////////////////////////////////////////////////////
+
+export async function saveUploadFile(
+  id: string,
+  file: File
+) {
+  const db = await dbPromise;
+
+  await db.put(
+    STORE_NAME,
+    file,
+    id
+  );
+}
+
+////////////////////////////////////////////////////////
+// GET FILE
+////////////////////////////////////////////////////////
+
+export async function getUploadFile(
+  id: string
+) {
+  const db = await dbPromise;
+
+  return db.get(
+    STORE_NAME,
+    id
+  );
+}
+
+////////////////////////////////////////////////////////
+// REMOVE FILE
+////////////////////////////////////////////////////////
+
+export async function removeUploadFile(
+  id: string
+) {
+  const db = await dbPromise;
+
+  await db.delete(
+    STORE_NAME,
+    id
+  );
+}
+---
+upload-session.service.ts
+////////////////////////////////////////////////////////
+// TYPES
+////////////////////////////////////////////////////////
+
+export type UploadSession = {
+  uploadId: string;
+
+  key: string;
+
+  filename: string;
+
+  size: number;
+
+  uploadedParts: {
+    ETag: string;
+
+    PartNumber: number;
+  }[];
+};
+
+////////////////////////////////////////////////////////
+// STORAGE KEY
+////////////////////////////////////////////////////////
+
+const STORAGE_KEY =
+  "multipart-upload-sessions";
+
+////////////////////////////////////////////////////////
+// GET ALL
+////////////////////////////////////////////////////////
+
+function getAllSessions(): UploadSession[] {
+  const raw =
+    localStorage.getItem(
+      STORAGE_KEY
+    );
+
+  if (!raw) {
+    return [];
+  }
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+////////////////////////////////////////////////////////
+// SAVE ALL
+////////////////////////////////////////////////////////
+
+function saveAllSessions(
+  sessions: UploadSession[]
+) {
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify(sessions)
+  );
+}
+
+////////////////////////////////////////////////////////
+// SAVE SESSION
+////////////////////////////////////////////////////////
+
+export function saveUploadSession(
+  session: UploadSession
+) {
+  const sessions =
+    getAllSessions();
+
+  const filtered =
+    sessions.filter(
+      (s) =>
+        !(
+          s.filename ===
+            session.filename &&
+          s.size ===
+            session.size
+        )
+    );
+
+  filtered.push(session);
+
+  saveAllSessions(filtered);
+}
+
+////////////////////////////////////////////////////////
+// GET SESSION
+////////////////////////////////////////////////////////
+
+export function getUploadSession(
+  file: File
+) {
+  const sessions =
+    getAllSessions();
+
+  return sessions.find(
+    (s) =>
+      s.filename === file.name &&
+      s.size === file.size
+  );
+}
+
+////////////////////////////////////////////////////////
+// REMOVE SESSION
+////////////////////////////////////////////////////////
+
+export function removeUploadSession(
+  file: File
+) {
+  const sessions =
+    getAllSessions();
+
+  const filtered =
+    sessions.filter(
+      (s) =>
+        !(
+          s.filename ===
+            file.name &&
+          s.size === file.size
+        )
+    );
+
+  saveAllSessions(filtered);
+}
+---
+upload.service.ts
+export type UploadProgressCallback = (progress: number) => void;
+
+export type UploadTask = {
+  promise: Promise<any>;
+  cancel: () => void;
+};
+
+type UploadFileOptions = {
+  versionId: number;
+  file: File;
+  onProgress?: UploadProgressCallback;
+};
+
+export function uploadVersionFile({
+  versionId,
+  file,
+  onProgress,
+}: UploadFileOptions): UploadTask {
+  const token = localStorage.getItem("token");
+
+  const xhr = new XMLHttpRequest();
+
+  const promise = (async () => {
+    //////////////////////////////////////////////////////
+    // 1️⃣ PEDIR PRESIGNED URL
+    //////////////////////////////////////////////////////
+
+    const presignedRes = await fetch(
+      `${import.meta.env.VITE_API_URL}/uploads/presigned`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          filename: file.name,
+          type: file.type,
+        }),
+      }
+    );
+
+    if (!presignedRes.ok) {
+      throw new Error("Error obteniendo URL de upload");
+    }
+
+    const { url, key } = await presignedRes.json();
+
+    //////////////////////////////////////////////////////
+    // 2️⃣ SUBIR A R2
+    //////////////////////////////////////////////////////
+
+    await new Promise<void>((resolve, reject) => {
+      xhr.open("PUT", url);
+
+      xhr.upload.onprogress = (event) => {
+        if (!event.lengthComputable) return;
+
+        const progress = Math.round(
+          (event.loaded / event.total) * 100
+        );
+
+        onProgress?.(progress);
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve();
+        } else {
+          reject(new Error("Error subiendo archivo"));
+        }
+      };
+
+      xhr.onerror = () => {
+        reject(new Error("Network error"));
+      };
+
+      xhr.onabort = () => {
+        reject(new Error("Upload cancelado"));
+      };
+
+      xhr.send(file);
+    });
+
+    //////////////////////////////////////////////////////
+    // 3️⃣ REGISTRAR EN BACKEND
+    //////////////////////////////////////////////////////
+
+    const registerRes = await fetch(
+      `${import.meta.env.VITE_API_URL}/versions/${versionId}/files`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          key,
+          filename: file.name,
+          size: file.size,
+          type: file.type,
+        }),
+      }
+    );
+
+    if (!registerRes.ok) {
+      throw new Error("Error registrando archivo");
+    }
+
+    return registerRes.json();
+  })();
+
+  return {
+    promise,
+
+    cancel() {
+      xhr.abort();
+    },
+  };
+}
+---
+feactures/uploads/store
+upload.store.ts
+import { create } from "zustand";
+
+import { persist } from "zustand/middleware";
+
+import {
+  uploadVersionFile,
+} from "@/features/uploads/services/upload.service";
+
+import type {
+  UploadTask,
+} from "@/features/uploads/services/upload.service";
+
+import {
+  saveUploadFile,
+  getUploadFile,
+  removeUploadFile,
+} from "@/features/uploads/services/upload-db.service";
+
+////////////////////////////////////////////////////////
+// TYPES
+////////////////////////////////////////////////////////
+
+export type UploadStatus =
+  | "queued"
+  | "uploading"
+  | "done"
+  | "error"
+  | "cancelled";
+
+export type UploadItem = {
+  id: string;
+
+  versionId: number;
+
+  file?: File;
+
+  filename: string;
+
+  createdAt: number;
+
+  completedAt?: number;
+
+  progress: number;
+
+  status: UploadStatus;
+
+  error?: string;
+
+  isRemoving?: boolean;
+
+  task?: UploadTask;
+};
+
+////////////////////////////////////////////////////////
+// CONFIG
+////////////////////////////////////////////////////////
+
+const MAX_PARALLEL_UPLOADS = 3;
+
+const AUTO_REMOVE_DELAY = 4000;
+
+const FADE_DURATION = 300;
+
+const ONE_HOUR =
+  1000 * 60 * 60;
+
+////////////////////////////////////////////////////////
+// STORE
+////////////////////////////////////////////////////////
+
+type UploadStore = {
+  uploads: UploadItem[];
+
+  addFiles: (
+    versionId: number,
+    files: File[]
+  ) => void;
+
+  processQueue: () => void;
+
+  cancelUpload: (
+    id: string
+  ) => void;
+
+  retryUpload: (
+    id: string
+  ) => void;
+
+  removeUpload: (
+    id: string
+  ) => void;
+
+  cleanupOldUploads: () => void;
+};
+
+////////////////////////////////////////////////////////
+// STORE
+////////////////////////////////////////////////////////
+
+export const useUploadStore =
+  create<UploadStore>()(
+    persist(
+      (set, get) => ({
+        //////////////////////////////////////////////////
+        // STATE
+        //////////////////////////////////////////////////
+
+        uploads: [],
+
+        //////////////////////////////////////////////////
+        // ADD FILES
+        //////////////////////////////////////////////////
+
+        addFiles(versionId, files) {
+          const mapped: UploadItem[] =
+            files.map((file) => ({
+              id:
+                Math.random()
+                  .toString(36)
+                  .slice(2) +
+                Date.now(),
+
+              versionId,
+
+              file,
+
+              filename:
+                file.name,
+
+              createdAt:
+                Date.now(),
+
+              progress: 0,
+
+              status: "queued",
+            }));
+
+            mapped.forEach((upload) => {
+              if (upload.file) {
+                saveUploadFile(
+                  upload.id,
+                  upload.file
+                );
+              }
+            });
+
+          set((state) => ({
+            uploads: [
+              ...state.uploads,
+              ...mapped,
+            ],
+          }));
+
+          get().processQueue();
+        },
+
+        //////////////////////////////////////////////////
+        // PROCESS QUEUE
+        //////////////////////////////////////////////////
+
+        processQueue() {
+          const state = get();
+
+          //////////////////////////////////////////////////
+          // ACTIVE
+          //////////////////////////////////////////////////
+
+          const activeUploads =
+            state.uploads.filter(
+              (u) =>
+                u.status ===
+                "uploading"
+            );
+
+          if (
+            activeUploads.length >=
+            MAX_PARALLEL_UPLOADS
+          ) {
+            return;
+          }
+
+          //////////////////////////////////////////////////
+          // NEXT
+          //////////////////////////////////////////////////
+
+          const next =
+            state.uploads.find(
+              (u) =>
+                u.status ===
+                  "queued" &&
+                u.file
+            );
+
+          if (!next) {
+            return;
+          }
+
+          //////////////////////////////////////////////////
+          // FILE LOST
+          //////////////////////////////////////////////////
+
+          if (!next.file) {
+            set((state) => ({
+              uploads:
+                state.uploads.map(
+                  (u) =>
+                    u.id ===
+                    next.id
+                      ? {
+                          ...u,
+
+                          status:
+                            "error",
+
+                          error:
+                            "Archivo perdido después de refrescar",
+                        }
+                      : u
+                ),
+            }));
+
+            return;
+          }
+
+          //////////////////////////////////////////////////
+          // START UPLOAD
+          //////////////////////////////////////////////////
+
+          const task =
+            uploadVersionFile({
+              versionId:
+                next.versionId,
+
+              file: next.file,
+
+              onProgress(
+                progress
+              ) {
+                set((state) => ({
+                  uploads:
+                    state.uploads.map(
+                      (u) =>
+                        u.id ===
+                        next.id
+                          ? {
+                              ...u,
+                              progress,
+                            }
+                          : u
+                    ),
+                }));
+              },
+            });
+
+          //////////////////////////////////////////////////
+          // SET UPLOADING
+          //////////////////////////////////////////////////
+
+          set((state) => ({
+            uploads:
+              state.uploads.map(
+                (u) =>
+                  u.id === next.id
+                    ? {
+                        ...u,
+
+                        status:
+                          "uploading",
+
+                        task,
+                      }
+                    : u
+              ),
+          }));
+
+          //////////////////////////////////////////////////
+          // HANDLE RESULT
+          //////////////////////////////////////////////////
+
+          task.promise
+            .then(() => {
+              set((state) => ({
+                uploads:
+                  state.uploads.map(
+                    (u) =>
+                      u.id ===
+                      next.id
+                        ? {
+                            ...u,
+
+                            status:
+                              "done",
+
+                            progress: 100,
+
+                            completedAt:
+                              Date.now(),
+                          }
+                        : u
+                  ),
+              }));
+
+              //////////////////////////////////////////////
+              // AUTO REMOVE
+              //////////////////////////////////////////////
+
+              setTimeout(() => {
+                get().removeUpload(
+                  next.id
+                );
+              }, AUTO_REMOVE_DELAY);
+            })
+
+            .catch((err) => {
+              const cancelled =
+                err.message ===
+                "Upload cancelado";
+
+              set((state) => ({
+                uploads:
+                  state.uploads.map(
+                    (u) =>
+                      u.id ===
+                      next.id
+                        ? {
+                            ...u,
+
+                            status:
+                              cancelled
+                                ? "cancelled"
+                                : "error",
+
+                            error:
+                              err.message,
+                          }
+                        : u
+                  ),
+              }));
+            })
+
+            .finally(() => {
+              get().processQueue();
+            });
+
+          //////////////////////////////////////////////////
+          // CONTINUE
+          //////////////////////////////////////////////////
+
+          get().processQueue();
+        },
+
+        //////////////////////////////////////////////////
+        // CANCEL
+        //////////////////////////////////////////////////
+
+        cancelUpload(id) {
+          const upload =
+            get().uploads.find(
+              (u) =>
+                u.id === id
+            );
+
+          upload?.task?.cancel();
+        },
+
+        //////////////////////////////////////////////////
+        // RETRY
+        //////////////////////////////////////////////////
+
+        retryUpload(id) {
+          set((state) => ({
+            uploads:
+              state.uploads.map(
+                (u) =>
+                  u.id === id
+                    ? {
+                        ...u,
+
+                        progress: 0,
+
+                        status:
+                          "queued",
+
+                        error:
+                          undefined,
+
+                        isRemoving:
+                          false,
+                      }
+                    : u
+              ),
+          }));
+
+          get().processQueue();
+        },
+
+        //////////////////////////////////////////////////
+        // REMOVE
+        //////////////////////////////////////////////////
+
+        removeUpload(id) {
+          removeUploadFile(id);
+          ////////////////////////////////////////////////
+          // START FADE
+          ////////////////////////////////////////////////
+
+          set((state) => ({
+            uploads:
+              state.uploads.map(
+                (u) =>
+                  u.id === id
+                    ? {
+                        ...u,
+
+                        isRemoving:
+                          true,
+                      }
+                    : u
+              ),
+          }));
+
+          ////////////////////////////////////////////////
+          // REMOVE AFTER ANIMATION
+          ////////////////////////////////////////////////
+
+          setTimeout(() => {
+            set((state) => ({
+              uploads:
+                state.uploads.filter(
+                  (u) =>
+                    u.id !== id
+                ),
+            }));
+          }, FADE_DURATION);
+        },
+
+        //////////////////////////////////////////////////
+        // CLEANUP
+        //////////////////////////////////////////////////
+
+        cleanupOldUploads() {
+          const now = Date.now();
+
+          set((state) => ({
+            uploads:
+              state.uploads.filter(
+                (u) => {
+                  //////////////////////////////////////////
+                  // KEEP ACTIVE
+                  //////////////////////////////////////////
+
+                  if (
+                    u.status ===
+                      "uploading" ||
+                    u.status ===
+                      "queued"
+                  ) {
+                    return true;
+                  }
+
+                  //////////////////////////////////////////
+                  // KEEP FAILED
+                  //////////////////////////////////////////
+
+                  if (
+                    u.status ===
+                      "error" ||
+                    u.status ===
+                      "cancelled"
+                  ) {
+                    return true;
+                  }
+
+                  //////////////////////////////////////////
+                  // REMOVE OLD DONE
+                  //////////////////////////////////////////
+
+                  if (
+                    u.status ===
+                    "done"
+                  ) {
+                    return (
+                      now -
+                        (u.completedAt ||
+                          now) <
+                      ONE_HOUR
+                    );
+                  }
+
+                  return true;
+                }
+              ),
+          }));
+        },
+      }),
+
+      ////////////////////////////////////////////////////
+      // PERSIST
+      ////////////////////////////////////////////////////
+
+      {
+        name: "upload-store",
+
+        ////////////////////////////////////////////////////
+        // PARTIALIZE
+        ////////////////////////////////////////////////////
+
+        partialize: (state) => ({
+          uploads:
+            state.uploads.map(
+              (u) => ({
+                id: u.id,
+
+                versionId:
+                  u.versionId,
+
+                filename:
+                  u.filename,
+
+                createdAt:
+                  u.createdAt,
+
+                completedAt:
+                  u.completedAt,
+
+                progress:
+                  u.progress,
+
+                status:
+                  u.status,
+
+                error:
+                  u.error,
+
+                isRemoving:
+                  false,
+              })
+            ),
+        }),
+
+        ////////////////////////////////////////////////////
+        // REHYDRATE
+        ////////////////////////////////////////////////////
+
+        onRehydrateStorage() {
+          return async (state) => {
+            if (!state) {
+              return;
+            }
+
+          ////////////////////////////////////////////////
+          // RECOVER FILES
+          ////////////////////////////////////////////////
+
+          const recoveredUploads: UploadItem[] =
+            await Promise.all(
+              state.uploads.map(
+                async (upload) => {
+                  const file =
+                    await getUploadFile(
+                      upload.id
+                    );
+
+                  const status: UploadStatus =
+                    upload.status ===
+                      "uploading" ||
+                    upload.status ===
+                      "queued"
+                      ? "queued"
+                      : upload.status;
+
+                  return {
+                    ...upload,
+
+                    file,
+
+                    status,
+                  };
+                }
+              )
+            );
+
+            ////////////////////////////////////////////////
+            // RESTORE
+            ////////////////////////////////////////////////
+
+            state.uploads =
+              recoveredUploads;
+
+            ////////////////////////////////////////////////
+            // AUTO RESUME
+            ////////////////////////////////////////////////
+
+            setTimeout(() => {
+              state.processQueue();
+            }, 500);
+          };
+        },
+      }
+    )
+  );
+---
+feactures/versions/
+api.ts
+import { apiFetch } from "@/shared/api/client";
+
+////////////////////////////////////////////////////////
+// TYPES
+////////////////////////////////////////////////////////
+
+export type VersionFile = {
+  id: number;
+
+  filename?: string;
+
+  displayName?: string;
+
+  size: number;
+
+  releaseType: string;
+
+  downloads: number;
+
+  url?: string;
+
+  isPrimary?: boolean;
+};
+
+export type Version = {
+  id: number;
+
+  version: string;
+
+  minecraftVersion: string;
+
+  loader?: string;
+
+  changelog?: string;
+
+  createdAt: string;
+
+  files?: VersionFile[];
+
+  isUploading?: boolean;
+};
+
+////////////////////////////////////////////////////////
+// GET VERSIONS
+////////////////////////////////////////////////////////
+
+export const getVersions = (
+  modId: string | number
+): Promise<Version[]> =>
+  apiFetch(`/mods/${modId}/versions`);
+
+////////////////////////////////////////////////////////
+// CREATE VERSION
+////////////////////////////////////////////////////////
+
+export const createVersion = (data: {
+  modId: string | number;
+  version: string;
+  minecraftVersion: string;
+  loader?: string;
+  changelog?: string;
+}) =>
+  apiFetch(`/mods/${data.modId}/versions`, {
+    method: "POST",
+
+    body: JSON.stringify({
+      version: data.version,
+      minecraftVersion: data.minecraftVersion,
+      loader: data.loader,
+      changelog: data.changelog,
+    }),
+  });
+
+////////////////////////////////////////////////////////
+// UPDATE VERSION
+////////////////////////////////////////////////////////
+
+export const updateVersion = ({
+  versionId,
+  version,
+}: {
+  versionId: number;
+  version: string;
+}) =>
+  apiFetch(`/versions/${versionId}`, {
+    method: "PATCH",
+
+    body: JSON.stringify({
+      version,
+    }),
+  });
+
+////////////////////////////////////////////////////////
+// DELETE VERSION
+////////////////////////////////////////////////////////
+
+export const deleteVersion = (
+  versionId: number
+) =>
+  apiFetch(`/versions/${versionId}`, {
+    method: "DELETE",
+  });
+
+////////////////////////////////////////////////////////
+// DOWNLOAD VERSION
+////////////////////////////////////////////////////////
+
+export const getVersionDownloadUrl = (
+  versionId: number
+) =>
+  `${import.meta.env.VITE_API_URL}/versions/${versionId}/download`;
+
+////////////////////////////////////////////////////////
+// UPLOAD FILE TO R2
+////////////////////////////////////////////////////////
+
+export async function uploadFileR2(data: {
+  versionId: number;
+  file: File;
+
+  onProgress?: (
+    progress: number
+  ) => void;
+}) {
+  const token = localStorage.getItem("token");
+
+  //////////////////////////////////////////////////////
+  // 1️⃣ CREATE PRESIGNED URL
+  //////////////////////////////////////////////////////
+
+  const presignedRes = await fetch(
+    `${import.meta.env.VITE_API_URL}/uploads/presigned`,
+    {
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json",
+
+        Authorization: `Bearer ${token}`,
+      },
+
+      body: JSON.stringify({
+        filename: data.file.name,
+        type: data.file.type,
+      }),
+    }
+  );
+
+  if (!presignedRes.ok) {
+    throw new Error(
+      "Error creating presigned URL"
+    );
+  }
+
+  const { url, key } =
+    await presignedRes.json();
+
+  //////////////////////////////////////////////////////
+  // 2️⃣ UPLOAD TO R2
+  //////////////////////////////////////////////////////
+
+  await new Promise<void>(
+    (resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+
+      xhr.open("PUT", url);
+
+      xhr.upload.onprogress = (e) => {
+        if (!e.lengthComputable) return;
+
+        const percent = Math.round(
+          (e.loaded / e.total) * 100
+        );
+
+        data.onProgress?.(percent);
+      };
+
+      xhr.onload = () => {
+        if (
+          xhr.status >= 200 &&
+          xhr.status < 300
+        ) {
+          resolve();
+        } else {
+          reject(
+            new Error(
+              "Error uploading file"
+            )
+          );
+        }
+      };
+
+      xhr.onerror = () => {
+        reject(
+          new Error(
+            "Network upload error"
+          )
+        );
+      };
+
+      xhr.send(data.file);
+    }
+  );
+
+  //////////////////////////////////////////////////////
+  // 3️⃣ REGISTER FILE
+  //////////////////////////////////////////////////////
+
+  const res = await fetch(
+    `${import.meta.env.VITE_API_URL}/versions/${data.versionId}/files`,
+    {
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json",
+
+        Authorization: `Bearer ${token}`,
+      },
+
+      body: JSON.stringify({
+        key,
+
+        filename: data.file.name,
+
+        size: data.file.size,
+
+        type: data.file.type,
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    throw new Error(
+      "Error registering file"
+    );
+  }
+
+  return res.json();
+}
+---
+pages/
+CreateModPage.tsx
+import CreateModForm from "@/features/create-mod/components/CreateModForm";
+
+export default function CreateModPage() {
+  return (
+    <div style={{ padding: 20, maxWidth: 800, margin: "0 auto" }}>
+      <h1>Crear Mod</h1>
+      <CreateModForm />
+    </div>
+  );
+}
+---
+LoginPage.tsx
+import { useLogin } from "@/features/auth/hooks";
+import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+
+export default function LoginPage() {
+  const { mutateAsync, isPending } = useLogin();
+  const navigate = useNavigate();
+
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e: any) => {
+    e.preventDefault();
+    setError("");
+
+    try {
+      const data = await mutateAsync({
+        email: e.target.email.value,
+        password: e.target.password.value,
+      });
+
+      localStorage.setItem("token", data.token);
+
+      navigate("/");
+    } catch (err: any) {
+      setError(err?.message || "Credenciales incorrectas");
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} style={{ padding: 20 }}>
+      <h1>Login</h1>
+
+      <input name="email" placeholder="Email" required />
+      <input name="password" type="password" placeholder="Password" required />
+
+      {error && <p style={{ color: "red" }}>{error}</p>}
+
+      <button disabled={isPending}>
+        {isPending ? "Entrando..." : "Login"}
+      </button>
+    </form>
+  );
+}
+---
+ModPage.tsx
+import ModPageFeature from "@/features/mods/pages/ModPage";
+
+export default function ModPage() {
+  return <ModPageFeature />;
+}
+---
+RegisterPage.tsx
+import { useRegister } from "@/features/auth/hooks";
+import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+
+export default function RegisterPage() {
+  const { mutateAsync, isPending } = useRegister();
+  const navigate = useNavigate();
+
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e: any) => {
+    e.preventDefault();
+    setError("");
+
+    try {
+      await mutateAsync({
+        username: e.target.username.value,
+        email: e.target.email.value,
+        password: e.target.password.value,
+      });
+
+      navigate("/login");
+    } catch (err: any) {
+      setError(err?.message || "Error al registrarse");
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} style={{ padding: 20 }}>
+      <h1>Register</h1>
+
+      <input name="username" placeholder="Username" required />
+      <input name="email" placeholder="Email" required />
+      <input name="password" type="password" placeholder="Password" required />
+
+      {error && <p style={{ color: "red" }}>{error}</p>}
+
+      <button disabled={isPending}>
+        {isPending ? "Creando..." : "Register"}
+      </button>
+    </form>
+  );
+}
+---
+pages/HomePage/
+HomePage.tsx
+import { Link } from "react-router-dom";
+
+import Container from "@/shared/ui/container/Container";
+
+import styles from "./HomePage.module.css";
+
+export default function HomePage() {
+  return (
+    <Container>
+      <div className={styles.hero}>
+        <h1 className={styles.title}>
+          Discover Minecraft Content
+        </h1>
+
+        <p className={styles.subtitle}>
+          Explore mods, addons,
+          shaders, resource packs
+          and worlds from the
+          community.
+        </p>
+
+        <div className={styles.actions}>
+          <Link
+            to="/minecraft"
+            className={
+              styles.javaButton
+            }
+          >
+            Minecraft Java
+          </Link>
+
+          <Link
+            to="/minecraftbedrock"
+            className={
+              styles.bedrockButton
+            }
+          >
+            Minecraft Bedrock
+          </Link>
+        </div>
+      </div>
+    </Container>
+  );
+}
+---
+HomePage.module.css
+.hero {
+  display: flex;
+
+  justify-content: space-between;
+
+  align-items: center;
+
+  gap: 24px;
+
+  margin-bottom: 40px;
+}
+
+.title {
+  margin: 0;
+
+  font-size:
+    clamp(38px, 6vw, 64px);
+
+  font-weight: 800;
+
+  line-height: 1;
+}
+
+.subtitle {
+  margin-top: 14px;
+
+  color: #9c9c9c;
+
+  max-width: 680px;
+
+  line-height: 1.6;
+
+  font-size: 18px;
+}
+
+.actions {
+  display: flex;
+
+  align-items: center;
+
+  gap: 12px;
+}
+
+.list {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 18px;
+}
+
+@media (max-width: 900px) {
+  .hero {
+    flex-direction: column;
+
+    align-items: flex-start;
+  }
+
+  .actions {
+    width: 100%;
+
+    flex-wrap: wrap;
+  }
+}
+---
+pages/Project/
+ProjectDash.tsx
+import { useParams, NavLink, Outlet } from "react-router-dom";
+import { useMod } from "@/features/mods/hooks";
+import { useAuth } from "@/context/AuthContext";
+import Skeleton from "@/shared/ui/Skeleton";
+
+export default function ProjectDashboard() {
+  const { id } = useParams();
+  const { data, isLoading } = useMod(id!); // podés hacer useModById
+  const { user } = useAuth();
+
+  if (isLoading) return <Skeleton height={200} />;
+  if (!data) return <div>No encontrado</div>;
+
+  const isOwner = user?.id === data.authorId;
+
+  return (
+    <div style={{ display: "flex", minHeight: "100vh" }}>
+      
+      {/* SIDEBAR */}
+      <div
+        style={{
+          width: 220,
+          background: "#111",
+          padding: 16,
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+        }}
+      >
+        <h3>{data.title}</h3>
+
+        <NavLink to={`/project/${id}`}>📊 Overview</NavLink>
+        <NavLink to={`/project/${id}/versions`}>📦 Versions</NavLink>
+        <NavLink to={`/project/${id}/gallery`}>🖼 Gallery</NavLink>
+        <NavLink to={`/project/${id}/settings`}>⚙ Settings</NavLink>
+      </div>
+
+      {/* CONTENT */}
+      <div style={{ flex: 1, padding: 20 }}>
+        <Outlet context={{ mod: data, isOwner }} />
+      </div>
+    </div>
+  );
+}
+---
+pages/Project/components/
+Sidebar.tsx
+
+---
+FileDropZone.tsx
+import { useUploadStore } from "@/pages/project/stores/upload.store";
+
+export default function FileDropzone({
+  versionId,
+}: {
+  versionId: number;
+}) {
+  const addFiles = useUploadStore(
+    (s) => s.addFiles
+  );
+
+  //////////////////////////////////////////////////////
+  // DROP
+  //////////////////////////////////////////////////////
+
+  const handleDrop = (
+    e: React.DragEvent
+  ) => {
+    e.preventDefault();
+
+    const files = Array.from(
+      e.dataTransfer.files
+    );
+
+    addFiles(versionId, files);
+  };
+
+  //////////////////////////////////////////////////////
+  // INPUT
+  //////////////////////////////////////////////////////
+
+  const handleInput = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const files = Array.from(
+      e.target.files || []
+    );
+
+    addFiles(versionId, files);
+  };
+
+  //////////////////////////////////////////////////////
+  // UI
+  //////////////////////////////////////////////////////
+
+  return (
+    <label
+      onDrop={handleDrop}
+      onDragOver={(e) =>
+        e.preventDefault()
+      }
+      style={{
+        border: "2px dashed #555",
+        borderRadius: 16,
+        padding: 50,
+        display: "block",
+        cursor: "pointer",
+        textAlign: "center",
+      }}
+    >
+      <input
+        hidden
+        multiple
+        type="file"
+        onChange={handleInput}
+      />
+
+      <h3>
+        Drag & Drop mods aquí 🚀
+      </h3>
+
+      <p>
+        o hacé click para subir
+      </p>
+
+      <small>
+        soporta .jar y .zip
+      </small>
+    </label>
+  );
+}
+---
+pages/Project/tabs/
+gallerytab.tsx
+import { useOutletContext } from "react-router-dom";
+
+export default function GalleryTab() {
+  const { mod }: any = useOutletContext();
+
+  return (
+    <div>
+      <h2>Gallery</h2>
+
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        {mod.images.map((img: any) => (
+          <img
+            key={img.id}
+            src={`http://192.168.0.110:3000${img.url}`}
+            style={{ width: 120, borderRadius: 8 }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+---
+OverviewTab.tsx
+import { useOutletContext } from "react-router-dom";
+
+export default function OverviewTab() {
+  const { mod }: any = useOutletContext();
+
+  return (
+    <div>
+      <h2>Overview</h2>
+
+      <h3>Descripción</h3>
+      <p>{mod.description}</p>
+
+      <h3>Contenido</h3>
+      <div dangerouslySetInnerHTML={{ __html: mod.content }} />
+    </div>
+  );
+}
+---
+Settingstab.tsx
+import { useOutletContext } from "react-router-dom";
+
+export default function OverviewTab() {
+  const { mod }: any = useOutletContext();
+
+  return (
+    <div>
+      <h2>Overview</h2>
+
+      <h3>Descripción</h3>
+      <p>{mod.description}</p>
+
+      <h3>Contenido</h3>
+      <div dangerouslySetInnerHTML={{ __html: mod.content }} />
+    </div>
+  );
+}
+---
+VersionsTab.tsx
+import { useState } from "react";
+import { useOutletContext } from "react-router-dom";
+
+import FileDropzone from "@/pages/project/components/FileDropzone";
+import VersionsTable from "@/widgets/VersionsTable/index";
+
+const MC_VERSIONS_JAVA: string[] = [
+  "1.21.1",
+  "1.21",
+  "1.20.6",
+  "1.20.5",
+  "1.20.4",
+  "1.20.3",
+  "1.20.2",
+  "1.20.1",
+  "1.20",
+  "1.19.4",
+  "1.19.3",
+  "1.19.2",
+  "1.19.1",
+  "1.19",
+  "1.18.2",
+  "1.18.1",
+  "1.18",
+];
+
+const MC_VERSIONS_BEDROCK: string[] = [
+  "1.21.0",
+  "1.20.80",
+  "1.20.70",
+  "1.20.60",
+  "1.20.50",
+  "1.20.40",
+  "1.20.30",
+  "1.20.10",
+  "1.20.0",
+  "1.19.80",
+  "1.19.70",
+  "1.19.60",
+  "1.19.50",
+  "1.19.40",
+  "1.19.30",
+  "1.19.20",
+  "1.19.10",
+  "1.19.0",
+  "1.18.30",
+  "1.18.20",
+  "1.18.10",
+  "1.18.0",
+];
+
+type ModFile = {
+  id: string;
+  filename?: string;
+  size: number;
+  releaseType: string;
+  downloads: number;
+  url?: string;
+};
+
+type Version = {
+  id: string;
+  version: string;
+  minecraftVersion: string;
+  loader?: string;
+  createdAt: string;
+  files?: ModFile[];
+};
+
+export default function VersionsTab() {
+  const { mod } = useOutletContext<any>();
+
+  const [versions, setVersions] = useState<Version[]>(
+    mod.versions || []
+  );
+
+  const [versionId, setVersionId] =
+    useState<number | null>(null);
+
+  const [releaseType, setReleaseType] =
+    useState("release");
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const versionsList =
+    mod.platform === "BEDROCK"
+      ? MC_VERSIONS_BEDROCK
+      : MC_VERSIONS_JAVA;
+
+  //////////////////////////////////////////////////////
+  // CREATE VERSION
+  //////////////////////////////////////////////////////
+
+  const handleCreateVersion = async (
+    e: React.FormEvent<HTMLFormElement>
+  ) => {
+    e.preventDefault();
+
+    const form = e.currentTarget;
+
+    const version = (
+      form.elements.namedItem(
+        "version"
+      ) as HTMLInputElement
+    ).value;
+
+    const minecraftVersion = (
+      form.elements.namedItem(
+        "minecraftVersion"
+      ) as HTMLSelectElement
+    ).value;
+
+    const loader =
+      mod.platform === "JAVA"
+        ? (
+            form.elements.namedItem(
+              "loader"
+            ) as HTMLSelectElement
+          ).value
+        : undefined;
+
+    try {
+      setLoading(true);
+
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/mods/${mod.id}/versions`,
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+
+            Authorization: `Bearer ${localStorage.getItem(
+              "token"
+            )}`,
+          },
+
+          body: JSON.stringify({
+            version,
+            minecraftVersion,
+            loader,
+            releaseType,
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        throw new Error(
+          "Error creando versión"
+        );
+      }
+
+      const data = await res.json();
+
+      setVersionId(Number(data.id));
+
+      setVersions((prev) => [
+        data,
+        ...prev,
+      ]);
+
+      form.reset();
+
+    } catch (err) {
+      console.error(err);
+
+      alert("Error creando versión");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  //////////////////////////////////////////////////////
+  // UI
+  //////////////////////////////////////////////////////
+
+  return (
+    <div>
+      <h2>📦 Versions</h2>
+
+      <form onSubmit={handleCreateVersion}>
+        <input
+          name="version"
+          placeholder="Version name"
+          required
+        />
+
+        <select
+          name="minecraftVersion"
+          required
+        >
+          {versionsList.map((v) => (
+            <option
+              key={v}
+              value={v}
+            >
+              {v}
+            </option>
+          ))}
+        </select>
+
+        {mod.platform === "JAVA" && (
+          <select name="loader">
+            <option value="FABRIC">
+              Fabric
+            </option>
+
+            <option value="FORGE">
+              Forge
+            </option>
+
+            <option value="NEOFORGE">
+              NeoForge
+            </option>
+
+            <option value="QUILT">
+              Quilt
+            </option>
+          </select>
+        )}
+
+        <select
+          value={releaseType}
+          onChange={(e) =>
+            setReleaseType(
+              e.target.value
+            )
+          }
+        >
+          <option value="release">
+            Release
+          </option>
+
+          <option value="beta">
+            Beta
+          </option>
+
+          <option value="alpha">
+            Alpha
+          </option>
+        </select>
+
+        <button disabled={loading}>
+          {loading
+            ? "Creating..."
+            : "Create version"}
+        </button>
+      </form>
+
+      {versionId && (
+        <div style={{ marginTop: 24 }}>
+          <h3>Upload files</h3>
+
+          <FileDropzone
+            versionId={versionId}
+          />
+        </div>
+      )}
+
+      <VersionsTable
+        versions={versions}
+        isOwner
+      />
+    </div>
+  );
+}
+---
+Pages/SearchPage/
+SearchPage.tsx
+import { useMemo } from "react";
+
+import {
+  useSearchParams,
+} from "react-router-dom";
+
+import { useMods } from "@/features/mods/hooks";
+
+import SearchControls from "@/features/search/components/SearchControls";
+
+import ModCard from "@/widgets/mod-card/ModCard";
+
+import Container from "@/shared/ui/container/Container";
+import Section from "@/shared/ui/section/Section";
+
+import Skeleton from "@/shared/ui/Skeleton";
+import ErrorState from "@/shared/ui/ErrorState";
+import EmptyState from "@/shared/ui/EmptyState";
+
+import styles from "./SearchPage.module.css";
+
+type Props = {
+  platform:
+    | "JAVA"
+    | "BEDROCK";
+
+  title: string;
+};
+
+export default function SearchPage({
+  platform,
+  title,
+}: Props) {
+  //////////////////////////////////////////////////
+  // URL PARAMS
+  //////////////////////////////////////////////////
+
+  const [params] =
+    useSearchParams();
+
+  //////////////////////////////////////////////////
+  // FILTERS
+  //////////////////////////////////////////////////
+
+  const query =
+    params.get("query") || "";
+
+  const type =
+    params.get("type") || "";
+
+  const category =
+    params.get(
+      "category"
+    ) || "";
+
+  const loader =
+    params.get("loader") || "";
+
+  const version =
+    params.get("version") ||
+    "";
+
+  const sort =
+    params.get("sort") ||
+    "newest";
+
+  //////////////////////////////////////////////////
+  // QUERY PARAMS
+  //////////////////////////////////////////////////
+
+  const searchParams =
+    useMemo(
+      () => ({
+        page: 1,
+
+        platform,
+
+        query,
+
+        type,
+
+        category,
+
+        loader,
+
+        version,
+
+        sort,
+      }),
+
+      [
+        platform,
+        query,
+        type,
+        category,
+        loader,
+        version,
+        sort,
+      ]
+    );
+
+  //////////////////////////////////////////////////
+  // API
+  //////////////////////////////////////////////////
+
+  const {
+    data,
+    isLoading,
+    error,
+  } = useMods(
+    searchParams
+  );
+
+  //////////////////////////////////////////////////
+  // RENDER
+  //////////////////////////////////////////////////
+
+  return (
+    <Container>
+      {/* HEADER */}
+
+      <div className={styles.hero}>
+        <h1>{title}</h1>
+
+        <p>
+          Explore community-made
+          content
+        </p>
+      </div>
+
+      {/* FILTERS */}
+
+      <SearchControls
+        platform={platform}
+      />
+
+      {/* LOADING */}
+
+      {isLoading && (
+        <div className={styles.list}>
+          {Array.from({
+            length: 8,
+          }).map((_, i) => (
+            <Skeleton
+              key={i}
+              height={180}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* ERROR */}
+
+      {error && (
+        <ErrorState message="Failed to load mods" />
+      )}
+
+      {/* EMPTY */}
+
+      {!isLoading &&
+        !error &&
+        !data?.data?.length && (
+          <EmptyState message="No projects found" />
+        )}
+
+      {/* RESULTS */}
+
+      {!!data?.data?.length && (
+        <Section
+          title={`${data.meta.total} results`}
+        >
+          <div className={styles.list}>
+            {data.data.map(
+              (mod: any) => (
+                <ModCard
+                  key={mod.id}
+                  mod={mod}
+                />
+              )
+            )}
+          </div>
+        </Section>
+      )}
+    </Container>
+  );
+}
+---
+SearchPage.module.css
+.page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 32px;
+}
+
+.hero {
+  margin-bottom: 32px;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: 42px;
+}
+
+.hero p {
+  opacity: 0.7;
+  margin-top: 8px;
+}
+
+.searchInput {
+  width: 100%;
+  margin-top: 20px;
+
+  padding: 16px;
+
+  border-radius: 14px;
+  border: 1px solid #2c2c2c;
+
+  background: #181818;
+  color: white;
+
+  font-size: 16px;
+}
+
+.filters {
+  display: flex;
+  gap: 12px;
+
+  margin-bottom: 24px;
+}
+
+.filters select {
+  padding: 10px 14px;
+
+  border-radius: 10px;
+
+  background: #1b1b1b;
+  color: white;
+
+  border: 1px solid #333;
+}
+
+.grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      auto-fill,
+      minmax(340px, 1fr)
+    );
+
+  gap: 20px;
+}
+---
+router/
+index.tsx
+import { createBrowserRouter } from "react-router-dom";
+
+import AppLayout from "@/app/layouts/AppLayout/AppLayout";
+
+import CreateModPage from "@/pages/CreateModPage";
+import LoginPage from "@/pages/LoginPage";
+import RegisterPage from "@/pages/RegisterPage";
+
+import HomePage from "@/pages/HomePage/HomePage";
+import SearchPage from "@/pages/SearchPage/SearchPage";
+import ModPage from "@/pages/ModPage";
+
+// DASHBOARD
+import ProjectDashboard from "@/pages/project/ProjectDashboard";
+import OverviewTab from "@/pages/project/tabs/OverviewTab";
+import VersionsTab from "@/pages/project/tabs/VersionsTab";
+import GalleryTab from "@/pages/project/tabs/GalleryTab";
+import SettingsTab from "@/pages/project/tabs/SettingsTab";
+
+export const router =
+  createBrowserRouter([
+    {
+      element: <AppLayout />,
+
+      children: [
+        //////////////////////////////////////////////////
+        // HOME
+        //////////////////////////////////////////////////
+
+        {
+          path: "/",
+          element: <HomePage />,
+        },
+
+        //////////////////////////////////////////////////
+        // GAME PAGES
+        //////////////////////////////////////////////////
+
+        {
+          path: "/minecraft",
+          element: (
+            <SearchPage
+              platform="JAVA"
+              title="Minecraft Java Mods"
+            />
+          ),
+        },
+
+        {
+          path: "/minecraftbedrock",
+          element: (
+            <SearchPage
+              platform="BEDROCK"
+              title="Minecraft Bedrock Addons"
+            />
+          ),
+        },
+
+        //////////////////////////////////////////////////
+        // SEARCH
+        //////////////////////////////////////////////////
+
+        {
+          path: "/search",
+          element: (
+            <SearchPage
+              platform="JAVA"
+              title="Search Projects"
+            />
+          ),
+        },
+
+        //////////////////////////////////////////////////
+        // MOD PAGE
+        //////////////////////////////////////////////////
+
+        {
+          path: "/mods/:slug",
+          element: <ModPage />,
+        },
+
+        //////////////////////////////////////////////////
+        // AUTH
+        //////////////////////////////////////////////////
+
+        {
+          path: "/login",
+          element: <LoginPage />,
+        },
+
+        {
+          path: "/register",
+          element: <RegisterPage />,
+        },
+
+        //////////////////////////////////////////////////
+        // CREATE
+        // SOLO ESTA REQUIERE LOGIN
+        //////////////////////////////////////////////////
+
+        {
+          path: "/create",
+          element: <CreateModPage />,
+        },
+
+        //////////////////////////////////////////////////
+        // PROJECT DASHBOARD
+        //////////////////////////////////////////////////
+
+        {
+          path: "/project/:slug",
+          element: <ProjectDashboard />,
+
+          children: [
+            {
+              index: true,
+              element: <OverviewTab />,
+            },
+
+            {
+              path: "versions",
+              element: <VersionsTab />,
+            },
+
+            {
+              path: "gallery",
+              element: <GalleryTab />,
+            },
+
+            {
+              path: "settings",
+              element: <SettingsTab />,
+            },
+          ],
+        },
+      ],
+    },
+  ]);
+---
+shared/api/
+client.ts
+import { normalizeError } from "./error";
+
+const API_URL =
+  import.meta.env.VITE_API_URL ||
+  "http://192.168.0.110:3000";
+
+export async function apiFetch<T = any>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
+  ////////////////////////////////////////////////////
+  // TOKEN
+  ////////////////////////////////////////////////////
+
+  const token =
+    localStorage.getItem("token");
+
+  ////////////////////////////////////////////////////
+  // REQUEST
+  ////////////////////////////////////////////////////
+
+  const res = await fetch(
+    `${API_URL}${endpoint}`,
+    {
+      ...options,
+
+      headers: {
+        "Content-Type":
+          "application/json",
+
+        ...(token
+          ? {
+              Authorization: `Bearer ${token}`,
+            }
+          : {}),
+
+        ...options.headers,
+      },
+    }
+  );
+
+  ////////////////////////////////////////////////////
+  // JSON
+  ////////////////////////////////////////////////////
+
+  const data = await res
+    .json()
+    .catch(() => null);
+
+  ////////////////////////////////////////////////////
+  // AUTH EXPIRED
+  ////////////////////////////////////////////////////
+
+  if (res.status === 401) {
+    localStorage.removeItem(
+      "token"
+    );
+
+    localStorage.removeItem(
+      "user"
+    );
+
+    //////////////////////////////////////////////////
+    // REDIRECT
+    //////////////////////////////////////////////////
+
+    if (
+      window.location.pathname !==
+      "/login"
+    ) {
+      window.location.href =
+        "/login";
+    }
+
+    throw new Error(
+      "Sesión expirada"
+    );
+  }
+
+  ////////////////////////////////////////////////////
+  // NORMAL ERROR
+  ////////////////////////////////////////////////////
+
+  if (!res.ok) {
+    throw normalizeError(data);
+  }
+
+  return data;
+}
+---
+error.ts
+export function normalizeError(err: any) {
+  if (!err) return { message: "Unknown error" };
+
+  if (err.message) return err;
+  if (err.error) return { message: err.error };
+
+  return { message: "Error desconocido" };
+}
+---
+shared/components/
+ToastProvider.tsx
+import { createContext, useContext, useState } from "react";
+
+type Toast = {
+  id: number;
+  message: string;
+};
+
+const ToastContext = createContext<any>(null);
+
+export function ToastProvider({ children }: any) {
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  const addToast = (message: string) => {
+    const id = Date.now();
+
+    setToasts((prev) => [...prev, { id, message }]);
+
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 3000);
+  };
+
+  return (
+    <ToastContext.Provider value={{ addToast }}>
+      {children}
+
+      {/* UI */}
+      <div
+        style={{
+          position: "fixed",
+          bottom: 20,
+          right: 20,
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+        }}
+      >
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            style={{
+              background: "#222",
+              color: "white",
+              padding: "10px 14px",
+              borderRadius: 8,
+            }}
+          >
+            {t.message}
+          </div>
+        ))}
+      </div>
+    </ToastContext.Provider>
+  );
+}
+
+export const useToast = () => useContext(ToastContext);
+---
+shaders/hooks/
+useDebounce.ts
+import {
+  useEffect,
+  useState,
+} from "react";
+
+export function useDebounce<T>(
+  value: T,
+  delay = 400
+) {
+  const [debounced, setDebounced] =
+    useState(value);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebounced(value);
+    }, delay);
+
+    return () =>
+      clearTimeout(timer);
+  }, [value, delay]);
+
+  return debounced;
+}
+---
+useSearchParamsState.ts
+import {
+  useSearchParams,
+} from "react-router-dom";
+
+export function useSearchParamsState() {
+  const [params, setParams] =
+    useSearchParams();
+
+  function setParam(
+    key: string,
+    value?: string
+  ) {
+    const next =
+      new URLSearchParams(params);
+
+    if (!value) {
+      next.delete(key);
+    } else {
+      next.set(key, value);
+    }
+
+    setParams(next);
+  }
+
+  return {
+    params,
+    setParam,
+  };
+}
+---
+shared/lib/
+authFetch.ts
+export async function authFetch(url: string, options: RequestInit = {}) {
+  const token = localStorage.getItem("token");
+
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      Authorization: token ? `Bearer ${token}` : "",
+    },
+  });
+
+  // 🚨 HANDLE GLOBAL 401
+  if (res.status === 401) {
+    console.warn("🔒 Usuario no autenticado o token inválido");
+
+    // 🔥 limpiar sesión
+    localStorage.removeItem("token");
+
+    // opcional: limpiar otros datos
+    localStorage.removeItem("user");
+
+    // 🚀 redirect HARD (evita estados rotos)
+    window.location.href = "/login";
+
+    throw new Error("Unauthorized");
+  }
+
+  return res;
+}
+---
+fetcher.ts
+export async function authFetch(url: string, options: RequestInit = {}) {
+  const token = localStorage.getItem("token");
+
+  return fetch(url, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      Authorization: token ? `Bearer ${token}` : "",
+    },
+  });
+}
+---
+queryKeys.ts
+export const queryKeys = {
+  mods: {
+    all: ["mods"] as const,
+
+    lists: () =>
+      [...queryKeys.mods.all, "list"] as const,
+
+    list: (params?: any) => [
+      "mods",
+      params,
+    ],
+
+    detail: (slug: string) => [
+      "mod",
+      slug,
+    ],
+
+    interactions: (
+      modId: number
+    ) => [
+      "mod-interactions",
+      modId,
+    ],
+  },
+};
+---
+isOwner.ts
+export function isOwner(userId: number, authorId: number) {
+  return userId === authorId;
+}
+---
+shared/ui/
+EmptyState.tsx
+export default function EmptyState({ message }: { message: string }) {
+  return (
+    <div
+      style={{
+        padding: 30,
+        textAlign: "center",
+        opacity: 0.6,
+      }}
+    >
+      {message}
+    </div>
+  );
+}
+---
+ErrorState.tsx
+export default function ErrorState({ message }: { message?: string }) {
+  return (
+    <div
+      style={{
+        padding: 20,
+        background: "#2a1a1a",
+        color: "#ffb3b3",
+        borderRadius: 8,
+      }}
+    >
+      <strong>Error:</strong> {message || "Algo salió mal"}
+    </div>
+  );
+}
+---
+Skeleton.tsx
+export default function Skeleton({ height = 20 }: { height?: number }) {
+  return (
+    <div
+      style={{
+        height,
+        background: "#2a2a2a",
+        borderRadius: 6,
+        animation: "pulse 1.5s infinite",
+      }}
+    />
+  );
+}
+---
+shared/ui/badge/
+Badge.module.css
+.badge {
+  background: #2a2a2a;
+
+  color: #d1d1d1;
+
+  border-radius: 999px;
+
+  padding: 4px 10px;
+
+  font-size: 12px;
+
+  font-weight: 500;
+
+  border: 1px solid #333;
+}
+---
+Badge.tsx
+import type { ReactNode } from "react";
+
+import styles from "./Badge.module.css";
+
+type BadgeProps = {
+  children: ReactNode;
+};
+
+export default function Badge({
+  children,
+}: BadgeProps) {
+  return (
+    <span className={styles.badge}>
+      {children}
+    </span>
+  );
+}
+---
+shared/ui/button/
+Button.tsx
+import type {
+  ButtonHTMLAttributes,
+  ReactNode,
+} from "react";
+
+import clsx from "clsx";
+
+import styles from "./Button.module.css";
+
+type ButtonProps =
+  ButtonHTMLAttributes<HTMLButtonElement> & {
+    children: ReactNode;
+
+    variant?:
+      | "primary"
+      | "secondary"
+      | "ghost";
+
+    loading?: boolean;
+  };
+
+export default function Button({
+  children,
+  variant = "primary",
+  loading,
+  className,
+  disabled,
+  ...props
+}: ButtonProps) {
+  return (
+    <button
+      className={clsx(
+        styles.button,
+        styles[variant],
+        className
+      )}
+      disabled={
+        disabled || loading
+      }
+      {...props}
+    >
+      {loading
+        ? "Cargando..."
+        : children}
+    </button>
+  );
+}
+---
+Button.module.css
+.button {
+  border: none;
+
+  border-radius: 12px;
+
+  padding: 10px 16px;
+
+  font-size: 14px;
+
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition:
+    transform 0.15s ease,
+    opacity 0.15s ease,
+    background 0.15s ease;
+
+  display: inline-flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  gap: 8px;
+}
+
+.button:hover {
+  transform: translateY(-1px);
+}
+
+.button:active {
+  transform: scale(0.98);
+}
+
+.button:disabled {
+  opacity: 0.6;
+
+  cursor: not-allowed;
+}
+
+.primary {
+  background: white;
+  color: black;
+}
+
+.secondary {
+  background: #2a2a2a;
+  color: white;
+}
+
+.ghost {
+  background: transparent;
+  color: white;
+}
+---
+shared/ui/card/
+Card.tsx
+import styles from "./Card.module.css";
+
+import type { ReactNode } from "react";
+import clsx from "clsx";
+
+type CardProps = {
+  children: ReactNode;
+
+  className?: string;
+
+  hoverable?: boolean;
+
+  padding?: "sm" | "md" | "lg";
+};
+
+export default function Card({
+  children,
+  className,
+  hoverable = false,
+  padding = "md",
+}: CardProps) {
+  return (
+    <div
+      className={clsx(
+        styles.card,
+        styles[padding],
+
+        hoverable &&
+          styles.hoverable,
+
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+---
+Card.module.css
+.card {
+  background: #1b1b1b;
+
+  border: 1px solid #2a2a2a;
+
+  border-radius: 16px;
+
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease;
+
+  overflow: hidden;
+}
+
+.hoverable:hover {
+  transform: translateY(-2px);
+
+  border-color: #3a3a3a;
+
+  background: #202020;
+
+  box-shadow:
+    0 10px 30px rgba(0,0,0,0.25);
+}
+
+.sm {
+  padding: 10px;
+}
+
+.md {
+  padding: 16px;
+}
+
+.lg {
+  padding: 24px;
+}
+---
+shared/ui/container/
+Container.tsx
+import type { ReactNode } from "react";
+
+import styles from "./Container.module.css";
+
+type Props = {
+  children: ReactNode;
+};
+
+export default function Container({
+  children,
+}: Props) {
+  return (
+    <div className={styles.container}>
+      {children}
+    </div>
+  );
+}
+---
+Container.module.css
+.container {
+  width: 100%;
+
+  max-width: 1400px;
+
+  margin: 0 auto;
+
+  padding:
+    24px
+    clamp(16px, 3vw, 32px);
+}
+---
+shared/ui/section/
+Section.tsx
+import type { ReactNode } from "react";
+
+import styles from "./Section.module.css";
+
+type Props = {
+  title?: string;
+
+  children: ReactNode;
+};
+
+export default function Section({
+  title,
+  children,
+}: Props) {
+  return (
+    <section className={styles.section}>
+      {title && (
+        <h2 className={styles.title}>
+          {title}
+        </h2>
+      )}
+
+      {children}
+    </section>
+  );
+}
+---
+Section.module.css
+.section {
+  margin-top: 40px;
+}
+
+.title {
+  margin: 0 0 18px;
+
+  font-size: 28px;
+
+  font-weight: 700;
+
+  color: white;
+}
+---
+widgets/mod-card/
+ModCard.tsx
+import { Link } from "react-router-dom";
+
+import Card from "@/shared/ui/card/Card";
+import Badge from "@/shared/ui/badge/Badge";
+
+import LikeButton from "@/features/interactions/components/LikeButton";
+import FavoriteButton from "@/features/interactions/components/FavoriteButton";
+
+import styles from "./ModCard.module.css";
+
+type ModCardProps = {
+  mod: any;
+};
+
+const API_URL =
+  import.meta.env.VITE_API_URL;
+
+export default function ModCard({
+  mod,
+}: ModCardProps) {
+  const cover = mod.images?.find(
+    (img: any) => img.isCover
+  );
+
+  return (
+    <Card
+      hoverable
+      padding="sm"
+      className={styles.card}
+    >
+      <Link
+        to={`/mods/${mod.slug}`}
+        className={styles.link}
+      >
+        //////////////////////////////////////////////////
+        // IMAGE
+        //////////////////////////////////////////////////
+
+        <div className={styles.imageWrapper}>
+          <img
+            src={`${API_URL}${cover?.url}`}
+            alt={mod.title}
+            className={styles.image}
+          />
+
+          <div className={styles.overlay} />
+        </div>
+
+        //////////////////////////////////////////////////
+        // CONTENT
+        //////////////////////////////////////////////////
+
+        <div className={styles.content}>
+          ////////////////////////////////////////////////
+          // HEADER
+          ////////////////////////////////////////////////
+
+          <div className={styles.header}>
+            <h3 className={styles.title}>
+              {mod.title}
+            </h3>
+
+            <div
+              className={styles.author}
+            >
+              by{" "}
+              {mod.author
+                ?.username ||
+                "Unknown"}
+            </div>
+          </div>
+
+          ////////////////////////////////////////////////
+          // DESCRIPTION
+          ////////////////////////////////////////////////
+
+          <p
+            className={
+              styles.description
+            }
+          >
+            {mod.description}
+          </p>
+
+          ////////////////////////////////////////////////
+          // TAGS
+          ////////////////////////////////////////////////
+
+          <div className={styles.tags}>
+            {mod.tags
+              ?.slice(0, 4)
+              .map((tag: any) => (
+                <Badge key={tag.name}>
+                  {tag.name}
+                </Badge>
+              ))}
+          </div>
+
+          ////////////////////////////////////////////////
+          // FOOTER
+          ////////////////////////////////////////////////
+
+          <div className={styles.footer}>
+            ////////////////////////////////////////////
+            // STATS
+            ////////////////////////////////////////////
+
+            <div
+              className={styles.stats}
+            >
+              <span>
+                ❤️{" "}
+                {
+                  mod.stats
+                    ?.likes
+                }
+              </span>
+
+              <span>
+                👁{" "}
+                {
+                  mod.stats
+                    ?.views
+                }
+              </span>
+
+              <span>
+                ⬇️{" "}
+                {
+                  mod.stats
+                    ?.downloads
+                }
+              </span>
+            </div>
+
+            ////////////////////////////////////////////
+            // ACTIONS
+            ////////////////////////////////////////////
+
+            <div
+              className={
+                styles.actions
+              }
+              onClick={(e) =>
+                e.preventDefault()
+              }
+            >
+              <LikeButton
+                modId={mod.id}
+                slug={mod.slug}
+              />
+
+              <FavoriteButton
+                modId={mod.id}
+                slug={mod.slug}
+              />
+            </div>
+          </div>
+        </div>
+      </Link>
+    </Card>
+  );
+}
+---
+ModCard.module.css
+.card {
+  width: 100%;
+}
+
+.link {
+  display: flex;
+
+  gap: 16px;
+
+  text-decoration: none;
+
+  color: inherit;
+}
+
+.imageWrapper {
+  position: relative;
+
+  width: 180px;
+
+  min-width: 180px;
+
+  height: 140px;
+
+  border-radius: 14px;
+
+  overflow: hidden;
+
+  background: #252525;
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+
+  object-fit: cover;
+
+  transition:
+    transform 0.3s ease;
+}
+
+.card:hover .image {
+  transform: scale(1.04);
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+
+  background:
+    linear-gradient(
+      to top,
+      rgba(0,0,0,0.35),
+      transparent
+    );
+}
+
+.content {
+  flex: 1;
+
+  display: flex;
+
+  flex-direction: column;
+
+  min-width: 0;
+}
+
+.header {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 4px;
+}
+
+.title {
+  margin: 0;
+
+  font-size: 22px;
+
+  font-weight: 700;
+
+  color: white;
+}
+
+.author {
+  font-size: 13px;
+
+  color: #8f8f8f;
+}
+
+.description {
+  margin-top: 10px;
+
+  color: #b7b7b7;
+
+  line-height: 1.5;
+
+  font-size: 14px;
+
+  display: -webkit-box;
+
+  -webkit-line-clamp: 2;
+
+  -webkit-box-orient: vertical;
+
+  overflow: hidden;
+}
+
+.tags {
+  display: flex;
+
+  flex-wrap: wrap;
+
+  gap: 8px;
+
+  margin-top: 14px;
+}
+
+.footer {
+  margin-top: auto;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  gap: 12px;
+
+  padding-top: 18px;
+}
+
+.stats {
+  display: flex;
+
+  align-items: center;
+
+  gap: 14px;
+
+  color: #8c8c8c;
+
+  font-size: 13px;
+}
+
+.actions {
+  display: flex;
+
+  align-items: center;
+
+  gap: 8px;
+}
+
+@media (max-width: 780px) {
+  .link {
+    flex-direction: column;
+  }
+
+  .imageWrapper {
+    width: 100%;
+
+    height: 220px;
+  }
+
+  .footer {
+    flex-direction: column;
+
+    align-items: flex-start;
+  }
+}
+---
+Card.module.css
+.card {
+  background: #1b1b1b;
+
+  border: 1px solid #2a2a2a;
+
+  border-radius: 16px;
+
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease;
+
+  overflow: hidden;
+}
+
+.hoverable:hover {
+  transform: translateY(-2px);
+
+  border-color: #3a3a3a;
+
+  background: #202020;
+
+  box-shadow:
+    0 10px 30px rgba(0,0,0,0.25);
+}
+
+.sm {
+  padding: 10px;
+}
+
+.md {
+  padding: 16px;
+}
+
+.lg {
+  padding: 24px;
+}
+---
+widgets/ModGallery/
+index.tsx
+export default function ModGallery({ images }: any) {
+  if (!images?.length) return null;
+
+  const BASE = "http://192.168.0.110:3000";
+  
+  return (
+    <div style={{ display: "flex", gap: 10, overflowX: "auto" }}>
+      {images.map((img: any) => (
+        <img
+          key={img.id}
+          src={BASE + img.url}
+          style={{
+            width: 200,
+            height: 120,
+            objectFit: "cover",
+            borderRadius: 8,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+---
+widgets/ModHeader/
+index.tsx
+import LikeButton from "@/features/like/components/LikeButton";
+import FavoriteButton from "@/features/favorite/components/FavoriteButton";
+import { useAuth } from "@/context/AuthContext";
+import { useNavigate } from "react-router-dom";
+
+type ModHeaderProps = {
+  mod: any;
+};
+
+export default function ModHeader({ mod }: ModHeaderProps) {
+  const cover = mod.images?.find((i: any) => i.isCover);
+
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const isOwner = user?.id === mod.authorId;
+
+  return (
+    <div style={{ display: "flex", gap: 16 }}>
+      {/* COVER */}
+      <img
+        src={`http://192.168.0.110:3000${cover?.url}`}
+        alt={mod.title}
+        style={{
+          width: 120,
+          height: 120,
+          borderRadius: 12,
+          objectFit: "cover",
+        }}
+      />
+
+      <div style={{ flex: 1 }}>
+        {/* TITLE */}
+        <h1 style={{ margin: 0 }}>{mod.title}</h1>
+
+        {/* META */}
+        <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
+        </div>
+
+        {/* DESC */}
+        <p style={{ opacity: 0.7 }}>{mod.description}</p>
+
+        {/* TAGS */}
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {mod.tags?.map((t: any) => (
+            <span
+              key={t.tag.name}
+              style={{
+                background: "#333",
+                padding: "4px 8px",
+                borderRadius: 6,
+                fontSize: 12,
+              }}
+            >
+              {t.tag.name}
+            </span>
+          ))}
+        </div>
+
+        {/* ACTIONS */}
+        <div style={{ marginTop: 10, display: "flex", gap: 10 }}>
+          <LikeButton modId={mod.id} initialCount={mod.likesCount} />
+          <FavoriteButton modId={mod.id} initial={mod.isFavorited} />
+
+          <button>⬇️ Descargar</button>
+
+          {isOwner && (
+            <button onClick={() => navigate(`/mods/${mod.id}/edit`)}>
+              ✏️ Editar
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+---
+widgets/navbar/
+Navbar.tsx
+import { Link } from "react-router-dom";
+
+import { Search } from "lucide-react";
+
+import { useAuth } from "@/context/AuthContext";
+
+import Container from "@/shared/ui/container/Container";
+import NavbarSearch from "@/widgets/navbar-search/NavbarSearch";
+import UserMenu from "@/widgets/user-menu/UserMenu";
+
+import styles from "./Navbar.module.css";
+
+export default function Navbar() {
+  const { user } = useAuth();
+
+  return (
+    <header className={styles.navbar}>
+      <Container>
+        <div className={styles.inner}>
+          {/* LEFT */}
+
+          <div className={styles.left}>
+            <Link
+              to="/"
+              className={styles.logo}
+            >
+              ModPlatform
+            </Link>
+
+            <nav className={styles.nav}>
+              <Link to="/">
+                Discover
+              </Link>
+
+              <Link to="/search">
+                Search
+              </Link>
+            </nav>
+          </div>
+
+          {/* CENTER */}
+
+          <div className={styles.search}>
+            <Search size={18} />
+
+            <NavbarSearch />
+          </div>
+
+          {/* RIGHT */}
+
+          <div className={styles.right}>
+            <Link
+              to="/create"
+              className={
+                styles.createButton
+              }
+            >
+              + Upload
+            </Link>
+
+            {user ? (
+              <UserMenu />
+            ) : (
+              <div
+                className={
+                  styles.auth
+                }
+              >
+                <Link to="/login">
+                  Login
+                </Link>
+
+                <Link
+                  to="/register"
+                  className={
+                    styles.register
+                  }
+                >
+                  Register
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+      </Container>
+    </header>
+  );
+}
+---
+Navbar.module.css
+.navbar {
+  position: fixed;
+
+  top: 0;
+  left: 0;
+  right: 0;
+
+  height: 72px;
+
+  background: rgba(15, 15, 15, 0.9);
+
+  backdrop-filter: blur(12px);
+
+  border-bottom: 1px solid #222;
+
+  z-index: 1000;
+}
+
+.inner {
+  height: 72px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 20px;
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+
+.logo {
+  font-size: 20px;
+  font-weight: 700;
+
+  color: white;
+  text-decoration: none;
+}
+
+.nav {
+  display: flex;
+  gap: 16px;
+}
+
+.nav a {
+  color: #b3b3b3;
+  text-decoration: none;
+
+  transition: 0.2s;
+}
+
+.nav a:hover {
+  color: white;
+}
+
+.search {
+  flex: 1;
+  max-width: 500px;
+
+  height: 42px;
+
+  background: #181818;
+
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+
+  display: flex;
+  align-items: center;
+
+  gap: 10px;
+
+  padding: 0 14px;
+
+  color: #888;
+}
+
+.search input {
+  flex: 1;
+
+  background: transparent;
+  border: none;
+  outline: none;
+
+  color: white;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.createButton {
+  background: white;
+  color: black;
+
+  padding: 10px 14px;
+
+  border-radius: 10px;
+
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.auth {
+  display: flex;
+  gap: 10px;
+}
+
+.auth a {
+  color: white;
+  text-decoration: none;
+}
+
+.register {
+  opacity: 0.7;
+}
+---
+widgets/navbarsearch/
+NavbarSearch.tsx
+import {
+  useNavigate,
+  useSearchParams,
+} from "react-router-dom";
+
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+
+import { useDebounce } from "@/features/search/lib/useDebounce";
+
+import { useMods } from "@/features/mods/hooks";
+
+import SearchResultCard from "@/widgets/search-result-card/SearchResultCard";
+
+import styles from "./NavbarSearch.module.css";
+
+export default function NavbarSearch() {
+  const navigate =
+    useNavigate();
+
+  const [searchParams] =
+    useSearchParams();
+
+  //////////////////////////////////////////////////
+  // STATE
+  //////////////////////////////////////////////////
+
+  const [value, setValue] =
+    useState(
+      searchParams.get(
+        "query"
+      ) || ""
+    );
+
+  const [focused, setFocused] =
+    useState(false);
+
+  const wrapperRef =
+    useRef<HTMLDivElement>(null);
+
+  //////////////////////////////////////////////////
+  // DEBOUNCE
+  //////////////////////////////////////////////////
+
+  const debounced =
+    useDebounce(value, 400);
+
+  //////////////////////////////////////////////////
+  // SEARCH
+  //////////////////////////////////////////////////
+
+  const { data } = useMods({
+    page: 1,
+    query: debounced,
+    limit: 6,
+  });
+
+  //////////////////////////////////////////////////
+  // AUTO SEARCH PAGE SYNC
+  //////////////////////////////////////////////////
+
+  useEffect(() => {
+    if (
+      window.location.pathname !==
+      "/search"
+    ) {
+      return;
+    }
+
+    navigate(
+      `/search?query=${encodeURIComponent(
+        debounced
+      )}`,
+      {
+        replace: true,
+      }
+    );
+  }, [debounced]);
+
+  //////////////////////////////////////////////////
+  // OUTSIDE CLICK
+  //////////////////////////////////////////////////
+
+  useEffect(() => {
+    function handleClick(
+      e: MouseEvent
+    ) {
+      if (
+        wrapperRef.current &&
+        !wrapperRef.current.contains(
+          e.target as Node
+        )
+      ) {
+        setFocused(false);
+      }
+    }
+
+    document.addEventListener(
+      "mousedown",
+      handleClick
+    );
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        handleClick
+      );
+    };
+  }, []);
+
+  //////////////////////////////////////////////////
+  // SUBMIT
+  //////////////////////////////////////////////////
+
+  function handleSubmit(
+    e: React.FormEvent
+  ) {
+    e.preventDefault();
+
+    navigate(
+      `/search?query=${encodeURIComponent(
+        value
+      )}`
+    );
+
+    setFocused(false);
+  }
+
+  //////////////////////////////////////////////////
+  // RESULTS
+  //////////////////////////////////////////////////
+
+  const results =
+    data?.data || [];
+
+  return (
+    <div
+      className={styles.wrapper}
+      ref={wrapperRef}
+    >
+      <form
+        onSubmit={handleSubmit}
+        className={styles.form}
+      >
+        <input
+          className={styles.input}
+          type="text"
+          placeholder="Search mods..."
+          value={value}
+          onFocus={() =>
+            setFocused(true)
+          }
+          onChange={(e) =>
+            setValue(
+              e.target.value
+            )
+          }
+        />
+      </form>
+
+      {focused &&
+        debounced &&
+        results.length > 0 && (
+          <div
+            className={
+              styles.results
+            }
+          >
+            {results.map(
+              (mod: any) => (
+                <SearchResultCard
+                  key={mod.id}
+                  mod={mod}
+                />
+              )
+            )}
+          </div>
+        )}
+    </div>
+  );
+}
+---
+NavbarSearch.module.css
+.wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.results {
+  position: absolute;
+
+  top: calc(100% + 8px);
+  left: 0;
+
+  width: 100%;
+
+  background: #1b1b1b;
+
+  border: 1px solid #2a2a2a;
+  border-radius: 16px;
+
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  max-height: 420px;
+
+  box-shadow:
+    0 10px 40px rgba(0, 0, 0, 0.45);
+
+  z-index: 100;
+}
+
+.form {
+  flex: 1;
+
+  max-width: 700px;
+}
+
+.input {
+  width: 100%;
+
+  height: 44px;
+
+  border-radius: 12px;
+
+  border: 1px solid #2f2f2f;
+
+  background: #151515;
+
+  color: white;
+
+  padding: 0 16px;
+
+  font-size: 15px;
+
+  transition: 0.2s;
+}
+
+.input:focus {
+  outline: none;
+
+  border-color: #4ade80;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(74, 222, 128, 0.15);
+}
+---
+widgets/search-result-card/
+SearchResultCard.tsx
+import { Link } from "react-router-dom";
+
+import styles from "./SearchResultCard.module.css";
+
+type Props = {
+  mod: any;
+};
+
+export default function SearchResultCard({
+  mod,
+}: Props) {
+  const cover = mod.images?.find(
+    (img: any) => img.isCover
+  );
+
+  return (
+    <Link
+      to={`/mods/${mod.slug}`}
+      className={styles.card}
+    >
+      {/* IMAGE */}
+
+      <img
+        src={`http://192.168.0.110:3000${cover?.url}`}
+        alt={mod.title}
+        className={styles.image}
+      />
+
+      {/* CONTENT */}
+
+      <div className={styles.content}>
+        <div className={styles.top}>
+          <h4 className={styles.title}>
+            {mod.title}
+          </h4>
+
+          <span className={styles.downloads}>
+            ⬇ {mod.stats?.downloads || 0}
+          </span>
+        </div>
+
+        <p className={styles.description}>
+          {mod.description}
+        </p>
+
+        <div className={styles.bottom}>
+          <span>
+            ❤️ {mod.stats?.likes || 0}
+          </span>
+
+          <span>
+            👁 {mod.stats?.views || 0}
+          </span>
+
+          <span className={styles.author}>
+            by{" "}
+            {mod.author?.username ||
+              "Unknown"}
+          </span>
+        </div>
+      </div>
+    </Link>
+  );
+}
+---
+SearchResultCard.module.css
+.card {
+  display: flex;
+  gap: 12px;
+
+  padding: 10px;
+
+  text-decoration: none;
+  color: white;
+
+  transition:
+    background 0.15s,
+    transform 0.15s;
+}
+
+.card:hover {
+  background: #232323;
+}
+
+.image {
+  width: 72px;
+  height: 72px;
+
+  object-fit: cover;
+
+  border-radius: 10px;
+
+  flex-shrink: 0;
+}
+
+.content {
+  flex: 1;
+
+  min-width: 0;
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.title {
+  margin: 0;
+
+  font-size: 15px;
+  font-weight: 700;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.downloads {
+  opacity: 0.7;
+  font-size: 12px;
+
+  white-space: nowrap;
+}
+
+.description {
+  margin: 6px 0;
+
+  font-size: 13px;
+  line-height: 1.4;
+
+  opacity: 0.75;
+
+  overflow: hidden;
+
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.bottom {
+  display: flex;
+  gap: 10px;
+
+  font-size: 12px;
+
+  opacity: 0.65;
+
+  flex-wrap: wrap;
+}
+
+.author {
+  margin-left: auto;
+}
+---
+widgets/user-menu/
+UserMenu.tsx
+import { logout } from "@/context/AuthContext";
+
+import { useAuth } from "@/context/AuthContext";
+
+import styles from "./UserMenu.module.css";
+
+export default function UserMenu() {
+  const { user } = useAuth();
+
+  return (
+    <div className={styles.menu}>
+      <div className={styles.avatar}>
+        {user?.username?.[0]}
+      </div>
+
+      <button onClick={logout}>
+        Logout
+      </button>
+    </div>
+  );
+}
+---
+UserMenu.module.css
+.menu {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatar {
+  width: 38px;
+  height: 38px;
+
+  border-radius: 50%;
+
+  background: #2a2a2a;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-weight: bold;
+}
+
+.menu button {
+  background: transparent;
+  border: none;
+
+  color: white;
+
+  cursor: pointer;
+}
+---
+widgets/VersionsTable/
+index.tsx
+import { useState } from "react";
+
+import styles from "./index.module.css";
+
+import EmptyState from "@/shared/ui/EmptyState";
+
+import {
+  getVersionDownloadUrl,
+} from "@/features/versions/api";
+
+import {
+  useDeleteVersion,
+  useUpdateVersion,
+} from "@/features/upload-version/hooks";
+
+import type {
+  Version,
+} from "@/features/versions/api";
+
+type Props = {
+  versions: Version[];
+
+  modId: string | number;
+
+  isOwner?: boolean;
+};
+
+export default function VersionsTable({
+  versions,
+  modId,
+  isOwner,
+}: Props) {
+  //////////////////////////////////////////////////////
+  // STATE
+  //////////////////////////////////////////////////////
+
+  const [openMenu, setOpenMenu] =
+    useState<number | null>(
+      null
+    );
+
+  //////////////////////////////////////////////////////
+  // MUTATIONS
+  //////////////////////////////////////////////////////
+
+  const {
+    mutateAsync:
+      deleteVersionMutation,
+  } = useDeleteVersion(modId);
+
+  const {
+    mutateAsync:
+      updateVersionMutation,
+  } = useUpdateVersion(modId);
+
+  //////////////////////////////////////////////////////
+  // EMPTY
+  //////////////////////////////////////////////////////
+
+  if (!versions?.length) {
+    return (
+      <EmptyState message="No versions yet" />
+    );
+  }
+
+  //////////////////////////////////////////////////////
+  // DOWNLOAD
+  //////////////////////////////////////////////////////
+
+  const handleDownload = (
+    versionId: number
+  ) => {
+    window.open(
+      getVersionDownloadUrl(
+        versionId
+      ),
+      "_blank"
+    );
+  };
+
+  //////////////////////////////////////////////////////
+  // DELETE
+  //////////////////////////////////////////////////////
+
+  const handleDelete = async (
+    versionId: number
+  ) => {
+    const confirmed =
+      confirm(
+        "Delete version?"
+      );
+
+    if (!confirmed) return;
+
+    try {
+      await deleteVersionMutation(
+        versionId
+      );
+
+      setOpenMenu(null);
+
+    } catch (err) {
+      console.error(err);
+
+      alert(
+        "Error deleting version"
+      );
+    }
+  };
+
+  //////////////////////////////////////////////////////
+  // EDIT
+  //////////////////////////////////////////////////////
+
+  const handleEdit = async (
+    version: Version
+  ) => {
+    const name = prompt(
+      "New version name",
+      version.version
+    );
+
+    if (!name) return;
+
+    try {
+      await updateVersionMutation({
+        versionId:
+          version.id,
+
+        version: name,
+      });
+
+      setOpenMenu(null);
+
+    } catch (err) {
+      console.error(err);
+
+      alert(
+        "Error editing version"
+      );
+    }
+  };
+
+  //////////////////////////////////////////////////////
+  // UI
+  //////////////////////////////////////////////////////
+
+  return (
+    <div className={styles.wrapper}>
+      <h3>Versions</h3>
+
+      <table className={styles.table}>
+        <thead>
+          <tr>
+            <th>Type</th>
+
+            <th>Version</th>
+
+            <th>Minecraft</th>
+
+            <th>Loader</th>
+
+            <th>Size</th>
+
+            <th>Downloads</th>
+
+            <th>Date</th>
+
+            <th>Download</th>
+
+            {isOwner && <th>⋯</th>}
+          </tr>
+        </thead>
+
+        <tbody>
+          {versions.flatMap((v) =>
+            (v.files || []).map(
+              (f) => (
+                <tr key={f.id}>
+                  <td>
+                    {
+                      f.releaseType
+                    }
+                  </td>
+
+                  <td>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <span>
+                        {v.version}
+                      </span>
+
+                      {v.isUploading && (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            padding: "2px 6px",
+                            borderRadius: 999,
+                            background: "#1677ff",
+                          }}
+                        >
+                          Uploading...
+                        </span>
+                      )}
+                    </div>
+                  </td>
+
+                  <td>
+                    {v.minecraftVersion ||
+                      "-"}
+                  </td>
+
+                  <td>
+                    {v.loader ||
+                      "-"}
+                  </td>
+
+                  <td>
+                    {(
+                      f.size /
+                      1024 /
+                      1024
+                    ).toFixed(2)}{" "}
+                    MB
+                  </td>
+
+                  <td>
+                    {f.downloads ||
+                      0}
+                  </td>
+
+                  <td>
+                    {v.createdAt
+                      ? new Date(
+                          v.createdAt
+                        ).toLocaleDateString()
+                      : "-"}
+                  </td>
+
+                  <td>
+                    <button
+                      onClick={() =>
+                        handleDownload(
+                          v.id
+                        )
+                      }
+                    >
+                      ⬇
+                    </button>
+                  </td>
+
+                  {isOwner && (
+                    <td
+                      style={{
+                        position:
+                          "relative",
+                      }}
+                    >
+                      <button
+                        onClick={() =>
+                          setOpenMenu(
+                            openMenu ===
+                              v.id
+                              ? null
+                              : v.id
+                          )
+                        }
+                      >
+                        ⋯
+                      </button>
+
+                      {openMenu ===
+                        v.id && (
+                        <div
+                          style={{
+                            position:
+                              "absolute",
+
+                            right: 0,
+
+                            background:
+                              "#222",
+
+                            padding: 8,
+
+                            borderRadius: 8,
+
+                            display:
+                              "flex",
+
+                            flexDirection:
+                              "column",
+
+                            gap: 6,
+
+                            zIndex: 20,
+
+                            minWidth: 120,
+                          }}
+                        >
+                          <button
+                            onClick={() =>
+                              handleEdit(
+                                v
+                              )
+                            }
+                          >
+                            ✏️ Edit
+                          </button>
+
+                          <button
+                            onClick={() =>
+                              handleDelete(
+                                v.id
+                              )
+                            }
+                          >
+                            🗑 Delete
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  )}
+                </tr>
+              )
+            )
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+---
+
+
+en telefono la barra de busqueda esta arriba de todo y en pc en el lateral como esta ahora, solo que en bedrock (android) esta la barra de busqueda y debajo dos botones, uno al lado del otro, el primero "type" (all, addon, map, texture, script) al lado "categories" que cambia dependiendo lo elejido, en pc se muestra la barra de busqueda y de bajo las cosas ya desplegada, se muestra todo lo de type, uno debajo del otro, y dependiendo el seleccionado es lo que se muestra debajo, recuerda usar chekbox, a continuacion lo de categories, recuerda poner todo en ingles
+all = nada
+addon = armas, armaduras, herramientas, cosméticos, horror, fantasía, comida, magia, addon de creación, creaciones, multijugador, roleplay, performance, skins, survival, technology, utility, vanilla+
+maps = aventura, creacion, custom terrain, minigame, parkour, puzzle, pvp, redstone, survival, roleplay
+texture = GUI, miscellaneous, PvP, realistic, shader, simplistic, themed, X128, X64, X32, X16
+script = none
+
+en pc casi lo mismo, en android la barra de busqueda arriba y debajo dos botones, uno de "type" (all, bukkit plugin, addons, mods, modpacks, data packs, shaders, resource packs, world) y al lado el de "categories" y de bajo otros dos botones, "loader" (forge, neoforge, fabric, quilt) y a lado "version" todas las versiones de minecraft java, ahora si, las categories
+all = none
+bukkit   = admin tools, anti-griefing tools, chat related, deveoper tools, economy, fixes, fun, information, mechanics, miscellaneous, roleplay, teleport, website administration, world generator
+world = adventure, creation, mini game, parkour, puzzle, survival, roleplay, modded world
+resource pack = X512, X256, X128, X64, X32, X16, X8, animated, font pack, medieval, mmiscellaneus, mod support, modern, traditional
+data pack =  adventure, fantasy, library, magic, miscellaneous, mod support, tech, utility
+addon = resource pack, scenarios, world
+mod = addon, adventure rpg, api, armor, tools, weapons, bug fixes, cosmetic, creative mode, education, food, horror, magic, map, mcreator, micellaneous, performance, redstone, server utility, storage, technology, world gen
+modpack = adventure rpg, combat, expert, exploration, extra large, hardcore, horror, magic, map based, mini game, multiplayer, skyblock, tech, vanilla+
+shader = fantasy, realistic, vanilla

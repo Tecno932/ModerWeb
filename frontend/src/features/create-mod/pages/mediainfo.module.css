@@ -1,0 +1,152 @@
+.container {
+  max-width: 900px;
+  margin: auto;
+  padding: 20px;
+}
+
+.wrapper {
+  max-width: 900px;
+  margin: auto;
+  padding: 40px 20px;
+}
+
+.title {
+  font-size: 28px;
+  font-weight: bold;
+  margin-bottom: 20px;
+}
+
+/* TOOLBAR */
+.toolbar {
+  position: sticky;
+  top: 10px;
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  background: #1e1e1e;
+  border-radius: 8px;
+  margin-bottom: 15px;
+  z-index: 10;
+}
+
+.toolbar button {
+  background: transparent;
+  border: none;
+  color: #aaa;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.toolbar button:hover {
+  background: #333;
+  color: white;
+}
+
+.imageUpload {
+  cursor: pointer;
+  padding: 6px 10px;
+  background: #2a2a2a;
+  border-radius: 6px;
+}
+
+.active {
+  background: #4ade80 !important;
+  color: black !important;
+}
+
+.editor {
+  border: 1px solid #333;
+  border-radius: 10px;
+  padding: 20px;
+  min-height: 400px;
+  cursor: text;
+  background: #111;
+  color: white;
+}
+
+/* TIPTAP BASE */
+.ProseMirror {
+  outline: none;
+  font-size: 18px;
+  line-height: 1.7;
+}
+
+/* BLOQUES */
+.ProseMirror p,
+.ProseMirror h1,
+.ProseMirror h2,
+.ProseMirror ul,
+.ProseMirror ol {
+  position: relative;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+/* BLOQUE ACTIVO (hover + focus) */
+.ProseMirror p:hover,
+.ProseMirror h1:hover,
+.ProseMirror h2:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* TEXTO */
+.ProseMirror h1 {
+  font-size: 32px;
+  font-weight: bold;
+}
+
+.ProseMirror h2 {
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.ProseMirror p {
+  margin: 8px 0;
+}
+
+.ProseMirror ul {
+  padding-left: 20px;
+}
+
+/* LINKS */
+.ProseMirror a {
+  color: #4ea1ff;
+  text-decoration: underline;
+}
+
+/* IMÁGENES */
+.ProseMirror img {
+  max-width: 100%;
+  border-radius: 10px;
+  margin: 15px 0;
+}
+
+/* GALLERY */
+.gallery {
+  margin-bottom: 15px;
+}
+
+.previewGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 100px);
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.previewImage {
+  width: 100px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+/* BOTÓN */
+.submit {
+  margin-top: 20px;
+  padding: 12px 18px;
+  background: #4ade80;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
