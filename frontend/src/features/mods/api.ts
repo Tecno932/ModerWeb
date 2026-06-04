@@ -16,6 +16,8 @@ export type GetModsParams = {
   loader?: string;
 
   sort?: string;
+
+  authorId?: number;
 };
 
 //////////////////////////////////////////////////////
@@ -66,10 +68,10 @@ export function getMods(
     );
   }
 
-  if (params?.loader) {
+  if (params?.authorId) {
     search.set(
-      "loader",
-      params.loader
+      "authorId",
+      String(params.authorId)
     );
   }
 

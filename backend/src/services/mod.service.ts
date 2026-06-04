@@ -450,6 +450,10 @@ export class ModService {
       where.platform = platform;
     }
 
+    if (query.authorId) {
+      where.authorId = Number(query.authorId);
+    }
+
     if (loader) {
       where.loader = loader;
     }
@@ -589,6 +593,16 @@ sort=${sort}
 
         include: {
           images: true,
+
+          versions: {
+            include: {
+              files: true,
+            },
+
+            orderBy: {
+              createdAt: "desc",
+            },
+          },
 
           tags: {
             include: {

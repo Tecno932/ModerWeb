@@ -1,0 +1,43 @@
+.layout {
+  display: flex;
+  flex-direction: column;
+
+  gap: 20px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+
+  gap: 14px;
+
+  padding: 20px;
+
+  background: #171717;
+
+  border: 1px solid #2b2b2b;
+  border-radius: 20px;
+}
+
+.card h3 {
+  margin: 0;
+}
+
+.card select {
+  width: 100%;
+
+  padding: 12px;
+
+  background: #111;
+  color: white;
+
+  border: 1px solid #333;
+  border-radius: 10px;
+}
+
+.actions {
+  margin-top: 24px;
+
+  display: flex;
+  justify-content: space-between;
+}

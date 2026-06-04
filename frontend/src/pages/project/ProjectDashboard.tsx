@@ -1,44 +1,237 @@
-import { useParams, NavLink, Outlet } from "react-router-dom";
+import {
+  NavLink,
+  Outlet,
+  useParams,
+} from "react-router-dom";
+
+import {
+  Globe,
+  Lock,
+  Package,
+  Star,
+} from "lucide-react";
+
 import { useMod } from "@/features/mods/hooks";
+
 import { useAuth } from "@/context/AuthContext";
+
 import Skeleton from "@/shared/ui/Skeleton";
 
+import styles from "./ProjectDashboard.module.css";
+
 export default function ProjectDashboard() {
-  const { id } = useParams();
-  const { data, isLoading } = useMod(id!); // podés hacer useModById
-  const { user } = useAuth();
+  const { slug } = useParams();
 
-  if (isLoading) return <Skeleton height={200} />;
-  if (!data) return <div>No encontrado</div>;
+  const {
+    data,
+    isLoading,
+  } = useMod(slug!);
 
-  const isOwner = user?.id === data.authorId;
+  const { user } =
+    useAuth();
+
+  //////////////////////////////////////////////////
+  // LOADING
+  //////////////////////////////////////////////////
+
+  if (isLoading) {
+    return (
+      <div className={styles.loading}>
+        <Skeleton height={260} />
+      </div>
+    );
+  }
+
+  //////////////////////////////////////////////////
+  // NOT FOUND
+  //////////////////////////////////////////////////
+
+  if (!data) {
+    return (
+      <div className={styles.notFound}>
+        <h2>
+          Project not found
+        </h2>
+
+        <p>
+          This project does not
+          exist or was removed.
+        </p>
+      </div>
+    );
+  }
+
+  //////////////////////////////////////////////////
+  // OWNER
+  //////////////////////////////////////////////////
+
+  const isOwner =
+    user?.id ===
+    data.authorId;
+
+  //////////////////////////////////////////////////
+  // TABS
+  //////////////////////////////////////////////////
+
+  const tabs = [
+    {
+      label: "Overview",
+      to: `/project/${slug}`,
+      end: true,
+    },
+
+    {
+      label: "Versions",
+      to: `/project/${slug}/versions`,
+    },
+
+    {
+      label: "Gallery",
+      to: `/project/${slug}/gallery`,
+    },
+
+    {
+      label: "Settings",
+      to: `/project/${slug}/settings`,
+    },
+  ];
+
+  //////////////////////////////////////////////////
+  // DATA
+  //////////////////////////////////////////////////
+
+  const downloads =
+    data.downloadCount || 0;
+
+  const followers =
+    data.favoriteCount || 0;
+
+  const visibility =
+    data.visibility ||
+    "Public";
+
+  //////////////////////////////////////////////////
+  // RENDER
+  //////////////////////////////////////////////////
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh" }}>
-      
-      {/* SIDEBAR */}
-      <div
-        style={{
-          width: 220,
-          background: "#111",
-          padding: 16,
-          display: "flex",
-          flexDirection: "column",
-          gap: 10,
-        }}
-      >
-        <h3>{data.title}</h3>
+    <div className={styles.page}>
+      {/* HEADER */}
+      <section className={styles.header}>
+        {/* TOP */}
+        <div className={styles.topSection}>
+          {/* ICON */}
+          <div className={styles.iconWrapper}>
+            <img
+              src={
+                data.iconUrl ||
+                "/default-mod.png"
+              }
+              alt={data.title}
+              className={styles.icon}
+            />
+          </div>
 
-        <NavLink to={`/project/${id}`}>📊 Overview</NavLink>
-        <NavLink to={`/project/${id}/versions`}>📦 Versions</NavLink>
-        <NavLink to={`/project/${id}/gallery`}>🖼 Gallery</NavLink>
-        <NavLink to={`/project/${id}/settings`}>⚙ Settings</NavLink>
-      </div>
+          {/* INFO */}
+          <div className={styles.info}>
+            <div className={styles.titleRow}>
+              <h1 className={styles.title}>
+                {data.title}
+              </h1>
+
+              <div
+                className={
+                  styles.visibility
+                }
+              >
+                {visibility ===
+                "Public" ? (
+                  <>
+                    <Globe size={14} />
+                    Public
+                  </>
+                ) : (
+                  <>
+                    <Lock size={14} />
+                    Private
+                  </>
+                )}
+              </div>
+            </div>
+
+            <p
+              className={
+                styles.description
+              }
+            >
+              {data.summary}
+            </p>
+
+            {/* STATS */}
+            <div className={styles.stats}>
+              <div
+                className={
+                  styles.statCard
+                }
+              >
+                <Package size={16} />
+
+                <span>
+                  {downloads.toLocaleString()}{" "}
+                  downloads
+                </span>
+              </div>
+
+              <div
+                className={
+                  styles.statCard
+                }
+              >
+                <Star size={16} />
+
+                <span>
+                  {followers.toLocaleString()}{" "}
+                  followers
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* TABS */}
+        <div className={styles.tabs}>
+          {tabs.map((tab) => (
+            <NavLink
+              key={tab.to}
+              to={tab.to}
+              end={tab.end}
+              className={({
+                isActive,
+              }) =>
+                `${styles.tab} ${
+                  isActive
+                    ? styles.activeTab
+                    : ""
+                }`
+              }
+            >
+              {tab.label}
+            </NavLink>
+          ))}
+        </div>
+      </section>
 
       {/* CONTENT */}
-      <div style={{ flex: 1, padding: 20 }}>
-        <Outlet context={{ mod: data, isOwner }} />
-      </div>
+      <section
+        className={styles.content}
+      >
+        <Outlet
+          context={{
+            mod: data,
+            isOwner,
+          }}
+        />
+      </section>
     </div>
   );
 }

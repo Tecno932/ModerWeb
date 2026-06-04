@@ -37,7 +37,7 @@ export default function ModPage() {
   const isOwner = user?.id === data.authorId;
 
   return (
-    <div style={{ maxWidth: 1100, margin: "0 auto", padding: 20 }}>
+    <div style={{ width: "100%", margin: "0 auto", padding: 24 }}>
       <ModHeader mod={data} />
 
       <div style={{ marginTop: 20 }}>

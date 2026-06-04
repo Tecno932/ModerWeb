@@ -1,14 +1,17 @@
 import { Link } from "react-router-dom";
 
-import Card from "@/shared/ui/card/Card";
-import Badge from "@/shared/ui/badge/Badge";
+import {
+  Download,
+  Heart,
+  Eye,
+} from "lucide-react";
 
 import LikeButton from "@/features/interactions/components/LikeButton";
 import FavoriteButton from "@/features/interactions/components/FavoriteButton";
 
 import styles from "./ModCard.module.css";
 
-type ModCardProps = {
+type Props = {
   mod: any;
 };
 
@@ -17,130 +20,44 @@ const API_URL =
 
 export default function ModCard({
   mod,
-}: ModCardProps) {
-  const cover = mod.images?.find(
-    (img: any) => img.isCover
-  );
+}: Props) {
+  const icon =
+    mod.icon
+      ? `${API_URL}${mod.icon}`
+      : "/placeholder.png";
 
   return (
-    <Card
-      hoverable
-      padding="sm"
-      className={styles.card}
-    >
+    <article className={styles.card}>
       <Link
         to={`/mods/${mod.slug}`}
         className={styles.link}
       >
-        //////////////////////////////////////////////////
-        // IMAGE
-        //////////////////////////////////////////////////
+        {/* ICON */}
 
-        <div className={styles.imageWrapper}>
-          <img
-            src={`${API_URL}${cover?.url}`}
-            alt={mod.title}
-            className={styles.image}
-          />
+        <img
+          src={icon}
+          alt={mod.title}
+          className={styles.icon}
+        />
 
-          <div className={styles.overlay} />
-        </div>
-
-        //////////////////////////////////////////////////
-        // CONTENT
-        //////////////////////////////////////////////////
+        {/* CONTENT */}
 
         <div className={styles.content}>
-          ////////////////////////////////////////////////
-          // HEADER
-          ////////////////////////////////////////////////
+          <div className={styles.top}>
+            <div>
+              <h3 className={styles.title}>
+                {mod.title}
+              </h3>
 
-          <div className={styles.header}>
-            <h3 className={styles.title}>
-              {mod.title}
-            </h3>
-
-            <div
-              className={styles.author}
-            >
-              by{" "}
-              {mod.author
-                ?.username ||
-                "Unknown"}
-            </div>
-          </div>
-
-          ////////////////////////////////////////////////
-          // DESCRIPTION
-          ////////////////////////////////////////////////
-
-          <p
-            className={
-              styles.description
-            }
-          >
-            {mod.description}
-          </p>
-
-          ////////////////////////////////////////////////
-          // TAGS
-          ////////////////////////////////////////////////
-
-          <div className={styles.tags}>
-            {mod.tags
-              ?.slice(0, 4)
-              .map((tag: any) => (
-                <Badge key={tag.name}>
-                  {tag.name}
-                </Badge>
-              ))}
-          </div>
-
-          ////////////////////////////////////////////////
-          // FOOTER
-          ////////////////////////////////////////////////
-
-          <div className={styles.footer}>
-            ////////////////////////////////////////////
-            // STATS
-            ////////////////////////////////////////////
-
-            <div
-              className={styles.stats}
-            >
-              <span>
-                ❤️{" "}
-                {
-                  mod.stats
-                    ?.likes
-                }
-              </span>
-
-              <span>
-                👁{" "}
-                {
-                  mod.stats
-                    ?.views
-                }
-              </span>
-
-              <span>
-                ⬇️{" "}
-                {
-                  mod.stats
-                    ?.downloads
-                }
-              </span>
+              <p className={styles.author}>
+                by{" "}
+                {mod.author?.username ||
+                  "Unknown"}
+              </p>
             </div>
 
-            ////////////////////////////////////////////
-            // ACTIONS
-            ////////////////////////////////////////////
-
             <div
-              className={
-                styles.actions
-              }
+              className={styles.actions}
               onClick={(e) =>
                 e.preventDefault()
               }
@@ -156,8 +73,89 @@ export default function ModCard({
               />
             </div>
           </div>
+
+          {/* SUMMARY */}
+
+          <p className={styles.summary}>
+            {mod.summary ||
+              mod.description}
+          </p>
+
+          {/* BADGES */}
+
+          <div className={styles.badges}>
+            <span
+              className={
+                styles.badge
+              }
+            >
+              {mod.type}
+            </span>
+
+            <span
+              className={
+                styles.badge
+              }
+            >
+              {mod.platform}
+            </span>
+
+            {mod.loader && (
+              <span
+                className={
+                  styles.badge
+                }
+              >
+                {mod.loader}
+              </span>
+            )}
+          </div>
+
+          {/* FOOTER */}
+
+          <div className={styles.footer}>
+            <div
+              className={styles.stats}
+            >
+              <span>
+                <Download
+                  size={14}
+                />
+
+                {
+                  mod.downloads
+                }
+              </span>
+
+              <span>
+                <Heart
+                  size={14}
+                />
+
+                {
+                  mod.likesCount
+                }
+              </span>
+
+              <span>
+                <Eye size={14} />
+
+                {mod.views}
+              </span>
+            </div>
+
+            <div
+              className={
+                styles.updated
+              }
+            >
+              {new Date(
+                mod.updatedAt
+              ).toLocaleDateString()}
+            </div>
+          </div>
         </div>
       </Link>
-    </Card>
+    </article>
   );
 }

@@ -1,0 +1,309 @@
+.sidebar {
+  position: fixed;
+
+  top: 0;
+  left: 0;
+  bottom: 0;
+
+  width: 280px;
+
+  background:
+    linear-gradient(
+      180deg,
+      #181818 0%,
+      #121212 100%
+    );
+
+  border-right: 1px solid #262626;
+
+  padding: 24px 18px;
+
+  display: flex;
+  flex-direction: column;
+
+  z-index: 300;
+
+  overflow-y: auto;
+
+  scrollbar-width: thin;
+
+  scrollbar-color:
+    #2d2d2d
+    transparent;
+}
+
+.sidebar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  background: #2d2d2d;
+
+  border-radius: 999px;
+}
+
+.profileCard {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+
+  width: 100%;
+
+  border: 1px solid #2a2a2a;
+
+  background: #1a1a1a;
+
+  padding: 14px;
+
+  border-radius: 18px;
+
+  cursor: pointer;
+
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.profileCard:hover {
+  background: #202020;
+
+  border-color: #383838;
+
+  transform: translateY(-1px);
+}
+
+.avatar {
+  width: 52px;
+  height: 52px;
+
+  border-radius: 16px;
+
+  object-fit: cover;
+}
+
+.profileInfo {
+  display: flex;
+  flex-direction: column;
+
+  gap: 4px;
+
+  text-align: left;
+}
+
+.profileInfo strong {
+  font-size: 15px;
+
+  color: white;
+}
+
+.profileInfo span {
+  font-size: 13px;
+
+  color: #8b8b8b;
+}
+
+.navigation {
+  margin-top: 32px;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 10px;
+}
+
+.navButton {
+  width: 100%;
+
+  display: flex;
+  position: relative;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 14px 16px;
+
+  border-radius: 14px;
+
+  border: 1px solid transparent;
+
+  background: transparent;
+
+  color: #bcbcbc;
+
+  text-decoration: none;
+
+  cursor: pointer;
+
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.navButton:hover {
+  background: #1d1d1d;
+
+  border-color: #2a2a2a;
+
+  color: white;
+}
+
+.active {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(80, 80, 80, 0.18),
+      rgba(50, 50, 50, 0.18)
+    );
+
+  border-color: #343434;
+
+  color: white;
+}
+
+.active::before {
+  content: "";
+
+  position: absolute;
+
+  left: -18px;
+  top: 10px;
+  bottom: 10px;
+
+  width: 4px;
+
+  border-radius: 999px;
+
+  background: white;
+}
+
+.navLeft {
+  display: flex;
+  align-items: center;
+
+  gap: 12px;
+
+  font-weight: 600;
+}
+
+.mobileHeader {
+  display: none;
+}
+
+.mobileSidebarTop {
+  display: none;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+
+  background: rgba(0, 0, 0, 0.55);
+
+  backdrop-filter: blur(4px);
+
+  opacity: 0;
+
+  pointer-events: none;
+
+  transition: opacity 0.25s ease;
+
+  z-index: 250;
+}
+
+.overlayVisible {
+  opacity: 1;
+
+  pointer-events: auto;
+}
+
+.closeButton,
+.mobileButton {
+  border: none;
+
+  background: #1f1f1f;
+
+  color: white;
+
+  width: 42px;
+  height: 42px;
+
+  border-radius: 12px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  cursor: pointer;
+
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.closeButton:hover,
+.mobileButton:hover {
+  background: #2a2a2a;
+}
+
+.closeButton:active,
+.mobileButton:active {
+  transform: scale(0.96);
+}
+
+@media (max-width: 768px) {
+  .mobileHeader {
+    position: fixed;
+
+    top: 0;
+    left: 0;
+    right: 0;
+
+    height: 68px;
+
+    background:
+      rgba(15, 15, 15, 0.92);
+
+    backdrop-filter: blur(10px);
+
+    border-bottom: 1px solid #222;
+
+    padding: 0 16px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    z-index: 240;
+  }
+
+  .mobileBrand {
+    font-size: 15px;
+
+    font-weight: 700;
+
+    letter-spacing: 0.4px;
+  }
+
+  .sidebar {
+    transform: translateX(-100%);
+
+    transition:
+      transform 0.28s ease;
+
+    width: 290px;
+  }
+
+  .sidebarOpen {
+    transform: translateX(0);
+  }
+
+  .mobileSidebarTop {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    margin-bottom: 20px;
+  }
+}

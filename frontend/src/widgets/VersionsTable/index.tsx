@@ -173,76 +173,78 @@ export default function VersionsTable({
         </thead>
 
         <tbody>
-          {versions.flatMap((v) =>
-            (v.files || []).map(
-              (f) => (
-                <tr key={f.id}>
-                  <td>
-                    {
-                      f.releaseType
-                    }
-                  </td>
+          {versions.map((v) => {
+            const primaryFile = v.files?.[0];
 
-                  <td>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                      }}
-                    >
-                      <span>
-                        {v.version}
+            return (
+              <tr key={v.id}>
+                <td>
+                  {primaryFile?.releaseType ||
+                    "release"}
+                </td>
+
+                <td>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                  >
+                    <span>
+                      {v.version}
+                    </span>
+
+                    {v.isUploading && (
+                      <span
+                        style={{
+                          fontSize: 11,
+                          padding: "2px 6px",
+                          borderRadius: 999,
+                          background:
+                            "#1677ff",
+                        }}
+                      >
+                        Uploading...
                       </span>
+                    )}
+                  </div>
+                </td>
 
-                      {v.isUploading && (
-                        <span
-                          style={{
-                            fontSize: 11,
-                            padding: "2px 6px",
-                            borderRadius: 999,
-                            background: "#1677ff",
-                          }}
-                        >
-                          Uploading...
-                        </span>
-                      )}
-                    </div>
-                  </td>
+                <td>
+                  {v.minecraftVersion ||
+                    "-"}
+                </td>
 
-                  <td>
-                    {v.minecraftVersion ||
-                      "-"}
-                  </td>
+                <td>
+                  {v.loader || "-"}
+                </td>
 
-                  <td>
-                    {v.loader ||
-                      "-"}
-                  </td>
+                <td>
+                  {primaryFile
+                    ? `${(
+                        primaryFile.size /
+                        1024 /
+                        1024
+                      ).toFixed(2)} MB`
+                    : "-"}
+                </td>
 
-                  <td>
-                    {(
-                      f.size /
-                      1024 /
-                      1024
-                    ).toFixed(2)}{" "}
-                    MB
-                  </td>
+                <td>
+                  {primaryFile?.downloads ||
+                    0}
+                </td>
 
-                  <td>
-                    {f.downloads ||
-                      0}
-                  </td>
+                <td>
+                  {v.createdAt
+                    ? new Date(
+                        v.createdAt
+                      ).toLocaleDateString()
+                    : "-"}
+                </td>
 
-                  <td>
-                    {v.createdAt
-                      ? new Date(
-                          v.createdAt
-                        ).toLocaleDateString()
-                      : "-"}
-                  </td>
-
-                  <td>
+                <td>
+                  {primaryFile ? (
                     <button
                       onClick={() =>
                         handleDownload(
@@ -252,84 +254,82 @@ export default function VersionsTable({
                     >
                       ⬇
                     </button>
-                  </td>
-
-                  {isOwner && (
-                    <td
-                      style={{
-                        position:
-                          "relative",
-                      }}
-                    >
-                      <button
-                        onClick={() =>
-                          setOpenMenu(
-                            openMenu ===
-                              v.id
-                              ? null
-                              : v.id
-                          )
-                        }
-                      >
-                        ⋯
-                      </button>
-
-                      {openMenu ===
-                        v.id && (
-                        <div
-                          style={{
-                            position:
-                              "absolute",
-
-                            right: 0,
-
-                            background:
-                              "#222",
-
-                            padding: 8,
-
-                            borderRadius: 8,
-
-                            display:
-                              "flex",
-
-                            flexDirection:
-                              "column",
-
-                            gap: 6,
-
-                            zIndex: 20,
-
-                            minWidth: 120,
-                          }}
-                        >
-                          <button
-                            onClick={() =>
-                              handleEdit(
-                                v
-                              )
-                            }
-                          >
-                            ✏️ Edit
-                          </button>
-
-                          <button
-                            onClick={() =>
-                              handleDelete(
-                                v.id
-                              )
-                            }
-                          >
-                            🗑 Delete
-                          </button>
-                        </div>
-                      )}
-                    </td>
+                  ) : (
+                    "-"
                   )}
-                </tr>
-              )
-            )
-          )}
+                </td>
+
+                {isOwner && (
+                  <td
+                    style={{
+                      position:
+                        "relative",
+                    }}
+                  >
+                    <button
+                      onClick={() =>
+                        setOpenMenu(
+                          openMenu === v.id
+                            ? null
+                            : v.id
+                        )
+                      }
+                    >
+                      ⋯
+                    </button>
+
+                    {openMenu ===
+                      v.id && (
+                      <div
+                        style={{
+                          position:
+                            "absolute",
+
+                          right: 0,
+
+                          background:
+                            "#222",
+
+                          padding: 8,
+
+                          borderRadius: 8,
+
+                          display: "flex",
+
+                          flexDirection:
+                            "column",
+
+                          gap: 6,
+
+                          zIndex: 20,
+
+                          minWidth: 120,
+                        }}
+                      >
+                        <button
+                          onClick={() =>
+                            handleEdit(v)
+                          }
+                        >
+                          ✏️ Edit
+                        </button>
+
+                        <button
+                          onClick={() =>
+                            handleDelete(
+                              v.id
+                            )
+                          }
+                        >
+                          🗑 Delete
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                )}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

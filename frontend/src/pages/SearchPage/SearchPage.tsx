@@ -117,70 +117,67 @@ export default function SearchPage({
 
   return (
     <Container>
-      {/* HEADER */}
+      <div className={styles.header}>
+        <h1 className={styles.title}>
+          {title}
+        </h1>
 
-      <div className={styles.hero}>
-        <h1>{title}</h1>
-
-        <p>
-          Explore community-made
-          content
+        <p className={styles.subtitle}>
+          Explore community-made content
         </p>
       </div>
 
-      {/* FILTERS */}
+      <div className={styles.page}>
+        <aside className={styles.sidebar}>
+          <SearchControls
+            platform={platform}
+          />
+        </aside>
 
-      <SearchControls
-        platform={platform}
-      />
-
-      {/* LOADING */}
-
-      {isLoading && (
-        <div className={styles.list}>
-          {Array.from({
-            length: 8,
-          }).map((_, i) => (
-            <Skeleton
-              key={i}
-              height={180}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* ERROR */}
-
-      {error && (
-        <ErrorState message="Failed to load mods" />
-      )}
-
-      {/* EMPTY */}
-
-      {!isLoading &&
-        !error &&
-        !data?.data?.length && (
-          <EmptyState message="No projects found" />
-        )}
-
-      {/* RESULTS */}
-
-      {!!data?.data?.length && (
-        <Section
-          title={`${data.meta.total} results`}
-        >
-          <div className={styles.list}>
-            {data.data.map(
-              (mod: any) => (
-                <ModCard
-                  key={mod.id}
-                  mod={mod}
+        <main className={styles.content}>
+          {isLoading && (
+            <div className={styles.list}>
+              {Array.from({
+                length: 8,
+              }).map((_, i) => (
+                <Skeleton
+                  key={i}
+                  height={180}
                 />
-              )
+              ))}
+            </div>
+          )}
+
+          {error && (
+            <ErrorState message="Failed to load mods" />
+          )}
+
+          {!isLoading &&
+            !error &&
+            !data?.data?.length && (
+              <EmptyState message="No projects found" />
             )}
-          </div>
-        </Section>
-      )}
+
+          {!!data?.data?.length && (
+            <>
+              <div className={styles.results}>
+                {data.meta.total} results
+              </div>
+
+              <div className={styles.list}>
+                {data.data.map(
+                  (mod: any) => (
+                    <ModCard
+                      key={mod.id}
+                      mod={mod}
+                    />
+                  )
+                )}
+              </div>
+            </>
+          )}
+        </main>
+      </div>
     </Container>
   );
 }

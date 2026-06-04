@@ -1,0 +1,211 @@
+.page {
+  display: flex;
+  flex-direction: column;
+
+  gap: 28px;
+
+  padding-bottom: 80px;
+}
+
+.uploadBox {
+  min-height: 260px;
+
+  border-radius: 32px;
+
+  border: 2px dashed #323232;
+
+  background:
+    linear-gradient(
+      180deg,
+      #191919,
+      #151515
+    );
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  text-align: center;
+
+  padding: 32px;
+
+  transition:
+    border-color 0.25s ease,
+    transform 0.25s ease,
+    background 0.25s ease;
+}
+
+.uploadBox:hover {
+  border-color: #484848;
+
+  background:
+    linear-gradient(
+      180deg,
+      #1d1d1d,
+      #181818
+    );
+}
+
+.uploadBox svg {
+  color: #9c9c9c;
+
+  margin-bottom: 18px;
+}
+
+.uploadBox h3 {
+  margin: 0;
+
+  color: white;
+
+  font-size: 24px;
+
+  font-weight: 800;
+}
+
+.uploadBox p {
+  margin-top: 12px;
+  margin-bottom: 24px;
+
+  color: #989898;
+
+  line-height: 1.7;
+}
+
+.grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      auto-fill,
+      minmax(280px, 1fr)
+    );
+
+  gap: 22px;
+}
+
+.card {
+  position: relative;
+
+  overflow: hidden;
+
+  border-radius: 28px;
+
+  background: #181818;
+
+  border: 1px solid #2c2c2c;
+
+  aspect-ratio: 16 / 10;
+
+  transition:
+    transform 0.25s ease,
+    border-color 0.25s ease;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+
+  border-color: #444;
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+
+  object-fit: cover;
+
+  display: block;
+}
+
+.overlay {
+  position: absolute;
+
+  inset: 0;
+
+  background:
+    linear-gradient(
+      to top,
+      rgba(0, 0, 0, 0.7),
+      rgba(0, 0, 0, 0.15)
+    );
+
+  opacity: 0;
+
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+
+  padding: 18px;
+
+  transition:
+    opacity 0.25s ease;
+}
+
+.card:hover .overlay {
+  opacity: 1;
+}
+
+.dragButton,
+.deleteButton {
+  width: 42px;
+  height: 42px;
+
+  border-radius: 14px;
+
+  border: 1px solid
+    rgba(255, 255, 255, 0.08);
+
+  backdrop-filter: blur(10px);
+
+  background:
+    rgba(20, 20, 20, 0.8);
+
+  color: white;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  cursor: pointer;
+
+  transition:
+    transform 0.2s ease,
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.dragButton:hover,
+.deleteButton:hover {
+  transform: translateY(-2px);
+
+  border-color:
+    rgba(255, 255, 255, 0.18);
+
+  background:
+    rgba(30, 30, 30, 0.92);
+}
+
+.deleteButton:hover {
+  background:
+    rgba(120, 25, 25, 0.85);
+}
+
+@media (max-width: 768px) {
+  .uploadBox {
+    min-height: 220px;
+
+    border-radius: 24px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .card {
+    border-radius: 22px;
+  }
+
+  .overlay {
+    opacity: 1;
+  }
+}

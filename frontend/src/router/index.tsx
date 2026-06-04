@@ -1,21 +1,42 @@
 import { createBrowserRouter } from "react-router-dom";
-
 import AppLayout from "@/app/layouts/AppLayout/AppLayout";
 
-import CreateModPage from "@/pages/CreateModPage";
-import LoginPage from "@/pages/LoginPage";
-import RegisterPage from "@/pages/RegisterPage";
+//////////////////////////////////////////////////
+// PUBLIC PAGES
+//////////////////////////////////////////////////
 
 import HomePage from "@/pages/HomePage/HomePage";
 import SearchPage from "@/pages/SearchPage/SearchPage";
 import ModPage from "@/pages/ModPage";
+import LoginPage from "@/pages/LoginPage";
+import RegisterPage from "@/pages/RegisterPage";
 
-// DASHBOARD
+//////////////////////////////////////////////////
+// DASHBOARD LAYOUT
+//////////////////////////////////////////////////
+
+import DashboardLayout from "@/app/layouts/DashboardLayout/DashboardLayout";
+
+//////////////////////////////////////////////////
+// DASHBOARD PAGES
+//////////////////////////////////////////////////
+
+import CreateModPage from "@/pages/CreateMod/CreateModPage";
+import ProjectsPage from "@/pages/project/ProjectsPage";
 import ProjectDashboard from "@/pages/project/ProjectDashboard";
+
+//////////////////////////////////////////////////
+// PROJECT TABS
+//////////////////////////////////////////////////
+
 import OverviewTab from "@/pages/project/tabs/OverviewTab";
 import VersionsTab from "@/pages/project/tabs/VersionsTab";
 import GalleryTab from "@/pages/project/tabs/GalleryTab";
 import SettingsTab from "@/pages/project/tabs/SettingsTab";
+
+//////////////////////////////////////////////////
+// ROUTER
+//////////////////////////////////////////////////
 
 export const router =
   createBrowserRouter([
@@ -29,6 +50,7 @@ export const router =
 
         {
           path: "/",
+
           element: <HomePage />,
         },
 
@@ -38,6 +60,7 @@ export const router =
 
         {
           path: "/minecraft",
+
           element: (
             <SearchPage
               platform="JAVA"
@@ -48,6 +71,7 @@ export const router =
 
         {
           path: "/minecraftbedrock",
+
           element: (
             <SearchPage
               platform="BEDROCK"
@@ -62,6 +86,7 @@ export const router =
 
         {
           path: "/search",
+
           element: (
             <SearchPage
               platform="JAVA"
@@ -76,6 +101,7 @@ export const router =
 
         {
           path: "/mods/:slug",
+
           element: <ModPage />,
         },
 
@@ -85,51 +111,100 @@ export const router =
 
         {
           path: "/login",
+
           element: <LoginPage />,
         },
 
         {
           path: "/register",
+
           element: <RegisterPage />,
         },
 
         //////////////////////////////////////////////////
-        // CREATE
-        // SOLO ESTA REQUIERE LOGIN
+        // DASHBOARD
         //////////////////////////////////////////////////
 
         {
-          path: "/create",
-          element: <CreateModPage />,
-        },
-
-        //////////////////////////////////////////////////
-        // PROJECT DASHBOARD
-        //////////////////////////////////////////////////
-
-        {
-          path: "/project/:slug",
-          element: <ProjectDashboard />,
+          element: <DashboardLayout />,
 
           children: [
-            {
-              index: true,
-              element: <OverviewTab />,
-            },
+            //////////////////////////////////////////////////
+            // PROJECTS PAGE
+            //////////////////////////////////////////////////
 
             {
-              path: "versions",
-              element: <VersionsTab />,
+              path: "/project",
+
+              element: <ProjectsPage />,
             },
 
-            {
-              path: "gallery",
-              element: <GalleryTab />,
-            },
+            //////////////////////////////////////////////////
+            // CREATE MOD
+            //////////////////////////////////////////////////
 
             {
-              path: "settings",
-              element: <SettingsTab />,
+              path: "/create",
+
+              element:
+                <CreateModPage />,
+            },
+
+            //////////////////////////////////////////////////
+            // PROJECT DASHBOARD
+            //////////////////////////////////////////////////
+
+            {
+              path: "/project/:slug",
+
+              element:
+                <ProjectDashboard />,
+
+              children: [
+                //////////////////////////////////////////////////
+                // OVERVIEW
+                //////////////////////////////////////////////////
+
+                {
+                  index: true,
+
+                  element:
+                    <OverviewTab />,
+                },
+
+                //////////////////////////////////////////////////
+                // VERSIONS
+                //////////////////////////////////////////////////
+
+                {
+                  path: "versions",
+
+                  element:
+                    <VersionsTab />,
+                },
+
+                //////////////////////////////////////////////////
+                // GALLERY
+                //////////////////////////////////////////////////
+
+                {
+                  path: "gallery",
+
+                  element:
+                    <GalleryTab />,
+                },
+
+                //////////////////////////////////////////////////
+                // SETTINGS
+                //////////////////////////////////////////////////
+
+                {
+                  path: "settings",
+
+                  element:
+                    <SettingsTab />,
+                },
+              ],
             },
           ],
         },

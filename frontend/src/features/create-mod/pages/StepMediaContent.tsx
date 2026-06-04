@@ -1,19 +1,36 @@
 import { useEditor, EditorContent } from "@tiptap/react";
-import styles from "./mediainfo.module.css";
+import styles from "./StepMediaContent.module.css";
 
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import Image from "@tiptap/extension-image";
+import Button from "@/shared/ui/button/Button";
+import Section from "@/shared/ui/section/Section";
+
+import {
+  Bold,
+  Italic,
+  Underline as UnderlineIcon,
+  Heading1,
+  Heading2,
+  List,
+  ListOrdered,
+  Link2,
+  ImagePlus,
+  Eraser,
+  Upload,
+} from "lucide-react";
 
 type Props = {
   data: any;
   setData: (data: any) => void;
   submit: () => void;
+  prev: () => void;
 };
 
-export default function StepMediaInfo({ data, setData, submit }: Props) {
+export default function StepMediaInfo({ data, setData, submit, prev }: Props) {
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -89,107 +106,196 @@ export default function StepMediaInfo({ data, setData, submit }: Props) {
   };
 
   return (
-    <div className={styles.wrapper}>
-      <h2 className={styles.title}>Media & Description</h2>
-
+      <Section
+        title="Media & Description"
+        description="Upload screenshots and write a detailed description."
+      >
       {/* GALLERY */}
-      <div className={styles.gallery}>
-        <input
-          type="file"
-          multiple
-          onChange={(e) => {
-            const files = Array.from(e.target.files || []);
-            handleGallery(files);
-          }}
-        />
+      <div className={styles.gallerySection}>
+        <div className={styles.galleryHeader}>
+          <h3>Gallery Images</h3>
+
+          <label>
+            <input
+              type="file"
+              multiple
+              hidden
+              onChange={(e) => {
+                const files = Array.from(
+                  e.target.files || []
+                );
+
+                handleGallery(files);
+              }}
+            />
+
+            <Button
+              type="button"
+              variant="secondary"
+            >
+              <Upload size={16} />
+              Upload Images
+            </Button>
+          </label>
+        </div>
 
         <div className={styles.previewGrid}>
-          {data.gallery?.map((file: File, i: number) => (
-            <img
-              key={i}
-              src={URL.createObjectURL(file)}
-              className={styles.previewImage}
-            />
-          ))}
+          {data.gallery?.map(
+            (file: File, i: number) => (
+              <img
+                key={i}
+                src={URL.createObjectURL(
+                  file
+                )}
+                className={
+                  styles.previewImage
+                }
+              />
+            )
+          )}
         </div>
       </div>
 
       {/* TOOLBAR FLOAT */}
       <div className={styles.toolbar}>
         <button
-          className={editor.isActive("bold") ? styles.active : ""}
-          onClick={() => editor.chain().focus().toggleBold().run()}
+          className={
+            editor.isActive("bold")
+              ? styles.active
+              : ""
+          }
+          onClick={() =>
+            editor
+              .chain()
+              .focus()
+              .toggleBold()
+              .run()
+          }
         >
-          B
+          <Bold size={16} />
         </button>
 
         <button
-          className={editor.isActive("italic") ? styles.active : ""}
-          onClick={() => editor.chain().focus().toggleItalic().run()}
+          className={
+            editor.isActive("italic")
+              ? styles.active
+              : ""
+          }
+          onClick={() =>
+            editor
+              .chain()
+              .focus()
+              .toggleItalic()
+              .run()
+          }
         >
-          I
+          <Italic size={16} />
         </button>
 
         <button
-          className={editor.isActive("underline") ? styles.active : ""}
-          onClick={() => editor.chain().focus().toggleUnderline().run()}
+          className={
+            editor.isActive(
+              "underline"
+            )
+              ? styles.active
+              : ""
+          }
+          onClick={() =>
+            editor
+              .chain()
+              .focus()
+              .toggleUnderline()
+              .run()
+          }
         >
-          U
+          <UnderlineIcon
+            size={16}
+          />
         </button>
-
-        <button onClick={addLink}>🔗</button>
 
         <button
           onClick={() =>
-            editor.chain().focus().toggleHeading({ level: 1 }).run()
+            editor
+              .chain()
+              .focus()
+              .toggleHeading({
+                level: 1,
+              })
+              .run()
           }
         >
-          H1
+          <Heading1 size={16} />
         </button>
 
         <button
           onClick={() =>
-            editor.chain().focus().toggleHeading({ level: 2 }).run()
+            editor
+              .chain()
+              .focus()
+              .toggleHeading({
+                level: 2,
+              })
+              .run()
           }
         >
-          H2
+          <Heading2 size={16} />
         </button>
-
-        <button onClick={() => editor.chain().focus().toggleBulletList().run()}>
-          •
-        </button>
-
-        <button onClick={() => editor.chain().focus().toggleOrderedList().run()}>
-          1.
-        </button>
-
-        <button onClick={addLink}>🔗</button>
 
         <button
-          onClick={() => editor.chain().focus().unsetLink().run()}
+          onClick={() =>
+            editor
+              .chain()
+              .focus()
+              .toggleBulletList()
+              .run()
+          }
         >
-          ❌
+          <List size={16} />
         </button>
 
-        {/* IMAGE BUTTON */}
-        <label className={styles.imageUpload}>
-          🖼️
+        <button
+          onClick={() =>
+            editor
+              .chain()
+              .focus()
+              .toggleOrderedList()
+              .run()
+          }
+        >
+          <ListOrdered size={16} />
+        </button>
+
+        <button onClick={addLink}>
+          <Link2 size={16} />
+        </button>
+
+        <label>
+          <ImagePlus size={16} />
+
           <input
-            type="file"
             hidden
+            type="file"
             onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) addImage(file);
+              const file =
+                e.target.files?.[0];
+
+              if (file)
+                addImage(file);
             }}
           />
         </label>
 
         <button
           onClick={() =>
-            editor.chain().focus().clearNodes().unsetAllMarks().run()
+            editor
+              .chain()
+              .focus()
+              .clearNodes()
+              .unsetAllMarks()
+              .run()
           }
         >
-          🧹
+          <Eraser size={16} />
         </button>
       </div>
 
@@ -198,9 +304,18 @@ export default function StepMediaInfo({ data, setData, submit }: Props) {
         <EditorContent editor={editor} />
       </div>
 
-      <button className={styles.submit} onClick={submit}>
-        🚀 Crear Mod
-      </button>
-    </div>
+      <div className={styles.actions}>
+        <Button
+          variant="secondary"
+          onClick={prev}
+        >
+          ← Back
+        </Button>
+
+        <button className={styles.submit} onClick={submit}>
+          🚀 Crear Mod
+        </button>
+      </div>
+    </Section>
   );
 }

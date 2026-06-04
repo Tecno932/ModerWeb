@@ -1,10 +1,25 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   PLATFORM_OPTIONS,
   LOADER_OPTIONS,
   PROJECT_TYPE_OPTIONS,
-  CATEGORIES,
 } from "@/entities/mod/enums";
+
+import {
+  JAVA_CATEGORIES,
+  BEDROCK_CATEGORIES,
+} from "@/entities/mod/categories";
+
+import {
+  ImagePlus,
+} from "lucide-react";
+
+import Section from "@/shared/ui/section/Section";
+import Input from "@/shared/ui/input/Input";
+import Textarea from "@/shared/ui/textarea/Textarea";
+import Button from "@/shared/ui/button/Button";
+
+import styles from "./StepBasicInfo.module.css";
 
 type Props = {
   data: any;
@@ -22,196 +37,328 @@ export default function StepBasicInfo({ data, setData, next }: Props) {
     }
   };
 
-  const [coverPreview, setCoverPreview] = useState<string | null>(null);
-
-  const toggleCategory = (value: string) => {
-    const exists = data.categories.includes(value);
-
-    if (exists) {
-      setData({
-        ...data,
-        categories: data.categories.filter((c: string) => c !== value),
-      });
-    } else {
-      setData({
-        ...data,
-        categories: [...data.categories, value],
-      });
-    }
+  const removeTag = (tag: string) => {
+    setData({
+      ...data,
+      tags: data.tags.filter(
+        (t: string) => t !== tag
+      ),
+    });
   };
 
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+
+  const currentCategories = useMemo(() => {
+    if (!data.type) return [];
+
+    if (data.platform === "JAVA") {
+      return (
+        JAVA_CATEGORIES[
+          data.type as keyof typeof JAVA_CATEGORIES
+        ] || []
+      );
+    }
+
+    if (data.platform === "BEDROCK") {
+      return (
+        BEDROCK_CATEGORIES[
+          data.type as keyof typeof BEDROCK_CATEGORIES
+        ] || []
+      );
+    }
+
+    return [];
+  }, [data.platform, data.type]);
+
+  const javaTypes = PROJECT_TYPE_OPTIONS.filter((t) =>
+    [
+      "PLUGIN",
+      "MOD",
+      "MODPACK",
+      "SHADER",
+      "DATA_PACK",
+      "RESOURCE_PACK",
+      "WORLD",
+    ].includes(t.value)
+  );
+
+  const bedrockTypes = PROJECT_TYPE_OPTIONS.filter((t) =>
+    [
+      "ADDON",
+      "TEXTURE",
+      "SCRIPT",
+    ].includes(t.value)
+  );
+
   return (
-    <div>
-      <h2>Basic Info</h2>
+    <Section
+      title="Basic Information"
+      description="Main information about your project."
+    >
+      <div className={styles.layout}>
+        {/* LEFT */}
+        <div className={styles.leftCard}>
+          <div className={styles.hero}>
+            <label className={styles.uploadBox}>
+              <Input
+                type="file"
+                hidden
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
 
-      <input
-        placeholder="Project name"
-        value={data.title}
-        onChange={(e) => setData({ ...data, title: e.target.value })}
-      />
+                  if (!file) return;
 
-      <textarea
-        placeholder="Summary"
+                  setData({
+                    ...data,
+                    icon: file,
+                  });
 
-        value={data.summary}
+                  setCoverPreview(
+                    URL.createObjectURL(file)
+                  );
+                }}
+              />
 
-        onChange={(e) =>
-          setData({
-            ...data,
-            summary: e.target.value,
-          })
-        }
-      />
+              {coverPreview ? (
+                <img
+                  src={coverPreview}
+                  className={styles.preview}
+                />
+              ) : (
+                <>
+                  <ImagePlus size={40} />
+                  <span>Upload Icon</span>
+                </>
+              )}
+            </label>
 
-      <textarea
-        placeholder="Description"
+            <div className={styles.heroContent}>
+              <Input
+                placeholder="Project Name"
+                value={data.title}
+                onChange={(e) =>
+                  setData({
+                    ...data,
+                    title: e.target.value,
+                  })
+                }
+              />
 
-        value={data.description}
+              <Textarea
+                placeholder="Short project summary..."
+                value={data.summary}
+                onChange={(e) =>
+                  setData({
+                    ...data,
+                    summary: e.target.value,
+                  })
+                }
+              />
+            </div>
+          </div>
 
-        onChange={(e) =>
-          setData({
-            ...data,
-            description: e.target.value,
-          })
-        }
-      />
-
-      <input
-        type="text"
-
-        placeholder="License (MIT, GPL-3.0...)"
-
-        value={data.license}
-
-        onChange={(e) =>
-          setData({
-            ...data,
-            license: e.target.value,
-          })
-        }
-      />
-
-      <select
-        value={data.visibility}
-
-        onChange={(e) =>
-          setData({
-            ...data,
-            visibility: e.target.value,
-          })
-        }
-      >
-        <option value="PUBLIC">
-          Public
-        </option>
-
-        <option value="UNLISTED">
-          Unlisted
-        </option>
-
-        <option value="PRIVATE">
-          Private
-        </option>
-      </select>
-
-      {/* ICON */}
-      <input
-        type="file"
-        accept="image/*"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-
-          if (!file) return;
-
-          setData({
-            ...data,
-            icon: file,
-          });
-
-          setCoverPreview(
-            URL.createObjectURL(file)
-          );
-        }}
-      />
-
-      {coverPreview && <img src={coverPreview} width={150} />}
-
-      {/* TYPE */}
-      <select
-        value={data.type}
-        onChange={(e) => setData({ ...data, type: e.target.value })}
-      >
-        <option value="">Tipo</option>
-        {PROJECT_TYPE_OPTIONS.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-
-      {/* PLATFORM */}
-      <select
-        value={data.platform}
-        onChange={(e) => setData({ ...data, platform: e.target.value })}
-      >
-        <option value="">Plataforma</option>
-        {PLATFORM_OPTIONS.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-
-      {/* LOADER */}
-      <select
-        value={data.loader}
-        onChange={(e) => setData({ ...data, loader: e.target.value })}
-      >
-        <option value="">Loader</option>
-        {LOADER_OPTIONS.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-
-      {/* CATEGORIES MULTI */}
-      <div>
-        <p>Categorías:</p>
-          <select
-            value={data.categories[0] || ""}
+          <Textarea
+            placeholder="Description"
+            value={data.description}
             onChange={(e) =>
-              setData({ ...data, categories: [e.target.value] })
+              setData({
+                ...data,
+                description: e.target.value,
+              })
             }
-          >
-            <option value="">Categoría</option>
-            {CATEGORIES.map((c) => (
-              <option key={c.value} value={c.value}>
-                {c.label}
+          />
+        </div>
+
+        {/* RIGHT */}
+        <div className={styles.rightColumn}>
+          <div className={styles.configCard}>
+            <h3>Project Settings</h3>
+
+            {/* PLATFORM */}
+            <select
+              value={data.platform}
+              onChange={(e) =>
+                setData({
+                  ...data,
+                  platform: e.target.value,
+                  loader: "",
+                  type: "",
+                  categories: [],
+                })
+              }
+            >
+              <option value="">
+                Select Platform
               </option>
-            ))}
-          </select>
-      </div>
 
-      {/* TAGS */}
-      <div>
-        <input
-          value={tagInput}
-          onChange={(e) => setTagInput(e.target.value)}
-          placeholder="Tag..."
-        />
-        <button type="button" onClick={addTag}>
-          +
-        </button>
+              {PLATFORM_OPTIONS.map((platform) => (
+                <option
+                  key={platform.value}
+                  value={platform.value}
+                >
+                  {platform.label}
+                </option>
+              ))}
+            </select>
 
-        <div>
-          {data.tags.map((t: string) => (
-            <span key={t}>{t}</span>
-          ))}
+            {/* LOADER */}
+            {data.platform === "JAVA" && (
+              <select
+                value={data.loader}
+                onChange={(e) =>
+                  setData({
+                    ...data,
+                    loader: e.target.value,
+                  })
+                }
+              >
+                <option value="">
+                  Select Loader
+                </option>
+
+                {LOADER_OPTIONS.map((loader) => (
+                  <option
+                    key={loader.value}
+                    value={loader.value}
+                  >
+                    {loader.label}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {/* TYPE JAVA */}
+            {data.platform === "JAVA" && (
+              <select
+                value={data.type}
+                onChange={(e) =>
+                  setData({
+                    ...data,
+                    type: e.target.value,
+                    categories: [],
+                  })
+                }
+              >
+                <option value="">
+                  Select Type
+                </option>
+
+                {javaTypes.map((type) => (
+                  <option
+                    key={type.value}
+                    value={type.value}
+                  >
+                    {type.label}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {/* TYPE BEDROCK */}
+            {data.platform === "BEDROCK" && (
+              <select
+                value={data.type}
+                onChange={(e) =>
+                  setData({
+                    ...data,
+                    type: e.target.value,
+                    categories: [],
+                  })
+                }
+              >
+                <option value="">
+                  Select Type
+                </option>
+
+                {bedrockTypes.map((type) => (
+                  <option
+                    key={type.value}
+                    value={type.value}
+                  >
+                    {type.label}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {/* CATEGORY */}
+            {currentCategories.length > 0 && (
+              <select
+                value={data.categories[0] || ""}
+                onChange={(e) =>
+                  setData({
+                    ...data,
+                    categories: [e.target.value],
+                  })
+                }
+              >
+                <option value="">
+                  Select Category
+                </option>
+
+                {currentCategories.map((category) => (
+                  <option
+                    key={category}
+                    value={category}
+                  >
+                    {category}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* TAGS */}
+          <div className={styles.tagsCard}>
+            <h3>Tags</h3>
+
+            <div className={styles.tagInputRow}>
+              <Input
+                value={tagInput}
+                onChange={(e) =>
+                  setTagInput(e.target.value)
+                }
+                placeholder="Tag..."
+              />
+
+              <Button
+                type="button"
+                onClick={addTag}
+              >
+                +
+              </Button>
+            </div>
+
+            <div className={styles.tags}>
+              {data.tags.map((tag: string) => (
+                <div
+                  key={tag}
+                  className={styles.tag}
+                >
+                  <span>{tag}</span>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      removeTag(tag)
+                    }
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
-      <button onClick={next}>Siguiente →</button>
-    </div>
+      <Button
+        className={styles.nextButton}
+        onClick={next}
+      >
+        Continue →
+      </Button>
+    </Section>
   );
 }

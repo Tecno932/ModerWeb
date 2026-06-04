@@ -12,26 +12,20 @@ export const LOADER_OPTIONS = [
 ];
 
 export const PROJECT_TYPE_OPTIONS = [
+  // Java //
   { value: "PLUGIN", label: "Plugin" },
   { value: "MOD", label: "Mod" },
   { value: "MODPACK", label: "Modpack" },
-  { value: "ADDON", label: "Addon" },
   { value: "SHADER", label: "Shader" },
   { value: "DATA_PACK", label: "Data Pack" },
   { value: "RESOURCE_PACK", label: "Resource Pack" },
-  { value: "MAP", label: "Map" },
-  { value: "CUSTOM", label: "Custom" },
-];
+  { value: "WORLD", label: "World" },
 
-export const CATEGORIES = [
-  { value: "ADVENTURE", label: "Adventure" },
-  { value: "RPG", label: "RPG" },
-  { value: "MMO", label: "MMO" },
-  { value: "EXPLORATION", label: "Exploration" },
-  { value: "HORROR", label: "Horror" },
-  { value: "MAGIC", label: "Magic" },
-  { value: "MINI_GAME", label: "Mini Game" },
-  { value: "SKYBLOCK", label: "Skyblock" },
-  { value: "TECH", label: "Tech" },
-  { value: "VANILLA_PLUS", label: "Vanilla Plus" },
+  // Bedrock //
+  { value: "ADDON", label: "Addon" },
+  { value: "TEXTURE", label: "Texture" },
+  { value: "SCRIPT", label: "Script" },
+
+  // Custom //
+  { value: "CUSTOM", label: "Custom" },
 ];

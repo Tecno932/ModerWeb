@@ -1,10 +1,17 @@
+import { useState } from "react";
+
 import { Link } from "react-router-dom";
 
-import { Search } from "lucide-react";
+import {
+  Menu,
+  X,
+  Search,
+} from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
 
 import Container from "@/shared/ui/container/Container";
+
 import NavbarSearch from "@/widgets/navbar-search/NavbarSearch";
 import UserMenu from "@/widgets/user-menu/UserMenu";
 
@@ -13,10 +20,32 @@ import styles from "./Navbar.module.css";
 export default function Navbar() {
   const { user } = useAuth();
 
+  const [mobileOpen, setMobileOpen] =
+    useState(false);
+
   return (
     <header className={styles.navbar}>
       <Container>
         <div className={styles.inner}>
+          {/* MOBILE MENU BUTTON */}
+
+          <button
+            className={
+              styles.mobileToggle
+            }
+            onClick={() =>
+              setMobileOpen(
+                !mobileOpen
+              )
+            }
+          >
+            {mobileOpen ? (
+              <X size={22} />
+            ) : (
+              <Menu size={22} />
+            )}
+          </button>
+
           {/* LEFT */}
 
           <div className={styles.left}>
@@ -27,7 +56,9 @@ export default function Navbar() {
               ModPlatform
             </Link>
 
-            <nav className={styles.nav}>
+            <nav
+              className={styles.nav}
+            >
               <Link to="/">
                 Discover
               </Link>
@@ -38,10 +69,10 @@ export default function Navbar() {
             </nav>
           </div>
 
-          {/* CENTER */}
+          {/* SEARCH */}
 
           <div className={styles.search}>
-            <Search size={18} />
+            <Search size={16} />
 
             <NavbarSearch />
           </div>
@@ -82,6 +113,75 @@ export default function Navbar() {
             )}
           </div>
         </div>
+
+        {/* MOBILE MENU */}
+
+        {mobileOpen && (
+          <div
+            className={
+              styles.mobileMenu
+            }
+          >
+            <Link
+              to="/"
+              onClick={() =>
+                setMobileOpen(
+                  false
+                )
+              }
+            >
+              Discover
+            </Link>
+
+            <Link
+              to="/search"
+              onClick={() =>
+                setMobileOpen(
+                  false
+                )
+              }
+            >
+              Search
+            </Link>
+
+            <Link
+              to="/create"
+              onClick={() =>
+                setMobileOpen(
+                  false
+                )
+              }
+            >
+              Upload
+            </Link>
+
+            {!user && (
+              <>
+                <Link
+                  to="/login"
+                  onClick={() =>
+                    setMobileOpen(
+                      false
+                    )
+                  }
+                >
+                  Login
+                </Link>
+
+                <Link
+                  to="/register"
+                  onClick={() =>
+                    setMobileOpen(
+                      false
+                    )
+                  }
+                >
+                  Register
+                </Link>
+              </>
+            )}
+          </div>
+        )}
       </Container>
     </header>
   );

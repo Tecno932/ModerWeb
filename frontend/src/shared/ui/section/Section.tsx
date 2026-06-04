@@ -1,26 +1,64 @@
 import type { ReactNode } from "react";
 
+import clsx from "clsx";
+
 import styles from "./Section.module.css";
 
-type Props = {
+type SectionProps = {
   title?: string;
 
+  description?: string;
+
   children: ReactNode;
+
+  className?: string;
 };
 
 export default function Section({
   title,
+  description,
   children,
-}: Props) {
+  className,
+}: SectionProps) {
   return (
-    <section className={styles.section}>
-      {title && (
-        <h2 className={styles.title}>
-          {title}
-        </h2>
+    <section
+      className={clsx(
+        styles.section,
+        className
+      )}
+    >
+      {(title ||
+        description) && (
+        <div
+          className={
+            styles.header
+          }
+        >
+          {title && (
+            <h2
+              className={
+                styles.title
+              }
+            >
+              {title}
+            </h2>
+          )}
+
+          {description && (
+            <p
+              className={
+                styles.description
+              }
+            >
+              {description}
+            </p>
+          )}
+        </div>
       )}
 
-      {children}
+      <div className={styles.content}>
+        {children}
+      </div>
     </section>
   );
 }

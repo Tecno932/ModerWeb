@@ -8,6 +8,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "./context/AuthContext";
 import UploadCenter from "@/features/uploads/components/UploadCenter";
 
+import "@/style/globals.css";
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

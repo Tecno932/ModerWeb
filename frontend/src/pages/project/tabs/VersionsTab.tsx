@@ -1,10 +1,29 @@
-import { useState } from "react";
+import { useEffect, useState, } from "react";
+
 import { useOutletContext } from "react-router-dom";
 
-import FileDropzone from "@/pages/project/components/FileDropzone";
-import VersionsTable from "@/widgets/VersionsTable/index";
+import {
+  FileArchive,
+  Plus,
+  Upload,
+} from "lucide-react";
 
-const MC_VERSIONS_JAVA: string[] = [
+import Button from "@/shared/ui/button/Button";
+import Input from "@/shared/ui/input/Input";
+import Section from "@/shared/ui/section/Section";
+import Textarea from "@/shared/ui/textarea/Textarea";
+
+import FileDropzone from "@/pages/project/components/FileDropzone";
+
+import VersionsTable from "@/widgets/VersionsTable";
+
+import styles from "./VersionsTab.module.css";
+
+//////////////////////////////////////////////////
+// MC VERSIONS
+//////////////////////////////////////////////////
+
+const MC_VERSIONS_JAVA = [
   "1.21.1",
   "1.21",
   "1.20.6",
@@ -19,12 +38,9 @@ const MC_VERSIONS_JAVA: string[] = [
   "1.19.2",
   "1.19.1",
   "1.19",
-  "1.18.2",
-  "1.18.1",
-  "1.18",
 ];
 
-const MC_VERSIONS_BEDROCK: string[] = [
+const MC_VERSIONS_BEDROCK = [
   "1.21.0",
   "1.20.80",
   "1.20.70",
@@ -34,92 +50,112 @@ const MC_VERSIONS_BEDROCK: string[] = [
   "1.20.30",
   "1.20.10",
   "1.20.0",
-  "1.19.80",
-  "1.19.70",
-  "1.19.60",
-  "1.19.50",
-  "1.19.40",
-  "1.19.30",
-  "1.19.20",
-  "1.19.10",
-  "1.19.0",
-  "1.18.30",
-  "1.18.20",
-  "1.18.10",
-  "1.18.0",
 ];
 
+//////////////////////////////////////////////////
+// TYPES
+//////////////////////////////////////////////////
+
 type ModFile = {
-  id: string;
+  id: number;
+
   filename?: string;
+
   size: number;
+
   releaseType: string;
+
   downloads: number;
+
   url?: string;
 };
 
 type Version = {
-  id: string;
+  id: number;
+
   version: string;
+
   minecraftVersion: string;
+
   loader?: string;
+
   createdAt: string;
+
+  changelog?: string;
+
+  releaseType?: string;
+
+  downloads?: number;
+
   files?: ModFile[];
 };
 
-export default function VersionsTab() {
-  const { mod } = useOutletContext<any>();
+//////////////////////////////////////////////////
+// COMPONENT
+//////////////////////////////////////////////////
 
-  const [versions, setVersions] = useState<Version[]>(
-    mod.versions || []
-  );
+export default function VersionsTab() {
+  const { mod } =
+    useOutletContext<any>();
+
+  //////////////////////////////////////////////////
+  // STATE
+  //////////////////////////////////////////////////
+
+  const [versions, setVersions] =
+    useState<Version[]>([]);
 
   const [versionId, setVersionId] =
-    useState<number | null>(null);
+    useState<number | null>(
+      null
+    );
+
+  const [loading, setLoading] =
+    useState(false);
+
+  //////////////////////////////////////////////////
+  // FORM
+  //////////////////////////////////////////////////
+
+  const [versionName, setVersionName] =
+    useState("");
+
+  const [gameVersion, setGameVersion] =
+    useState("");
+
+  const [loader, setLoader] =
+    useState("");
+
+  const [changelog, setChangelog] =
+    useState("");
 
   const [releaseType, setReleaseType] =
     useState("release");
 
-  const [loading, setLoading] =
-    useState(false);
+  //////////////////////////////////////////////////
+  // MC VERSIONS
+  //////////////////////////////////////////////////
 
   const versionsList =
     mod.platform === "BEDROCK"
       ? MC_VERSIONS_BEDROCK
       : MC_VERSIONS_JAVA;
 
-  //////////////////////////////////////////////////////
+  //////////////////////////////////////////////////
+  // SYNC VERSIONS
+  //////////////////////////////////////////////////
+
+  useEffect(() => {
+    if (mod?.versions) {
+      setVersions(mod.versions);
+    }
+  }, [mod]);
+
+  //////////////////////////////////////////////////
   // CREATE VERSION
-  //////////////////////////////////////////////////////
+  //////////////////////////////////////////////////
 
-  const handleCreateVersion = async (
-    e: React.FormEvent<HTMLFormElement>
-  ) => {
-    e.preventDefault();
-
-    const form = e.currentTarget;
-
-    const version = (
-      form.elements.namedItem(
-        "version"
-      ) as HTMLInputElement
-    ).value;
-
-    const minecraftVersion = (
-      form.elements.namedItem(
-        "minecraftVersion"
-      ) as HTMLSelectElement
-    ).value;
-
-    const loader =
-      mod.platform === "JAVA"
-        ? (
-            form.elements.namedItem(
-              "loader"
-            ) as HTMLSelectElement
-          ).value
-        : undefined;
-
+  const handlePublish = async () => {
     try {
       setLoading(true);
 
@@ -138,9 +174,20 @@ export default function VersionsTab() {
           },
 
           body: JSON.stringify({
-            version,
-            minecraftVersion,
-            loader,
+            version:
+              versionName,
+
+            minecraftVersion:
+              gameVersion,
+
+            loader:
+              mod.platform ===
+              "JAVA"
+                ? loader
+                : undefined,
+
+            changelog,
+
             releaseType,
           }),
         }
@@ -152,117 +199,255 @@ export default function VersionsTab() {
         );
       }
 
-      const data = await res.json();
+      const data =
+        await res.json();
 
-      setVersionId(Number(data.id));
+      //////////////////////////////////////////////////
+      // UPDATE STATE
+      //////////////////////////////////////////////////
 
       setVersions((prev) => [
         data,
         ...prev,
       ]);
 
-      form.reset();
+      setVersionId(data.id);
+
+      //////////////////////////////////////////////////
+      // RESET
+      //////////////////////////////////////////////////
+
+      setVersionName("");
+
+      setGameVersion("");
+
+      setLoader("");
+
+      setChangelog("");
+
+      setReleaseType(
+        "release"
+      );
 
     } catch (err) {
       console.error(err);
 
-      alert("Error creando versión");
+      alert(
+        "Error creando versión"
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  //////////////////////////////////////////////////////
-  // UI
-  //////////////////////////////////////////////////////
+  //////////////////////////////////////////////////
+  // RENDER
+  //////////////////////////////////////////////////
 
   return (
-    <div>
-      <h2>📦 Versions</h2>
+    <div className={styles.page}>
+      {/* CREATE */}
+      <Section
+        title="Create Version"
+        description="Upload and publish a new release for your project."
+      >
+        <div className={styles.form}>
+          {/* GRID */}
+          <div className={styles.grid}>
+            {/* VERSION */}
+            <Input
+              label="Version Name"
+              placeholder="Name"
+              value={versionName}
+              onChange={(e) =>
+                setVersionName(
+                  e.target.value
+                )
+              }
+            />
 
-      <form onSubmit={handleCreateVersion}>
-        <input
-          name="version"
-          placeholder="Version name"
-          required
-        />
-
-        <select
-          name="minecraftVersion"
-          required
-        >
-          {versionsList.map((v) => (
-            <option
-              key={v}
-              value={v}
+            {/* MC VERSION */}
+            <div
+              className={
+                styles.field
+              }
             >
-              {v}
-            </option>
-          ))}
-        </select>
+              <label>
+                Minecraft Version
+              </label>
 
-        {mod.platform === "JAVA" && (
-          <select name="loader">
-            <option value="FABRIC">
-              Fabric
-            </option>
+              <select
+                value={gameVersion}
+                onChange={(e) =>
+                  setGameVersion(
+                    e.target.value
+                  )
+                }
+                className={
+                  styles.select
+                }
+              >
+                <option value="">
+                  Select version
+                </option>
 
-            <option value="FORGE">
-              Forge
-            </option>
+                {versionsList.map(
+                  (version) => (
+                    <option
+                      key={version}
+                      value={version}
+                    >
+                      {version}
+                    </option>
+                  )
+                )}
+              </select>
+            </div>
 
-            <option value="NEOFORGE">
-              NeoForge
-            </option>
+            {/* LOADER */}
+            {mod.platform ===
+              "JAVA" && (
+              <div
+                className={
+                  styles.field
+                }
+              >
+                <label>
+                  Loader
+                </label>
 
-            <option value="QUILT">
-              Quilt
-            </option>
-          </select>
-        )}
+                <select
+                  value={loader}
+                  onChange={(e) =>
+                    setLoader(
+                      e.target.value
+                    )
+                  }
+                  className={
+                    styles.select
+                  }
+                >
+                  <option value="">
+                    Select loader
+                  </option>
 
-        <select
-          value={releaseType}
-          onChange={(e) =>
-            setReleaseType(
-              e.target.value
-            )
-          }
-        >
-          <option value="release">
-            Release
-          </option>
+                  <option value="FABRIC">
+                    Fabric
+                  </option>
 
-          <option value="beta">
-            Beta
-          </option>
+                  <option value="FORGE">
+                    Forge
+                  </option>
 
-          <option value="alpha">
-            Alpha
-          </option>
-        </select>
+                  <option value="NEOFORGE">
+                    NeoForge
+                  </option>
 
-        <button disabled={loading}>
-          {loading
-            ? "Creating..."
-            : "Create version"}
-        </button>
-      </form>
+                  <option value="QUILT">
+                    Quilt
+                  </option>
+                </select>
+              </div>
+            )}
 
+            {/* TYPE */}
+            <div
+              className={
+                styles.field
+              }
+            >
+              <label>
+                Release Type
+              </label>
+
+              <select
+                value={releaseType}
+                onChange={(e) =>
+                  setReleaseType(
+                    e.target.value
+                  )
+                }
+                className={
+                  styles.select
+                }
+              >
+                <option value="release">
+                  Release
+                </option>
+
+                <option value="beta">
+                  Beta
+                </option>
+
+                <option value="alpha">
+                  Alpha
+                </option>
+              </select>
+            </div>
+          </div>
+
+          {/* CHANGELOG */}
+          <Textarea
+            label="Changelog"
+            placeholder="Describe what changed in this version..."
+            value={changelog}
+            onChange={(e) =>
+              setChangelog(
+                e.target.value
+              )
+            }
+          />
+
+          {/* ACTIONS */}
+          <div
+            className={
+              styles.actions
+            }
+          >
+            <Button
+              onClick={
+                handlePublish
+              }
+              disabled={loading}
+            >
+              <Plus size={16} />
+
+              {loading
+                ? "Publishing..."
+                : "Publish Version"}
+            </Button>
+          </div>
+        </div>
+      </Section>
+
+      {/* FILE UPLOAD */}
       {versionId && (
-        <div style={{ marginTop: 24 }}>
-          <h3>Upload files</h3>
-
+        <Section
+          title="Upload Files"
+          description="Attach files to the latest version."
+        >
           <FileDropzone
             versionId={versionId}
           />
-        </div>
+        </Section>
       )}
 
-      <VersionsTable
-        versions={versions}
-        isOwner
-      />
+      {/* RELEASES */}
+      <Section>
+
+        {/* TABLE */}
+        <div
+          className={
+            styles.tableWrapper
+          }
+        >
+          <VersionsTable
+            modId={mod.id}
+            versions={versions}
+            isOwner
+          />
+        </div>
+      </Section>
     </div>
   );
 }

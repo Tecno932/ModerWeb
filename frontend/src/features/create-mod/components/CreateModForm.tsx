@@ -2,7 +2,10 @@ import { useState } from "react";
 import { useCreateMod } from "../hooks";
 
 import StepBasicInfo from "../pages/StepBasicInfo";
+import StepMediaLinks from "../pages/StepMediaLinks";
 import StepMediaInfo from "../pages/StepMediaContent";
+
+import styles from "./CreateModForm.module.css";
 
 export default function CreateModForm() {
   const { mutateAsync, isPending } = useCreateMod();
@@ -74,17 +77,23 @@ export default function CreateModForm() {
   ////////////////////////////////////////
 
   const nextStep = () => {
-    // Validación básica (podés mejorar con Zod después)
-    if (!data.title || !data.description || !data.type || !data.platform) {
-      alert("Completa los campos obligatorios ⚠️");
-      return;
+    if (step === 1) {
+      if (
+        !data.title ||
+        !data.description ||
+        !data.type ||
+        !data.platform
+      ) {
+        alert("Completa los campos obligatorios ⚠️");
+        return;
+      }
     }
 
-    setStep(2);
+    setStep((s) => Math.min(s + 1, 3));
   };
 
   const prevStep = () => {
-    setStep(1);
+    setStep((s) => Math.max(s - 1, 1));
   };
 
   ////////////////////////////////////////
@@ -279,18 +288,44 @@ export default function CreateModForm() {
 
   return (
     <div>
+      {/* indicador */}
+      <div className={styles.steps}>
+        <span className={styles.active}>
+          Create Basic Info
+        </span>
 
-      {/* STEP INDICATOR */}
-      <div style={{ marginBottom: 20 }}>
-        <span style={{ marginRight: 10 }}>
-          {step === 1 ? "🟢" : "⚪"} Basic Info
-        </span>
-        <span>
-          {step === 2 ? "🟢" : "⚪"} Media & Description
-        </span>
+        {step >= 2 && (
+          <>
+            <span>›</span>
+            <span
+              className={
+                step === 2
+                  ? styles.active
+                  : undefined
+              }
+            >
+              Data Web
+            </span>
+          </>
+        )}
+
+        {step >= 3 && (
+          <>
+            <span>›</span>
+            <span
+              className={
+                step === 3
+                  ? styles.active
+                  : undefined
+              }
+            >
+              Data Mod
+            </span>
+          </>
+        )}
       </div>
 
-      {/* STEP 1 */}
+      {/* contenido */}
       {step === 1 && (
         <StepBasicInfo
           data={data}
@@ -299,23 +334,23 @@ export default function CreateModForm() {
         />
       )}
 
-      {/* STEP 2 */}
       {step === 2 && (
-        <div>
-          <StepMediaInfo
-            data={data}
-            setData={setData}
-            submit={handleSubmit}
-          />
-
-          <button onClick={prevStep} style={{ marginTop: 10 }}>
-            ← Volver
-          </button>
-        </div>
+        <StepMediaLinks
+          data={data}
+          setData={setData}
+          next={nextStep}
+          prev={prevStep}
+        />
       )}
 
-      {/* LOADING */}
-      {isPending && <p>Creando mod...</p>}
+      {step === 3 && (
+        <StepMediaInfo
+          data={data}
+          setData={setData}
+          submit={handleSubmit}
+          prev={prevStep}
+        />
+      )}
     </div>
   );
 }

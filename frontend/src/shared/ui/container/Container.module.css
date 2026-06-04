@@ -1,11 +1,10 @@
 .container {
   width: 100%;
 
-  max-width: 1400px;
+  max-width: 1440px;
 
   margin: 0 auto;
 
-  padding:
-    24px
-    clamp(16px, 3vw, 32px);
+  padding-left: clamp(16px, 3vw, 32px);
+  padding-right: clamp(16px, 3vw, 32px);
 }

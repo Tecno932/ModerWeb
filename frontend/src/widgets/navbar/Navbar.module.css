@@ -5,39 +5,40 @@
   left: 0;
   right: 0;
 
-  height: 72px;
+  height: 64px;
 
-  background: rgba(15, 15, 15, 0.9);
+  background: rgba(15, 15, 15, 0.92);
 
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(16px);
 
-  border-bottom: 1px solid #222;
+  border-bottom: 1px solid #232323;
 
   z-index: 1000;
 }
 
 .inner {
-  height: 72px;
+  height: 64px;
 
   display: flex;
   align-items: center;
   justify-content: space-between;
 
-  gap: 20px;
+  gap: 16px;
 }
 
 .left {
   display: flex;
   align-items: center;
-  gap: 28px;
+  gap: 24px;
 }
 
 .logo {
-  font-size: 20px;
-  font-weight: 700;
-
   color: white;
+
   text-decoration: none;
+
+  font-size: 18px;
+  font-weight: 800;
 }
 
 .nav {
@@ -46,7 +47,8 @@
 }
 
 .nav a {
-  color: #b3b3b3;
+  color: #a0a0a0;
+
   text-decoration: none;
 
   transition: 0.2s;
@@ -58,14 +60,10 @@
 
 .search {
   flex: 1;
-  max-width: 500px;
 
-  height: 42px;
+  max-width: 480px;
 
-  background: #181818;
-
-  border: 1px solid #2a2a2a;
-  border-radius: 12px;
+  height: 40px;
 
   display: flex;
   align-items: center;
@@ -74,6 +72,12 @@
 
   padding: 0 14px;
 
+  background: #181818;
+
+  border: 1px solid #2a2a2a;
+
+  border-radius: 12px;
+
   color: #888;
 }
 
@@ -81,46 +85,31 @@
   flex: 1;
 
   background: transparent;
+
   border: none;
   outline: none;
 
   color: white;
 }
 
-.results {
-  position: absolute;
-  top: 110%;
-  left: 0;
-  width: 100%;
-
-  background: #1b1b1b;
-  border: 1px solid #2b2b2b;
-  border-radius: 14px;
-
-  overflow-y: auto;
-  overflow-x: hidden;
-
-  max-height: 420px;
-
-  z-index: 40;
-}
-
 .right {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 }
 
 .createButton {
   background: white;
+
   color: black;
+
+  text-decoration: none;
+
+  font-weight: 700;
 
   padding: 10px 14px;
 
   border-radius: 10px;
-
-  text-decoration: none;
-  font-weight: 600;
 }
 
 .auth {
@@ -130,9 +119,101 @@
 
 .auth a {
   color: white;
+
   text-decoration: none;
 }
 
 .register {
   opacity: 0.7;
+}
+
+.mobileToggle {
+  display: none;
+
+  background: none;
+
+  border: none;
+
+  color: white;
+
+  cursor: pointer;
+}
+
+.mobileMenu {
+  display: none;
+}
+
+.results {
+  position: absolute;
+
+  top: 110%;
+  left: 0;
+
+  width: 100%;
+
+  max-height: 420px;
+
+  overflow-y: auto;
+
+  background: #1b1b1b;
+
+  border: 1px solid #2b2b2b;
+
+  border-radius: 14px;
+
+  z-index: 40;
+}
+
+@media (max-width: 900px) {
+  .nav,
+  .search,
+  .createButton,
+  .auth {
+    display: none;
+  }
+
+  .mobileToggle {
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+  }
+
+  .mobileMenu {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 14px;
+
+    padding: 18px;
+
+    background: #151515;
+
+    border: 1px solid #262626;
+
+    border-radius: 16px;
+
+    margin-top: 12px;
+  }
+
+  .mobileMenu a {
+    color: white;
+
+    text-decoration: none;
+
+    font-size: 15px;
+  }
+
+  .inner {
+    gap: 10px;
+  }
+
+  .left {
+    flex: 1;
+  }
+
+  .logo {
+    font-size: 17px;
+  }
 }

@@ -1,0 +1,55 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+
+  gap: 10px;
+}
+
+.label {
+  color: white;
+
+  font-size: 14px;
+
+  font-weight: 700;
+}
+
+.textarea {
+  width: 100%;
+
+  min-height: 180px;
+
+  resize: vertical;
+
+  border-radius: 18px;
+
+  border: 1px solid #2b2b2b;
+
+  background: #151515;
+
+  color: white;
+
+  padding: 16px;
+
+  line-height: 1.7;
+
+  font-size: 14px;
+
+  transition:
+    border-color
+      var(--transition-fast),
+    background
+      var(--transition-fast);
+}
+
+.textarea:focus {
+  outline: none;
+
+  border-color: #4c4c4c;
+
+  background:
+    #191919;
+}
+
+.textarea::placeholder {
+  color: #707070;
+}

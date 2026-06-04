@@ -33,6 +33,8 @@ export default function SearchControls({
     query,
     type,
     category,
+    loader,
+    sort,
     setFilter,
   } = useSearchFilters();
 
@@ -110,6 +112,51 @@ export default function SearchControls({
           />
         </div>
       )}
+      <div className={styles.section}>
+        <h3>Loader</h3>
+
+        <SearchTypeFilter
+          options={[
+            "FABRIC",
+            "FORGE",
+            "NEOFORGE",
+            "QUILT",
+          ]}
+          value={loader}
+          onChange={(v) =>
+            setFilter(
+              "loader",
+              v
+            )
+          }
+        />
+      </div>
+
+      <div className={styles.section}>
+        <h3>Sort</h3>
+
+        <select
+          value={sort}
+          onChange={(e) =>
+            setFilter(
+              "sort",
+              e.target.value
+            )
+          }
+        >
+          <option value="newest">
+            Newest
+          </option>
+
+          <option value="downloads">
+            Downloads
+          </option>
+
+          <option value="likes">
+            Likes
+          </option>
+        </select>
+      </div>
     </div>
   );
 }

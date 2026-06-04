@@ -1,0 +1,55 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+
+  gap: 10px;
+}
+
+.label {
+  color: white;
+
+  font-size: 14px;
+
+  font-weight: 700;
+}
+
+.input {
+  width: 100%;
+
+  min-height: 54px;
+
+  border-radius: 16px;
+
+  border: 1px solid
+    var(--border);
+
+  background:
+    var(--bg-secondary);
+
+  color: white;
+
+  padding:
+    0
+    16px;
+
+  font-size: 14px;
+
+  transition:
+    border-color
+      var(--transition-fast),
+    background
+      var(--transition-fast);
+}
+
+.input:focus {
+  outline: none;
+
+  border-color: #4c4c4c;
+
+  background:
+    #191919;
+}
+
+.input::placeholder {
+  color: #707070;
+}

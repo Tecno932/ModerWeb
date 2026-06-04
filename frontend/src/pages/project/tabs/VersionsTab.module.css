@@ -1,0 +1,121 @@
+.page {
+  display: flex;
+  flex-direction: column;
+
+  gap: 28px;
+
+  padding-bottom: 80px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+
+  gap: 24px;
+}
+
+.grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+
+  gap: 20px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+
+  gap: 10px;
+}
+
+.field label {
+  color: white;
+
+  font-size: 14px;
+
+  font-weight: 700;
+}
+
+.select {
+  height: 54px;
+
+  border: 1px solid #2f2f2f;
+
+  background: #151515;
+
+  border-radius: 16px;
+
+  padding:
+    0
+    16px;
+
+  color: white;
+
+  font-size: 14px;
+
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.select:focus {
+  outline: none;
+
+  border-color: #505050;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.beta {
+  background:
+    rgba(170, 120, 30, 0.18);
+
+  color: #ffd27b;
+
+  border: 1px solid
+    rgba(255, 190, 70, 0.25);
+}
+
+.alpha {
+  background:
+    rgba(150, 70, 70, 0.18);
+
+  color: #ffb0b0;
+
+  border: 1px solid
+    rgba(220, 90, 90, 0.28);
+}
+
+@media (max-width: 900px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .versionTop {
+    flex-direction: column;
+  }
+
+  .badges {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 768px) {
+  .uploadArea {
+    min-height: 200px;
+  }
+
+  .versionCard {
+    padding: 20px;
+  }
+
+  .footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
