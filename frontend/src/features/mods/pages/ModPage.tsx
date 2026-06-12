@@ -101,7 +101,7 @@ export default function ModPage() {
                 setTab("comments")
               }
             >
-              Comments
+              Comments ({data.stats.comments})
             </button>
           </div>
 
@@ -127,7 +127,9 @@ export default function ModPage() {
             )}
 
             {tab === "comments" && (
-              <ModComments />
+              <ModComments
+                modId={data.id}
+              />
             )}
           </main>
 

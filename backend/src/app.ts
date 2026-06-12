@@ -17,6 +17,7 @@ import { authMiddleware } from "./middleware/auth.middleware";
 import { errorHandler } from "./middleware/errorHandler.middleware";
 
 import interactionsRoutes from "./modules/interactions/interactions.routes";
+import commentRoutes from "./routes/comment";
 
 const app = express();
 
@@ -49,6 +50,9 @@ app.use("/uploads", uploadsRoutes);
 
 // ❤️ Likes & Favoritos
 app.use("/mods", interactionsRoutes);
+
+// 💬 Comments
+app.use("/comments", commentRoutes);
 
 // HEALTH
 app.get("/", (_, res) => {

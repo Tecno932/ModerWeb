@@ -617,6 +617,16 @@ sort=${sort}
               avatar: true,
             },
           },
+
+          _count: {
+            select: {
+              comments: {
+                where: {
+                  deleted: false,
+                },
+              },
+            },
+          },
         },
       });
 

@@ -384,22 +384,30 @@ model ModTag {
 //////////////////////
 
 model Comment {
-  id     Int @id @default(autoincrement())
-  modId  Int
+  id Int @id @default(autoincrement())
+
+  modId Int
   userId Int
 
+  parentId Int?
+
   content String
+
+  deleted Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  deleted Boolean @default(false)
-
-  mod  Mod  @relation(fields: [modId], references: [id])
+  mod Mod @relation(fields: [modId], references: [id])
   user User @relation(fields: [userId], references: [id])
+
+  parent Comment? @relation("CommentReplies", fields: [parentId], references: [id]) 
+  replies Comment[] @relation("CommentReplies")
 
   @@index([modId])
   @@index([userId])
+  @@index([parentId])
+  @@index([modId, createdAt])
 }
 
 //////////////////////
@@ -1698,6 +1706,9 @@ export function mapMod(
 
       downloads:
         mod.downloads,
+
+      comments:
+        mod._count?.comments || 0,
     },
 
     ////////////////////////////////////////////////////
@@ -3931,6 +3942,16 @@ sort=${sort}
               id: true,
               username: true,
               avatar: true,
+            },
+          },
+
+          _count: {
+            select: {
+              comments: {
+                where: {
+                  deleted: false,
+                },
+              },
             },
           },
         },

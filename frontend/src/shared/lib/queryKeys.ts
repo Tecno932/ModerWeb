@@ -22,4 +22,13 @@ export const queryKeys = {
       modId,
     ],
   },
+
+  comments: {
+    byMod: (
+      modId: number
+    ) => [
+      "comments",
+      modId,
+    ],
+  },
 };

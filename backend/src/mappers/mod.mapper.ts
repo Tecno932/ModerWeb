@@ -65,6 +65,9 @@ export function mapMod(
 
       downloads:
         mod.downloads,
+
+      comments:
+        mod._count?.comments || 0,
     },
 
     ////////////////////////////////////////////////////
