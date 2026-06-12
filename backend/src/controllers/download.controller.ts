@@ -25,7 +25,7 @@ export async function download(req: Request, res: Response) {
     const file =
       version.files.find((f) => f.isPrimary) || version.files[0];
 
-    // 🔥 incrementar downloads del archivo
+    // incrementar downloads archivo
     await prisma.modFile.update({
       where: { id: file.id },
       data: {
@@ -35,7 +35,7 @@ export async function download(req: Request, res: Response) {
       },
     });
 
-    // 🔥 opcional: incrementar downloads del mod
+    // incrementar downloads mod
     await prisma.mod.update({
       where: { id: version.modId },
       data: {
@@ -45,15 +45,12 @@ export async function download(req: Request, res: Response) {
       },
     });
 
-    // 🔥 CDN READY
-    const BASE_URL =
-      process.env.CDN_URL || "http://192.168.0.110:3000";
+    console.log(
+      "⬇ REDIRECT A:",
+      file.url
+    );
 
-    const finalUrl = `${BASE_URL}${file.url}`;
-
-    console.log("⬇ REDIRECT A:", finalUrl);
-
-    return res.redirect(finalUrl);
+    return res.redirect(file.url);
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : "Error";

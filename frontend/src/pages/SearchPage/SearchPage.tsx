@@ -11,7 +11,6 @@ import SearchControls from "@/features/search/components/SearchControls";
 import ModCard from "@/widgets/mod-card/ModCard";
 
 import Container from "@/shared/ui/container/Container";
-import Section from "@/shared/ui/section/Section";
 
 import Skeleton from "@/shared/ui/Skeleton";
 import ErrorState from "@/shared/ui/ErrorState";
@@ -57,12 +56,7 @@ export default function SearchPage({
     params.get("loader") || "";
 
   const version =
-    params.get("version") ||
-    "";
-
-  const sort =
-    params.get("sort") ||
-    "newest";
+    params.get("version") || "";
 
   //////////////////////////////////////////////////
   // QUERY PARAMS
@@ -84,8 +78,6 @@ export default function SearchPage({
         loader,
 
         version,
-
-        sort,
       }),
 
       [
@@ -95,7 +87,6 @@ export default function SearchPage({
         category,
         loader,
         version,
-        sort,
       ]
     );
 

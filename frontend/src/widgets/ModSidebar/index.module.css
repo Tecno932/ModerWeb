@@ -1,0 +1,103 @@
+.sidebar {
+  position: sticky;
+  top: 20px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.card {
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.title {
+  margin: 0 0 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid
+    rgba(255, 255, 255, 0.08);
+}
+
+.iconButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  height: 42px;
+
+  border: none;
+  border-radius: 10px;
+
+  background: rgba(
+    255,
+    255,
+    255,
+    0.05
+  );
+
+  cursor: pointer;
+
+  transition: 0.2s;
+}
+
+.iconButton:hover {
+  background: rgba(
+    255,
+    255,
+    255,
+    0.1
+  );
+
+  transform: translateY(-1px);
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: repeat(
+    4,
+    1fr
+  );
+  gap: 8px;
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.info div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(
+    255,
+    255,
+    255,
+    0.08
+  );
+  font-size: 12px;
+}
+
+.links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.links a {
+  text-decoration: none;
+}

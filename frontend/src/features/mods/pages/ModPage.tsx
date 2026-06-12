@@ -1,26 +1,35 @@
 import { useParams } from "react-router-dom";
+import { useState } from "react";
 import { useMod } from "../hooks";
 
-import ModHeader from "@/widgets/ModHeader";
+import ModHero from "@/widgets/ModHero";
+import ModSidebar from "@/widgets/ModSidebar";
+
+import ModDescription from "@/widgets/ModDescription";
 import ModGallery from "@/widgets/ModGallery";
-import VersionsTable from "@/widgets/VersionsTable";
+import ModVersions from "@/widgets/ModVersions";
+import ModComments from "@/widgets/ModComments";
 import { useVersions } from "@/features/upload-version/hooks";
-import UploadVersionForm from "@/features/upload-version/components/UploadVersionForm";
 
 import Skeleton from "@/shared/ui/Skeleton";
 import ErrorState from "@/shared/ui/ErrorState";
 
-import { useAuth } from "@/context/AuthContext";
+import styles from "./ModPage.module.css";
 
 export default function ModPage() {
   const { slug } = useParams();
-  const { user } = useAuth();
 
   const { data, isLoading, error } = useMod(slug!);
-  console.log("MOD DATA:", data);
 
   const { data: versions } =
     useVersions(data?.id || "");
+
+  const [tab, setTab] = useState<
+    "description" |
+    "gallery" |
+    "versions" |
+    "comments"
+  >("description");
 
   if (isLoading)
     return (
@@ -33,41 +42,97 @@ export default function ModPage() {
 
   if (error) return <ErrorState message="No se pudo cargar el mod" />;
   if (!data) return <div>Mod no encontrado</div>;
-
-  const isOwner = user?.id === data.authorId;
+  console.log("CONTENT:", data.content);
+  console.log("TYPE:", typeof data.content);
 
   return (
-    <div style={{ width: "100%", margin: "0 auto", padding: 24 }}>
-      <ModHeader mod={data} />
+    <div className={styles.page}>
+      <div className={styles.layout}>
+        <main className={styles.main}>
+          <ModHero mod={data} />
 
-      <div style={{ marginTop: 20 }}>
-        <ModGallery images={data.images} />
+          <div className={styles.tabs}>
+            <button
+              className={
+                tab === "description"
+                  ? styles.activeTab
+                  : ""
+              }
+              onClick={() =>
+                setTab("description")
+              }
+            >
+              Description
+            </button>
+
+            <button
+              className={
+                tab === "gallery"
+                  ? styles.activeTab
+                  : ""
+              }
+              onClick={() =>
+                setTab("gallery")
+              }
+            >
+              Gallery
+            </button>
+
+            <button
+              className={
+                tab === "versions"
+                  ? styles.activeTab
+                  : ""
+              }
+              onClick={() =>
+                setTab("versions")
+              }
+            >
+              Versions
+            </button>
+
+            <button
+              className={
+                tab === "comments"
+                  ? styles.activeTab
+                  : ""
+              }
+              onClick={() =>
+                setTab("comments")
+              }
+            >
+              Comments
+            </button>
+          </div>
+
+
+            {tab === "description" && (
+              <ModDescription
+                content={data.content}
+                description={data.description}
+              />
+            )}
+
+            {tab === "gallery" && (
+              <section className={styles.section}>
+                <ModGallery images={data.images} />
+              </section>
+            )}
+
+            {tab === "versions" && (
+              <ModVersions
+                versions={versions || []}
+                modId={data.id}
+              />
+            )}
+
+            {tab === "comments" && (
+              <ModComments />
+            )}
+          </main>
+
+        <ModSidebar mod={data} />
       </div>
-
-      <div style={{ marginTop: 20 }}>
-        <p>{data.description}</p>
-      </div>
-
-      {data.content && (
-        <div style={{ marginTop: 20 }}>
-          <div dangerouslySetInnerHTML={{ __html: data.content }} />
-        </div>
-      )}
-
-      <div style={{ marginTop: 30 }}>
-      <VersionsTable
-        versions={versions || []}
-        modId={data.id}
-        isOwner={isOwner}
-      />
-      </div>
-      
-      {isOwner && (
-        <div style={{ marginTop: 40 }}>
-          <h2>Subir nueva versión</h2>
-          {data?.id && <UploadVersionForm modId={data.id} />}
-        </div>
-      )}
     </div>
   );
 }

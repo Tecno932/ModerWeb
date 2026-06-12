@@ -3210,6 +3210,7 @@ export interface ModInteractions {
 ---
 feactures/interactions/components/
 LikeButton.tsx
+import { useState, useEffect } from "react";
 import { Heart } from "lucide-react";
 
 import {
@@ -3243,26 +3244,53 @@ export default function LikeButton({
   const likes =
     data?.likesCount || 0;
 
+  const [localLiked, setLocalLiked] =
+    useState(liked);
+
+  const [localLikes, setLocalLikes] =
+    useState(likes);
+
+  useEffect(() => {
+    setLocalLiked(liked);
+    setLocalLikes(likes);
+  }, [liked, likes]);
+
   return (
     <button
       className={`${styles.button} ${
-        liked ? styles.active : ""
+        localLiked
+          ? styles.active
+          : ""
       }`}
-      onClick={() =>
-        mutation.mutate()
-      }
+      onClick={() => {
+        setLocalLiked(
+          !localLiked
+        );
+
+        setLocalLikes(
+          localLiked
+            ? localLikes - 1
+            : localLikes + 1
+        );
+
+        mutation.mutate();
+      }}
       disabled={
         mutation.isPending
       }
     >
-      <Heart size={16} />
+      <Heart
+        size={18}
+        strokeWidth={2.2}
+      />
 
-      <span>{likes}</span>
+      <span>{localLikes}</span>
     </button>
   );
 }
 ---
 FavoriteButton.tsx
+import { useEffect, useState } from "react";
 import { Star } from "lucide-react";
 
 import {
@@ -3296,23 +3324,75 @@ export default function FavoriteButton({
   const favorites =
     data?.favoritesCount || 0;
 
+  const [localFavorited, setLocalFavorited] =
+    useState(favorited);
+
+  const [localFavorites, setLocalFavorites] =
+    useState(favorites);
+
+  //////////////////////////////////////////////////////
+  // SINCRONIZAR CON EL SERVIDOR
+  //////////////////////////////////////////////////////
+
+  useEffect(() => {
+    setLocalFavorited(favorited);
+    setLocalFavorites(favorites);
+  }, [favorited, favorites]);
+
+  //////////////////////////////////////////////////////
+  // TOGGLE
+  //////////////////////////////////////////////////////
+
+  const handleClick = () => {
+    const nextState =
+      !localFavorited;
+
+    setLocalFavorited(nextState);
+
+    setLocalFavorites((prev) =>
+      nextState
+        ? prev + 1
+        : Math.max(0, prev - 1)
+    );
+
+    mutation.mutate(undefined, {
+      onError: () => {
+        setLocalFavorited(
+          !nextState
+        );
+
+        setLocalFavorites(
+          localFavorites
+        );
+      },
+    });
+  };
+
   return (
     <button
       className={`${styles.button} ${
-        favorited
+        localFavorited
           ? styles.active
           : ""
       }`}
-      onClick={() =>
-        mutation.mutate()
-      }
+      onClick={handleClick}
       disabled={
         mutation.isPending
       }
     >
-      <Star size={16} />
+      <Star
+        size={18}
+        strokeWidth={2.2}
+        fill={
+          localFavorited
+            ? "currentColor"
+            : "none"
+        }
+      />
 
-      <span>{favorites}</span>
+      <span>
+        {localFavorites}
+      </span>
     </button>
   );
 }
@@ -3321,30 +3401,35 @@ LikeButton.module.css
 .button {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
 
-  border: none;
+  min-height: 42px;
 
-  background: #1f1f1f;
+  border: none;
+  border-radius: 10px;
+
+  background: rgba(
+    255,
+    255,
+    255,
+    0.05
+  );
 
   color: #d0d0d0;
 
-  padding: 10px 14px;
-
-  border-radius: 12px;
-
   cursor: pointer;
 
-  transition:
-    transform 0.15s ease,
-    background 0.2s ease,
-    color 0.2s ease;
-
-  font-weight: 600;
+  transition: all 0.2s ease;
 }
 
 .button:hover {
-  background: #2b2b2b;
+  background: rgba(
+    255,
+    255,
+    255,
+    0.1
+  );
 
   transform: translateY(-1px);
 }
@@ -3354,9 +3439,22 @@ LikeButton.module.css
 }
 
 .active {
-  background: rgba(255, 70, 70, 0.15);
+  background: rgba(
+    255,
+    70,
+    70,
+    0.15
+  );
 
   color: #ff6b6b;
+}
+
+.active svg {
+  fill: currentColor;
+}
+
+.active svg {
+  fill: currentColor;
 }
 
 .button:disabled {
@@ -3369,30 +3467,35 @@ favoriteButton.module.css
 .button {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
 
-  border: none;
+  min-height: 42px;
 
-  background: #1f1f1f;
+  border: none;
+  border-radius: 10px;
+
+  background: rgba(
+    255,
+    255,
+    255,
+    0.05
+  );
 
   color: #d0d0d0;
 
-  padding: 10px 14px;
-
-  border-radius: 12px;
-
   cursor: pointer;
 
-  transition:
-    transform 0.15s ease,
-    background 0.2s ease,
-    color 0.2s ease;
-
-  font-weight: 600;
+  transition: all 0.2s ease;
 }
 
 .button:hover {
-  background: #2b2b2b;
+  background: rgba(
+    255,
+    255,
+    255,
+    0.1
+  );
 
   transform: translateY(-1px);
 }
@@ -3402,9 +3505,18 @@ favoriteButton.module.css
 }
 
 .active {
-  background: rgba(255, 210, 70, 0.15);
+  background: rgba(
+    255,
+    210,
+    70,
+    0.15
+  );
 
   color: #ffd43b;
+}
+
+.active svg {
+  fill: currentColor;
 }
 
 .button:disabled {
@@ -3790,28 +3902,37 @@ export function useMod(
 feactures/mods/page/
 ModPage.tsx
 import { useParams } from "react-router-dom";
+import { useState } from "react";
 import { useMod } from "../hooks";
 
-import ModHeader from "@/widgets/ModHeader";
+import ModHero from "@/widgets/ModHero";
+import ModSidebar from "@/widgets/ModSidebar";
+
+import ModDescription from "@/widgets/ModDescription";
 import ModGallery from "@/widgets/ModGallery";
-import VersionsTable from "@/widgets/VersionsTable";
+import ModVersions from "@/widgets/ModVersions";
+import ModComments from "@/widgets/ModComments";
 import { useVersions } from "@/features/upload-version/hooks";
-import UploadVersionForm from "@/features/upload-version/components/UploadVersionForm";
 
 import Skeleton from "@/shared/ui/Skeleton";
 import ErrorState from "@/shared/ui/ErrorState";
 
-import { useAuth } from "@/context/AuthContext";
+import styles from "./ModPage.module.css";
 
 export default function ModPage() {
   const { slug } = useParams();
-  const { user } = useAuth();
 
   const { data, isLoading, error } = useMod(slug!);
-  console.log("MOD DATA:", data);
 
   const { data: versions } =
     useVersions(data?.id || "");
+
+  const [tab, setTab] = useState<
+    "description" |
+    "gallery" |
+    "versions" |
+    "comments"
+  >("description");
 
   if (isLoading)
     return (
@@ -3824,43 +3945,212 @@ export default function ModPage() {
 
   if (error) return <ErrorState message="No se pudo cargar el mod" />;
   if (!data) return <div>Mod no encontrado</div>;
-
-  const isOwner = user?.id === data.authorId;
+  console.log("CONTENT:", data.content);
+  console.log("TYPE:", typeof data.content);
 
   return (
-    <div style={{ maxWidth: 1100, margin: "0 auto", padding: 20 }}>
-      <ModHeader mod={data} />
+    <div className={styles.page}>
+      <div className={styles.layout}>
+        <main className={styles.main}>
+          <ModHero mod={data} />
 
-      <div style={{ marginTop: 20 }}>
-        <ModGallery images={data.images} />
+          <div className={styles.tabs}>
+            <button
+              className={
+                tab === "description"
+                  ? styles.activeTab
+                  : ""
+              }
+              onClick={() =>
+                setTab("description")
+              }
+            >
+              Description
+            </button>
+
+            <button
+              className={
+                tab === "gallery"
+                  ? styles.activeTab
+                  : ""
+              }
+              onClick={() =>
+                setTab("gallery")
+              }
+            >
+              Gallery
+            </button>
+
+            <button
+              className={
+                tab === "versions"
+                  ? styles.activeTab
+                  : ""
+              }
+              onClick={() =>
+                setTab("versions")
+              }
+            >
+              Versions
+            </button>
+
+            <button
+              className={
+                tab === "comments"
+                  ? styles.activeTab
+                  : ""
+              }
+              onClick={() =>
+                setTab("comments")
+              }
+            >
+              Comments
+            </button>
+          </div>
+
+
+            {tab === "description" && (
+              <ModDescription
+                content={data.content}
+                description={data.description}
+              />
+            )}
+
+            {tab === "gallery" && (
+              <section className={styles.section}>
+                <ModGallery images={data.images} />
+              </section>
+            )}
+
+            {tab === "versions" && (
+              <ModVersions
+                versions={versions || []}
+                modId={data.id}
+              />
+            )}
+
+            {tab === "comments" && (
+              <ModComments />
+            )}
+          </main>
+
+        <ModSidebar mod={data} />
       </div>
-
-      <div style={{ marginTop: 20 }}>
-        <p>{data.description}</p>
-      </div>
-
-      {data.content && (
-        <div style={{ marginTop: 20 }}>
-          <div dangerouslySetInnerHTML={{ __html: data.content }} />
-        </div>
-      )}
-
-      <div style={{ marginTop: 30 }}>
-      <VersionsTable
-        versions={versions || []}
-        modId={data.id}
-        isOwner={isOwner}
-      />
-      </div>
-      
-      {isOwner && (
-        <div style={{ marginTop: 40 }}>
-          <h2>Subir nueva versión</h2>
-          {data?.id && <UploadVersionForm modId={data.id} />}
-        </div>
-      )}
     </div>
   );
+}
+---
+ModPgae.module.css
+.page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 24px;
+  align-items: start;
+  overflow-x: hidden;
+}
+
+.sidebar {
+  position: sticky;
+  top: 24px;
+
+  align-self: start;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+
+.section {
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin: 24px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid
+    rgba(255, 255, 255, 0.08);
+  overflow-x: auto;
+}
+
+.tabs button {
+  border: none;
+  background: transparent;
+  color: inherit;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.tabs button:hover {
+  background: rgba(
+    255,
+    255,
+    255,
+    0.05
+  );
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.actions button {
+  width: 100%;
+  min-width: 0;
+}
+
+.activeTab {
+  background: rgba(
+    255,
+    255,
+    255,
+    0.08
+  ) !important;
+
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .page {
+    padding: 12px;
+  }
+
+  .tabs {
+    gap: 4px;
+    margin: 16px 0;
+  }
+
+  .tabs button {
+    padding: 8px 10px;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+
+  .actions {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 ---
 feactures/search/
@@ -3956,9 +4246,95 @@ SearchBar.module.css
 }
 ---
 feactures/search/components/
-SearchControls.tsx
-import SearchInput from "./SearchInput";
+CollapsibleFilter.tsx
+import { useState } from "react";
 
+import {
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
+
+import styles from "./CollapsibleFilter.module.css";
+
+type Props = {
+  title: string;
+
+  children: React.ReactNode;
+};
+
+export default function CollapsibleFilter({
+  title,
+  children,
+}: Props) {
+  const [open, setOpen] =
+    useState(true);
+
+  return (
+    <div className={styles.wrapper}>
+      <button
+        className={styles.header}
+        onClick={() =>
+          setOpen(!open)
+        }
+      >
+        {open ? (
+          <ChevronDown size={16} />
+        ) : (
+          <ChevronRight size={16} />
+        )}
+
+        {title}
+      </button>
+
+      {open && (
+        <div className={styles.body}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+---
+CollapsibleFilter.module.css
+.wrapper {
+  border-bottom: 1px solid #2c2c2c;
+
+  padding-bottom: 12px;
+}
+
+.header {
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+
+  background: none;
+  border: none;
+
+  color: white;
+
+  cursor: pointer;
+
+  font-size: 14px;
+  font-weight: 600;
+
+  padding: 8px 0;
+}
+
+.body {
+  margin-top: 10px;
+}
+---
+SearchControls.tsx
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+
+import SearchInput from "./SearchInput";
 import SearchTypeFilter from "./SearchTypeFilter";
 
 import {
@@ -3970,6 +4346,8 @@ import {
   BEDROCK_TYPES,
   BEDROCK_CATEGORIES,
 } from "../config/bedrockFilters";
+
+import CollapsibleFilter from "./CollapsibleFilter";
 
 import { useSearchFilters } from "../hooks/useSearchFilters";
 
@@ -3984,24 +4362,17 @@ type Props = {
 export default function SearchControls({
   platform,
 }: Props) {
-  //////////////////////////////////////////////////
-  // FILTER STATE
-  //////////////////////////////////////////////////
-
   const {
     query,
     type,
     category,
+    loader,
+    version,
     setFilter,
   } = useSearchFilters();
 
-  //////////////////////////////////////////////////
-  // CONFIG
-  //////////////////////////////////////////////////
-
   const isJava =
-    platform ===
-    "JAVA";
+    platform === "JAVA";
 
   const types = isJava
     ? JAVA_TYPES
@@ -4012,63 +4383,271 @@ export default function SearchControls({
     : BEDROCK_CATEGORIES[type] ||
       [];
 
-  //////////////////////////////////////////////////
-  // RENDER
-  //////////////////////////////////////////////////
+  const versions = [
+    "1.21.6",
+    "1.21.5",
+    "1.21.4",
+    "1.21.3",
+    "1.21.2",
+    "1.21.1",
+    "1.21",
+    "1.20.6",
+    "1.20.5",
+    "1.20.4",
+    "1.20.3",
+    "1.20.2",
+    "1.20.1",
+    "1.20",
+    "1.19.4",
+    "1.19.3",
+    "1.19.2",
+    "1.19.1",
+    "1.19",
+  ];
+
+  const [mobileOpen, setMobileOpen] =
+    useState<string | null>(null);
+
+  const wrapperRef =
+    useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (
+      e: MouseEvent
+    ) => {
+      if (
+        wrapperRef.current &&
+        !wrapperRef.current.contains(
+          e.target as Node
+        )
+      ) {
+        setMobileOpen(null);
+      }
+    };
+
+    document.addEventListener(
+      "mousedown",
+      handleClickOutside
+    );
+
+    return () =>
+      document.removeEventListener(
+        "mousedown",
+        handleClickOutside
+      );
+  }, []);
 
   return (
     <div className={styles.wrapper}>
-      {/* SEARCH */}
-
       <SearchInput
         value={query}
         onChange={(v) =>
-          setFilter(
-            "query",
-            v
-          )
+          setFilter("query", v)
         }
       />
 
-      {/* TYPE */}
+      {/* MOBILE */}
 
-      <div className={styles.section}>
-        <h3>Type</h3>
-
-        <SearchTypeFilter
-          options={types}
-          value={type}
-          onChange={(v) =>
-            setFilter(
-              "type",
-              v
+      <div
+        className={styles.mobileFilters}
+        ref={wrapperRef}
+      >
+        <button
+          className={styles.mobileButton}
+          onClick={() =>
+            setMobileOpen(
+              mobileOpen === "type"
+                ? null
+                : "type"
             )
           }
-        />
+        >
+          Type
+        </button>
+
+        <button
+          className={styles.mobileButton}
+          onClick={() =>
+            setMobileOpen(
+              mobileOpen ===
+                "category"
+                ? null
+                : "category"
+            )
+          }
+        >
+          Category
+        </button>
+
+        <button
+          className={styles.mobileButton}
+          onClick={() =>
+            setMobileOpen(
+              mobileOpen ===
+                "loader"
+                ? null
+                : "loader"
+            )
+          }
+        >
+          Loader
+        </button>
+
+        <button
+          className={styles.mobileButton}
+          onClick={() =>
+            setMobileOpen(
+              mobileOpen ===
+                "version"
+                ? null
+                : "version"
+            )
+          }
+        >
+          Version
+        </button>
+
+        {mobileOpen === "type" && (
+          <div className={styles.mobileDropdown}>
+            <SearchTypeFilter
+              options={types}
+              value={type}
+              onChange={(v) => {
+                setFilter("type", v);
+                setMobileOpen(null);
+              }}
+            />
+          </div>
+        )}
+
+        {mobileOpen ===
+          "category" &&
+          !!categories.length && (
+            <div
+              className={
+                styles.mobileDropdown
+              }
+            >
+              <SearchTypeFilter
+                options={categories}
+                value={category}
+                onChange={(v) => {
+                  setFilter(
+                    "category",
+                    v
+                  );
+
+                  setMobileOpen(null);
+                }}
+              />
+            </div>
+          )}
+
+        {mobileOpen ===
+          "loader" && (
+          <div className={styles.mobileDropdown}>
+            <SearchTypeFilter
+              options={[
+                "FABRIC",
+                "FORGE",
+                "NEOFORGE",
+                "QUILT",
+              ]}
+              value={loader}
+              onChange={(v) => {
+                setFilter(
+                  "loader",
+                  v
+                );
+
+                setMobileOpen(null);
+              }}
+            />
+          </div>
+        )}
+
+        {mobileOpen ===
+          "version" && (
+          <div className={styles.mobileDropdown}>
+            <SearchTypeFilter
+              options={versions}
+              value={version}
+              onChange={(v) => {
+                setFilter(
+                  "version",
+                  v
+                );
+
+                setMobileOpen(null);
+              }}
+            />
+          </div>
+        )}
       </div>
 
-      {/* CATEGORY */}
+      {/* DESKTOP */}
 
-      {!!categories.length && (
-        <div
-          className={styles.section}
-        >
-          <h3>
-            Categories
-          </h3>
-
+      <div
+        className={
+          styles.desktopFilters
+        }
+      >
+        <CollapsibleFilter title="Type">
           <SearchTypeFilter
-            options={categories}
-            value={category}
+            options={types}
+            value={type}
+            onChange={(v) =>
+              setFilter("type", v)
+            }
+          />
+        </CollapsibleFilter>
+
+        {!!categories.length && (
+          <CollapsibleFilter title="Category">
+            <SearchTypeFilter
+              options={categories}
+              value={category}
+              onChange={(v) =>
+                setFilter(
+                  "category",
+                  v
+                )
+              }
+            />
+          </CollapsibleFilter>
+        )}
+
+        <CollapsibleFilter title="Loader">
+          <SearchTypeFilter
+            options={[
+              "FABRIC",
+              "FORGE",
+              "NEOFORGE",
+              "QUILT",
+            ]}
+            value={loader}
             onChange={(v) =>
               setFilter(
-                "category",
+                "loader",
                 v
               )
             }
           />
-        </div>
-      )}
+        </CollapsibleFilter>
+
+        <CollapsibleFilter title="Version">
+          <SearchTypeFilter
+            options={versions}
+            value={version}
+            onChange={(v) =>
+              setFilter(
+                "version",
+                v
+              )
+            }
+          />
+        </CollapsibleFilter>
+      </div>
     </div>
   );
 }
@@ -4076,12 +4655,32 @@ export default function SearchControls({
 SearchControll.module.css
 .wrapper {
   display: flex;
-
   flex-direction: column;
 
-  gap: 16px;
+  gap: 18px;
 
-  margin-bottom: 32px;
+  padding: 18px;
+
+  background: #161616;
+
+  border: 1px solid #2a2a2a;
+  border-radius: 16px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+
+  gap: 10px;
+}
+
+.section h3 {
+  margin: 0;
+
+  font-size: 14px;
+  font-weight: 600;
+
+  color: #d0d0d0;
 }
 
 .filters {
@@ -4090,6 +4689,90 @@ SearchControll.module.css
   gap: 12px;
 
   flex-wrap: wrap;
+}
+
+.desktopFilters {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.mobileFilters {
+  display: none;
+
+  position: relative;
+}
+
+.mobileButton {
+  height: 42px;
+
+  background: #1f1f1f;
+
+  border: 1px solid #333;
+
+  border-radius: 12px;
+
+  color: white;
+
+  cursor: pointer;
+
+  transition: 0.15s;
+}
+
+.mobileButton:hover {
+  background: #262626;
+}
+
+.mobileDropdown {
+  position: absolute;
+
+  top: 100%;
+
+  left: 0;
+  right: 0;
+
+  margin-top: 8px;
+
+  z-index: 100;
+
+  background: #171717;
+
+  border: 1px solid #303030;
+
+  border-radius: 14px;
+
+  padding: 10px;
+
+  box-shadow:
+    0 10px 30px
+      rgba(0, 0, 0, 0.4);
+}
+
+@media (max-width: 900px) {
+  .mobileFilters {
+    display: grid;
+
+    grid-template-columns:
+      1fr 1fr;
+
+    gap: 8px;
+  }
+
+  .wrapper {
+    padding: 0;
+    border: none;
+    background: transparent;
+  }
+
+  .desktopFilters {
+    display: none;
+  }
+  
+  .section,
+  .wrapper > details,
+  .wrapper > .collapsible {
+    display: none;
+  }
 }
 ---
 searchInput.tsx
@@ -4155,13 +4838,9 @@ SearchTypeFilter.tsx
 import styles from "./Filter.module.css";
 
 type Props = {
-  options: string[];
-
+  options: any[];
   value: string;
-
-  onChange: (
-    value: string
-  ) => void;
+  onChange: (value: string) => void;
 };
 
 export default function SearchTypeFilter({
@@ -4170,22 +4849,86 @@ export default function SearchTypeFilter({
   onChange,
 }: Props) {
   return (
-    <div className={styles.group}>
-      {options.map((type) => (
-        <label key={type}>
-          <input
-            type="checkbox"
-            checked={value === type}
-            onChange={() =>
-              onChange(type)
-            }
-          />
+    <div className={styles.list}>
+      <button
+        className={`${styles.item} ${
+          value === ""
+            ? styles.active
+            : ""
+        }`}
+        onClick={() => onChange("")}
+      >
+        All
+      </button>
 
-          {type || "all"}
-        </label>
-      ))}
+      {options.map((option) => {
+        const label =
+          typeof option === "string"
+            ? option
+            : option.label;
+
+        const optionValue =
+          typeof option === "string"
+            ? option
+            : option.value;
+
+        return (
+          <button
+            key={optionValue}
+            className={`${styles.item} ${
+              value === optionValue
+                ? styles.active
+                : ""
+            }`}
+            onClick={() =>
+              onChange(optionValue)
+            }
+          >
+            {label}
+          </button>
+        );
+      })}
     </div>
   );
+}
+---
+Filter.module.css
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.item {
+  width: 100%;
+
+  background: transparent;
+  border: none;
+
+  text-align: left;
+
+  padding: 10px 12px;
+
+  border-radius: 10px;
+
+  cursor: pointer;
+
+  color: #bdbdbd;
+
+  font-size: 14px;
+
+  transition: 0.15s;
+}
+
+.item:hover {
+  background: #202020;
+  color: white;
+}
+
+.active {
+  background: #2a2a2a;
+  color: white;
+  font-weight: 600;
 }
 ---
 feactures/search/config/
@@ -11566,7 +12309,6 @@ import SearchControls from "@/features/search/components/SearchControls";
 import ModCard from "@/widgets/mod-card/ModCard";
 
 import Container from "@/shared/ui/container/Container";
-import Section from "@/shared/ui/section/Section";
 
 import Skeleton from "@/shared/ui/Skeleton";
 import ErrorState from "@/shared/ui/ErrorState";
@@ -11612,12 +12354,7 @@ export default function SearchPage({
     params.get("loader") || "";
 
   const version =
-    params.get("version") ||
-    "";
-
-  const sort =
-    params.get("sort") ||
-    "newest";
+    params.get("version") || "";
 
   //////////////////////////////////////////////////
   // QUERY PARAMS
@@ -11639,8 +12376,6 @@ export default function SearchPage({
         loader,
 
         version,
-
-        sort,
       }),
 
       [
@@ -11650,7 +12385,6 @@ export default function SearchPage({
         category,
         loader,
         version,
-        sort,
       ]
     );
 
@@ -11672,138 +12406,133 @@ export default function SearchPage({
 
   return (
     <Container>
-      {/* HEADER */}
+      <div className={styles.header}>
+        <h1 className={styles.title}>
+          {title}
+        </h1>
 
-      <div className={styles.hero}>
-        <h1>{title}</h1>
-
-        <p>
-          Explore community-made
-          content
+        <p className={styles.subtitle}>
+          Explore community-made content
         </p>
       </div>
 
-      {/* FILTERS */}
+      <div className={styles.page}>
+        <aside className={styles.sidebar}>
+          <SearchControls
+            platform={platform}
+          />
+        </aside>
 
-      <SearchControls
-        platform={platform}
-      />
-
-      {/* LOADING */}
-
-      {isLoading && (
-        <div className={styles.list}>
-          {Array.from({
-            length: 8,
-          }).map((_, i) => (
-            <Skeleton
-              key={i}
-              height={180}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* ERROR */}
-
-      {error && (
-        <ErrorState message="Failed to load mods" />
-      )}
-
-      {/* EMPTY */}
-
-      {!isLoading &&
-        !error &&
-        !data?.data?.length && (
-          <EmptyState message="No projects found" />
-        )}
-
-      {/* RESULTS */}
-
-      {!!data?.data?.length && (
-        <Section
-          title={`${data.meta.total} results`}
-        >
-          <div className={styles.list}>
-            {data.data.map(
-              (mod: any) => (
-                <ModCard
-                  key={mod.id}
-                  mod={mod}
+        <main className={styles.content}>
+          {isLoading && (
+            <div className={styles.list}>
+              {Array.from({
+                length: 8,
+              }).map((_, i) => (
+                <Skeleton
+                  key={i}
+                  height={180}
                 />
-              )
+              ))}
+            </div>
+          )}
+
+          {error && (
+            <ErrorState message="Failed to load mods" />
+          )}
+
+          {!isLoading &&
+            !error &&
+            !data?.data?.length && (
+              <EmptyState message="No projects found" />
             )}
-          </div>
-        </Section>
-      )}
+
+          {!!data?.data?.length && (
+            <>
+              <div className={styles.results}>
+                {data.meta.total} results
+              </div>
+
+              <div className={styles.list}>
+                {data.data.map(
+                  (mod: any) => (
+                    <ModCard
+                      key={mod.id}
+                      mod={mod}
+                    />
+                  )
+                )}
+              </div>
+            </>
+          )}
+        </main>
+      </div>
     </Container>
   );
 }
 ---
 SearchPage.module.css
 .page {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 32px;
-}
-
-.hero {
-  margin-bottom: 32px;
-}
-
-.hero h1 {
-  margin: 0;
-  font-size: 42px;
-}
-
-.hero p {
-  opacity: 0.7;
-  margin-top: 8px;
-}
-
-.searchInput {
-  width: 100%;
-  margin-top: 20px;
-
-  padding: 16px;
-
-  border-radius: 14px;
-  border: 1px solid #2c2c2c;
-
-  background: #181818;
-  color: white;
-
-  font-size: 16px;
-}
-
-.filters {
-  display: flex;
-  gap: 12px;
-
-  margin-bottom: 24px;
-}
-
-.filters select {
-  padding: 10px 14px;
-
-  border-radius: 10px;
-
-  background: #1b1b1b;
-  color: white;
-
-  border: 1px solid #333;
-}
-
-.grid {
   display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 24px;
+  align-items: start;
+}
 
-  grid-template-columns:
-    repeat(
-      auto-fill,
-      minmax(340px, 1fr)
-    );
+.sidebar {
+  position: sticky;
 
-  gap: 20px;
+  top: 80px;
+
+  max-height: calc(100vh - 100px);
+
+  overflow-y: auto;
+}
+
+.content {
+  min-width: 0;
+}
+
+.list {
+  display: grid;
+  gap: 16px;
+}
+
+.header {
+  margin-bottom: 20px;
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.subtitle {
+  opacity: 0.7;
+  font-size: 14px;
+}
+
+.results {
+  margin-bottom: 18px;
+  opacity: 0.7;
+  font-size: 14px;
+}
+
+@media (max-width: 900px) {
+  .page {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+
+    max-height: none;
+
+    overflow: visible;
+
+    margin-bottom: 16px;
+  }
 }
 ---
 router/
@@ -12663,6 +13392,412 @@ Container.module.css
   padding-right: clamp(16px, 3vw, 32px);
 }
 ---
+shared/ui/ContentRenderer/
+ContentRenderer.tsx
+import styles from "./index.module.css";
+
+type Props = {
+  content: any;
+};
+
+function renderTextNode(
+  node: any,
+  key: number
+) {
+  let element: React.ReactNode =
+    node.text || "";
+
+  if (node.marks) {
+    node.marks.forEach(
+      (mark: any) => {
+        switch (mark.type) {
+          case "bold":
+            element = (
+              <strong>
+                {element}
+              </strong>
+            );
+            break;
+
+          case "italic":
+            element = (
+              <em>{element}</em>
+            );
+            break;
+
+          case "underline":
+            element = (
+              <u>{element}</u>
+            );
+            break;
+
+          case "strike":
+            element = (
+              <s>{element}</s>
+            );
+            break;
+
+          case "textStyle":
+            element = (
+              <span
+                style={{
+                  color:
+                    mark.attrs
+                      ?.color,
+                }}
+              >
+                {element}
+              </span>
+            );
+            break;
+
+          case "highlight":
+            element = (
+              <mark
+                style={{
+                  background:
+                    mark.attrs
+                      ?.color,
+                }}
+              >
+                {element}
+              </mark>
+            );
+            break;
+        }
+      }
+    );
+  }
+
+  return (
+    <span key={key}>
+      {element}
+    </span>
+  );
+}
+
+function renderInline(
+  content: any[]
+) {
+  if (!content) return null;
+
+  return content.map(
+    (
+      node: any,
+      index: number
+    ) =>
+      renderTextNode(
+        node,
+        index
+      )
+  );
+}
+
+export default function ContentRenderer({
+  content,
+}: Props) {
+  if (!content?.content) {
+    return null;
+  }
+
+  return (
+    <div className={styles.content}>
+      {content.content.map(
+        (
+          block: any,
+          index: number
+        ) => {
+          switch (
+            block.type
+          ) {
+            case "heading": {
+              const level =
+                block.attrs
+                  ?.level || 1;
+
+              const text =
+                renderInline(
+                  block.content
+                );
+
+              if (
+                level === 1
+              ) {
+                return (
+                  <h1
+                    key={index}
+                  >
+                    {text}
+                  </h1>
+                );
+              }
+
+              if (
+                level === 2
+              ) {
+                return (
+                  <h2
+                    key={index}
+                  >
+                    {text}
+                  </h2>
+                );
+              }
+
+              return (
+                <h3
+                  key={index}
+                >
+                  {text}
+                </h3>
+              );
+            }
+
+            case "paragraph":
+              return (
+                <p key={index}>
+                  {renderInline(
+                    block.content
+                  )}
+                </p>
+              );
+
+            case "quote":
+              return (
+                <blockquote
+                  key={index}
+                >
+                  {renderInline(
+                    block.content
+                  )}
+                </blockquote>
+              );
+
+            case "image":
+              return (
+                <img
+                  key={index}
+                  src={
+                    block
+                      .attrs
+                      ?.src
+                  }
+                  alt={
+                    block
+                      .attrs
+                      ?.alt ||
+                    ""
+                  }
+                />
+              );
+
+            case "bulletList":
+              return (
+                <ul
+                  key={index}
+                >
+                  {block.content?.map(
+                    (
+                      item: any,
+                      i: number
+                    ) => (
+                      <li
+                        key={i}
+                      >
+                        {renderInline(
+                          item
+                            .content?.[0]
+                            ?.content
+                        )}
+                      </li>
+                    )
+                  )}
+                </ul>
+              );
+
+            case "orderedList":
+              return (
+                <ol
+                  key={index}
+                >
+                  {block.content?.map(
+                    (
+                      item: any,
+                      i: number
+                    ) => (
+                      <li
+                        key={i}
+                      >
+                        {renderInline(
+                          item
+                            .content?.[0]
+                            ?.content
+                        )}
+                      </li>
+                    )
+                  )}
+                </ol>
+              );
+
+            case "codeBlock":
+              return (
+                <pre
+                  key={index}
+                  className={
+                    styles.code
+                  }
+                >
+                  <code>
+                    {block.content?.[0]
+                      ?.text ||
+                      ""}
+                  </code>
+                </pre>
+              );
+
+            case "divider":
+              return (
+                <hr
+                  key={index}
+                />
+              );
+
+            default:
+              return (
+                <div
+                  key={index}
+                  className={
+                    styles.unsupported
+                  }
+                >
+                  Unsupported:
+                  {" "}
+                  {block.type}
+                </div>
+              );
+          }
+        }
+      )}
+    </div>
+  );
+}
+---
+index.module.css
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.content h1 {
+  font-size: 2rem;
+}
+
+.content h2 {
+  font-size: 1.5rem;
+}
+
+.content h3 {
+  font-size: 1.25rem;
+}
+
+.content p {
+  line-height: 1.7;
+}
+
+.content img {
+  max-width: 100%;
+  border-radius: 12px;
+}
+
+.content blockquote {
+  border-left: 4px solid #666;
+  padding-left: 16px;
+  opacity: 0.8;
+}
+
+.content ul,
+.content ol {
+  padding-left: 24px;
+}
+
+.content mark {
+  color: inherit;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.code {
+  padding: 16px;
+  border-radius: 12px;
+  overflow-x: auto;
+  font-family: monospace;
+  background: #111;
+}
+
+.unsupported {
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px dashed #666;
+  opacity: 0.7;
+}
+
+.content hr {
+  border: none;
+  height: 1px;
+  background: #444;
+}
+
+details {
+  border: 1px solid #333;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+details summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.calloutInfo {
+  padding: 16px;
+  border-radius: 10px;
+  border-left: 4px solid #3b82f6;
+}
+
+.calloutSuccess {
+  padding: 16px;
+  border-radius: 10px;
+  border-left: 4px solid #22c55e;
+}
+
+.calloutWarning {
+  padding: 16px;
+  border-radius: 10px;
+  border-left: 4px solid #f59e0b;
+}
+
+.calloutError {
+  padding: 16px;
+  border-radius: 10px;
+  border-left: 4px solid #ef4444;
+}
+
+.content table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.content td,
+.content th {
+  border: 1px solid #333;
+  padding: 10px;
+}
+
+.content th {
+  text-align: left;
+}
+---
 shared/ui/input/
 Input.tsx
 import type {
@@ -13215,15 +14350,16 @@ widgets/mod-card/
 ModCard.tsx
 import { Link } from "react-router-dom";
 
-import Card from "@/shared/ui/card/Card";
-import Badge from "@/shared/ui/badge/Badge";
-
-import LikeButton from "@/features/interactions/components/LikeButton";
-import FavoriteButton from "@/features/interactions/components/FavoriteButton";
+import {
+  Download,
+  Heart,
+  Star,
+  ClockFading,
+} from "lucide-react";
 
 import styles from "./ModCard.module.css";
 
-type ModCardProps = {
+type Props = {
   mod: any;
 };
 
@@ -13232,345 +14368,903 @@ const API_URL =
 
 export default function ModCard({
   mod,
-}: ModCardProps) {
-  const cover = mod.images?.find(
-    (img: any) => img.isCover
-  );
+}: Props) {
+  const icon =
+    mod.icon
+      ? `${API_URL}${mod.icon}`
+      : "/placeholder.png";
 
   return (
-    <Card
-      hoverable
-      padding="sm"
-      className={styles.card}
-    >
+    <article className={styles.card}>
       <Link
         to={`/mods/${mod.slug}`}
         className={styles.link}
       >
-        //////////////////////////////////////////////////
-        // IMAGE
-        //////////////////////////////////////////////////
+        {/* ICON */}
 
-        <div className={styles.imageWrapper}>
-          <img
-            src={`${API_URL}${cover?.url}`}
-            alt={mod.title}
-            className={styles.image}
-          />
+        <img
+          src={icon}
+          alt={mod.title}
+          className={styles.icon}
+        />
 
-          <div className={styles.overlay} />
-        </div>
-
-        //////////////////////////////////////////////////
-        // CONTENT
-        //////////////////////////////////////////////////
+        {/* CONTENT */}
 
         <div className={styles.content}>
-          ////////////////////////////////////////////////
-          // HEADER
-          ////////////////////////////////////////////////
+          <div className={styles.top}>
+            <div>
+              <h3 className={styles.title}>
+                {mod.title}
+              </h3>
 
-          <div className={styles.header}>
-            <h3 className={styles.title}>
-              {mod.title}
-            </h3>
+              {/* SUMMARY */}
 
-            <div
-              className={styles.author}
-            >
-              by{" "}
-              {mod.author
-                ?.username ||
-                "Unknown"}
+              <p className={styles.summary}>
+                {mod.summary ||
+                  mod.description}
+              </p>
+            </div>
+
+            <div className={styles.rightColumn}>
+              <div className={styles.actions}>
+                <div className={styles.statButton}>
+                  <Download size={16} />
+                  <span>{mod.downloads}</span>
+                </div>
+
+                <div className={styles.statButton}>
+                  <Heart size={16} />
+                  <span>{mod.likesCount}</span>
+                </div>
+
+                <div className={styles.statButton}>
+                  <Star size={16} />
+                  <span>{mod.favoritesCount}</span>
+                </div>
+              </div>
+
+              <div className={styles.date}>
+                <ClockFading size={14} />
+
+                <span>
+                  {new Date(
+                    mod.createdAt
+                  ).toLocaleDateString()}
+                </span>
+              </div>
             </div>
           </div>
 
-          ////////////////////////////////////////////////
-          // DESCRIPTION
-          ////////////////////////////////////////////////
+          {/* BADGES */}
 
-          <p
-            className={
-              styles.description
-            }
-          >
-            {mod.description}
-          </p>
-
-          ////////////////////////////////////////////////
-          // TAGS
-          ////////////////////////////////////////////////
-
-          <div className={styles.tags}>
-            {mod.tags
-              ?.slice(0, 4)
-              .map((tag: any) => (
-                <Badge key={tag.name}>
-                  {tag.name}
-                </Badge>
-              ))}
-          </div>
-
-          ////////////////////////////////////////////////
-          // FOOTER
-          ////////////////////////////////////////////////
-
-          <div className={styles.footer}>
-            ////////////////////////////////////////////
-            // STATS
-            ////////////////////////////////////////////
-
-            <div
-              className={styles.stats}
-            >
-              <span>
-                ❤️{" "}
-                {
-                  mod.stats
-                    ?.likes
-                }
-              </span>
-
-              <span>
-                👁{" "}
-                {
-                  mod.stats
-                    ?.views
-                }
-              </span>
-
-              <span>
-                ⬇️{" "}
-                {
-                  mod.stats
-                    ?.downloads
-                }
-              </span>
-            </div>
-
-            ////////////////////////////////////////////
-            // ACTIONS
-            ////////////////////////////////////////////
-
-            <div
+          <div className={styles.badges}>
+            <span
               className={
-                styles.actions
-              }
-              onClick={(e) =>
-                e.preventDefault()
+                styles.badge
               }
             >
-              <LikeButton
-                modId={mod.id}
-                slug={mod.slug}
-              />
+              {mod.type}
+            </span>
 
-              <FavoriteButton
-                modId={mod.id}
-                slug={mod.slug}
-              />
-            </div>
+            <span
+              className={
+                styles.badge
+              }
+            >
+              {mod.platform}
+            </span>
+
+            {mod.loader && (
+              <span
+                className={
+                  styles.badge
+                }
+              >
+                {mod.loader}
+              </span>
+            )}
           </div>
         </div>
       </Link>
-    </Card>
+    </article>
   );
 }
 ---
 ModCard.module.css
 .card {
-  width: 100%;
+  background: #171717;
+  border: 1px solid #2b2b2b;
+  border-radius: 16px;
+  transition: 0.2s;
+}
+
+.card:hover {
+  border-color: #3d3d3d;
 }
 
 .link {
   display: flex;
-
-  gap: 16px;
-
+  gap: 18px;
+  padding: 18px;
   text-decoration: none;
-
   color: inherit;
 }
 
-.imageWrapper {
-  position: relative;
-
-  width: 180px;
-
-  min-width: 180px;
-
-  height: 140px;
-
-  border-radius: 14px;
-
-  overflow: hidden;
-
-  background: #252525;
-}
-
-.image {
-  width: 100%;
-  height: 100%;
-
+.icon {
+  width: 96px;
+  height: 96px;
+  flex-shrink: 0;
+  border-radius: 18px;
   object-fit: cover;
-
-  transition:
-    transform 0.3s ease;
-}
-
-.card:hover .image {
-  transform: scale(1.04);
-}
-
-.overlay {
-  position: absolute;
-  inset: 0;
-
-  background:
-    linear-gradient(
-      to top,
-      rgba(0,0,0,0.35),
-      transparent
-    );
+  background: #242424;
 }
 
 .content {
   flex: 1;
-
-  display: flex;
-
-  flex-direction: column;
-
   min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
-.header {
+.top {
   display: flex;
-
-  flex-direction: column;
-
-  gap: 4px;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
 }
 
 .title {
   margin: 0;
-
-  font-size: 22px;
-
+  font-size: 20px;
   font-weight: 700;
-
   color: white;
 }
 
 .author {
+  margin-top: 4px;
+  color: #8a8a8a;
   font-size: 13px;
-
-  color: #8f8f8f;
 }
 
-.description {
-  margin-top: 10px;
-
-  color: #b7b7b7;
-
-  line-height: 1.5;
-
+.summary {
+  margin-top: 4px;
+  color: #c0c0c0;
+  line-height: 1.45;
   font-size: 14px;
-
   display: -webkit-box;
-
   -webkit-line-clamp: 2;
-
   -webkit-box-orient: vertical;
-
   overflow: hidden;
 }
 
-.tags {
+.badges {
   display: flex;
-
   flex-wrap: wrap;
-
   gap: 8px;
+  margin-top: 12px;
+}
 
-  margin-top: 14px;
+.badge {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #222;
+  border: 1px solid #333;
+  font-size: 12px;
+  color: #d8d8d8;
 }
 
 .footer {
   margin-top: auto;
-
   display: flex;
-
-  align-items: center;
-
   justify-content: space-between;
-
-  gap: 12px;
-
-  padding-top: 18px;
+  align-items: center;
+  padding-top: 16px;
 }
 
 .stats {
   display: flex;
+  gap: 18px;
+}
 
+.stats span {
+  display: flex;
   align-items: center;
-
-  gap: 14px;
-
-  color: #8c8c8c;
-
+  gap: 6px;
+  color: #8f8f8f;
   font-size: 13px;
+}
+
+.updated {
+  color: #777;
+  font-size: 12px;
+}
+
+.rightColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
 }
 
 .actions {
   display: flex;
-
-  align-items: center;
-
-  gap: 8px;
+  gap: 10px;
 }
 
-@media (max-width: 780px) {
+.statButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #d5d5d5;
+  font-size: 13px;
+}
+
+.statButton svg {
+  color: #9f9f9f;
+}
+
+.date {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  color: #8b8b8b;
+  font-size: 12px;
+}
+
+@media (max-width: 700px) {
   .link {
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: 72px 1fr;
+    gap: 12px;
+    align-items: start;
   }
 
-  .imageWrapper {
-    width: 100%;
 
-    height: 220px;
+  .icon {
+    width: 72px;
+    height: 72px;
+  }
+
+  .content {
+    display: contents;
+  }
+
+  .top {
+    grid-column: 2;
+  }
+
+  .badges {
+    grid-column: 1 / -1;
+    margin-top: 1px;
+    padding-top: 1px;
+    font-size: 11px;
+  }
+  
+  .title {
+    font-size: 17px;
   }
 
   .footer {
     flex-direction: column;
 
     align-items: flex-start;
+
+    gap: 10px;
   }
 }
 ---
-widgets/ModGallery/
+widgets/ModComment/
 index.tsx
-export default function ModGallery({ images }: any) {
-  if (!images?.length) return null;
-
-  const BASE = "http://192.168.0.110:3000";
-  
+export default function ModComments() {
   return (
-    <div style={{ display: "flex", gap: 10, overflowX: "auto" }}>
+    <section>
+      <h2>Comments</h2>
+
+      <p>Coming soon...</p>
+    </section>
+  );
+}
+---
+widgets/ModDescription/index.tsx
+import styles from "./index.module.css";
+
+type Props = {
+  content?: any;
+  description?: string;
+};
+
+export default function ContentRenderer({
+  content,
+}: Props) {
+  if (!content?.content) {
+    return null;
+  }
+
+  const renderInline = (
+    node: any,
+    key: number
+  ) => {
+    if (node.type !== "text") {
+      return null;
+    }
+
+    let element: any = node.text;
+
+    if (node.marks) {
+      node.marks.forEach(
+        (mark: any) => {
+          switch (mark.type) {
+            case "bold":
+              element = (
+                <strong>
+                  {element}
+                </strong>
+              );
+              break;
+
+            case "italic":
+              element = (
+                <em>{element}</em>
+              );
+              break;
+
+            case "underline":
+              element = (
+                <u>{element}</u>
+              );
+              break;
+
+            case "strike":
+              element = (
+                <s>{element}</s>
+              );
+              break;
+
+            case "textStyle":
+              element = (
+                <span
+                  style={{
+                    color:
+                      mark.attrs
+                        ?.color,
+                  }}
+                >
+                  {element}
+                </span>
+              );
+              break;
+
+            case "highlight":
+              element = (
+                <mark
+                  style={{
+                    background:
+                      mark.attrs
+                        ?.color,
+                  }}
+                >
+                  {element}
+                </mark>
+              );
+              break;
+          }
+        }
+      );
+    }
+
+    return (
+      <span key={key}>
+        {element}
+      </span>
+    );
+  };
+
+  const renderParagraph = (
+    block: any,
+    index: number
+  ) => (
+    <p key={index}>
+      {block.content?.map(
+        (
+          node: any,
+          i: number
+        ) =>
+          renderInline(
+            node,
+            i
+          )
+      )}
+    </p>
+  );
+
+  return (
+    <div className={styles.content}>
+      {content.content.map(
+        (
+          block: any,
+          index: number
+        ) => {
+          switch (
+            block.type
+          ) {
+            ////////////////////////////////////////////////////
+            // HEADINGS
+            ////////////////////////////////////////////////////
+
+            case "heading": {
+              const level =
+                block.attrs
+                  ?.level || 1;
+
+              const text =
+                block.content?.map(
+                  (
+                    c: any
+                  ) => c.text
+                );
+
+              if (
+                level === 1
+              )
+                return (
+                  <h1
+                    key={index}
+                  >
+                    {text}
+                  </h1>
+                );
+
+              if (
+                level === 2
+              )
+                return (
+                  <h2
+                    key={index}
+                  >
+                    {text}
+                  </h2>
+                );
+
+              return (
+                <h3
+                  key={index}
+                >
+                  {text}
+                </h3>
+              );
+            }
+
+            ////////////////////////////////////////////////////
+            // PARAGRAPH
+            ////////////////////////////////////////////////////
+
+            case "paragraph":
+              return renderParagraph(
+                block,
+                index
+              );
+
+            ////////////////////////////////////////////////////
+            // QUOTE
+            ////////////////////////////////////////////////////
+
+            case "quote":
+              return (
+                <blockquote
+                  key={index}
+                >
+                  {block.content?.map(
+                    (
+                      c: any
+                    ) => c.text
+                  )}
+                </blockquote>
+              );
+
+            ////////////////////////////////////////////////////
+            // BULLET LIST
+            ////////////////////////////////////////////////////
+
+            case "bulletList":
+              return (
+                <ul
+                  key={index}
+                >
+                  {block.content?.map(
+                    (
+                      item: any,
+                      i: number
+                    ) => (
+                      <li
+                        key={i}
+                      >
+                        {item
+                          .content?.[0]
+                          ?.content?.map(
+                            (
+                              c: any,
+                              x: number
+                            ) =>
+                              renderInline(
+                                c,
+                                x
+                              )
+                          )}
+                      </li>
+                    )
+                  )}
+                </ul>
+              );
+
+            ////////////////////////////////////////////////////
+            // ORDERED LIST
+            ////////////////////////////////////////////////////
+
+            case "orderedList":
+              return (
+                <ol
+                  key={index}
+                >
+                  {block.content?.map(
+                    (
+                      item: any,
+                      i: number
+                    ) => (
+                      <li
+                        key={i}
+                      >
+                        {item
+                          .content?.[0]
+                          ?.content?.map(
+                            (
+                              c: any,
+                              x: number
+                            ) =>
+                              renderInline(
+                                c,
+                                x
+                              )
+                          )}
+                      </li>
+                    )
+                  )}
+                </ol>
+              );
+
+            ////////////////////////////////////////////////////
+            // CODE
+            ////////////////////////////////////////////////////
+
+            case "codeBlock":
+              return (
+                <pre
+                  key={index}
+                  className={
+                    styles.code
+                  }
+                >
+                  <code>
+                    {block.content?.map(
+                      (
+                        c: any
+                      ) =>
+                        c.text
+                    )}
+                  </code>
+                </pre>
+              );
+
+            ////////////////////////////////////////////////////
+            // IMAGE
+            ////////////////////////////////////////////////////
+
+            case "image":
+              return (
+                <img
+                  key={index}
+                  src={
+                    block
+                      .attrs
+                      ?.src
+                  }
+                  alt={
+                    block
+                      .attrs
+                      ?.alt ||
+                    ""
+                  }
+                />
+              );
+
+            ////////////////////////////////////////////////////
+            // SPOILER
+            ////////////////////////////////////////////////////
+
+            case "spoiler":
+            case "accordion":
+              return (
+                <details
+                  key={index}
+                  className={
+                    styles.details
+                  }
+                >
+                  <summary>
+                    {block
+                      .attrs
+                      ?.title ||
+                      "Expandir"}
+                  </summary>
+
+                  <div>
+                    {block.content?.map(
+                      (
+                        p: any,
+                        i: number
+                      ) => (
+                        <p
+                          key={
+                            i
+                          }
+                        >
+                          {p
+                            .content?.map(
+                              (
+                                c: any
+                              ) =>
+                                c.text
+                            )}
+                        </p>
+                      )
+                    )}
+                  </div>
+                </details>
+              );
+
+            ////////////////////////////////////////////////////
+            // CALLOUT
+            ////////////////////////////////////////////////////
+
+            case "callout":
+              return (
+                <div
+                  key={index}
+                  className={`${styles.callout} ${styles[block.attrs?.variant]}`}
+                >
+                  {block.content?.map(
+                    (
+                      c: any
+                    ) => c.text
+                  )}
+                </div>
+              );
+
+            ////////////////////////////////////////////////////
+            // DIVIDER
+            ////////////////////////////////////////////////////
+
+            case "divider":
+              return (
+                <hr
+                  key={index}
+                />
+              );
+
+            ////////////////////////////////////////////////////
+            // TABLE
+            ////////////////////////////////////////////////////
+
+            case "table":
+              return (
+                <table
+                  key={index}
+                  className={
+                    styles.table
+                  }
+                >
+                  <tbody>
+                    {block.content?.map(
+                      (
+                        row: any,
+                        r: number
+                      ) => (
+                        <tr
+                          key={
+                            r
+                          }
+                        >
+                          {row.cells?.map(
+                            (
+                              cell: string,
+                              c: number
+                            ) => (
+                              <td
+                                key={
+                                  c
+                                }
+                              >
+                                {
+                                  cell
+                                }
+                              </td>
+                            )
+                          )}
+                        </tr>
+                      )
+                    )}
+                  </tbody>
+                </table>
+              );
+
+            default:
+              return (
+                <div
+                  key={index}
+                  className={
+                    styles.unsupported
+                  }
+                >
+                  Unsupported:
+                  {" "}
+                  {block.type}
+                </div>
+              );
+          }
+        }
+      )}
+    </div>
+  );
+}
+---
+index.module.css
+.description {
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.content {
+  line-height: 1.7;
+}
+
+.content h1,
+.content h2,
+.content h3 {
+  margin-top: 24px;
+  margin-bottom: 12px;
+}
+
+.content p {
+  margin: 12px 0;
+}
+
+.content img {
+  max-width: 100%;
+  border-radius: 12px;
+}
+
+.content ul,
+.content ol {
+  padding-left: 24px;
+}
+
+.content blockquote {
+  border-left: 4px solid var(--accent);
+  padding-left: 16px;
+  opacity: 0.85;
+}
+
+.jsonPreview {
+  white-space: pre-wrap;
+  overflow-x: auto;
+  font-family: monospace;
+}
+
+.code {
+  background: #111;
+  padding: 16px;
+  border-radius: 12px;
+  overflow-x: auto;
+}
+
+.details {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.details summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.callout {
+  padding: 14px;
+  border-radius: 12px;
+}
+
+.info {
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.warning {
+  background: rgba(245, 158, 11, 0.15);
+}
+
+.danger {
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table td {
+  border: 1px solid var(--border);
+  padding: 10px;
+}
+
+.unsupported {
+  padding: 12px;
+  border-radius: 12px;
+  background: #2a2a2a;
+  color: #9ca3af;
+  font-family: monospace;
+}
+---
+widgets/ModGallery/index.tsx
+import.meta.env.VITE_API_URL
+import styles from "./index.module.css";
+
+type Props = {
+  images: any[];
+};
+
+export default function ModGallery({
+  images,
+}: Props) {
+  if (!images?.length) {
+    return null;
+  }
+
+  const API_URL =
+    import.meta.env.VITE_API_URL;
+
+  return (
+    <div className={styles.gallery}>
       {images.map((img: any) => (
         <img
           key={img.id}
-          src={BASE + img.url}
-          style={{
-            width: 200,
-            height: 120,
-            objectFit: "cover",
-            borderRadius: 8,
-          }}
+          src={`${API_URL}${img.url}`}
+          alt=""
+          className={styles.image}
         />
       ))}
     </div>
   );
+}
+---
+index.module.css
+.gallery {
+  display: flex;
+  gap: 20x;
+
+  overflow-x: column;
+
+  padding-bottom: 8px;
+}
+
+.image {
+  width: 100%;
+  height: auto;
+
+  object-fit: cover;
+
+  border-radius: 12px;
+
+  flex-shrink: 0;
 }
 ---
 widgets/ModHeader/
@@ -13650,6 +15344,710 @@ export default function ModHeader({ mod }: ModHeaderProps) {
       </div>
     </div>
   );
+}
+---
+widgets/ModHero/
+index.tsx
+import styles from "./index.module.css";
+
+type Props = {
+  mod: any;
+};
+
+export default function ModHero({
+  mod,
+}: Props) {
+
+  return (
+    <div className={styles.hero}>
+      <div className={styles.header}>
+        <img
+          src={`${import.meta.env.VITE_API_URL}${mod.icon}`}
+          alt={mod.title}
+          className={styles.cover}
+        />
+
+        <div className={styles.content}>
+          <h1>{mod.title}</h1>
+
+          {mod.summary && (
+            <p className={styles.summary}>
+              {mod.summary}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <p className={styles.description}>
+        {mod.description}
+      </p>
+    </div>
+  );
+}
+---
+index.module.css
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.header {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.cover {
+  width: 140px;
+  height: 140px;
+  object-fit: cover;
+  border-radius: 16px;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+}
+
+.summary {
+  font-size: 1.1rem;
+  margin-bottom: 12px;
+  opacity: 0.9;
+}
+
+.description {
+  opacity: 0.8;
+  line-height: 1.6;
+}
+
+@media (max-width: 768px) {
+  .header {
+    gap: 12px;
+  }
+
+  .cover {
+    width: 90px;
+    height: 90px;
+  }
+
+  .content h1 {
+    font-size: 1.4rem;
+    line-height: 1.2;
+  }
+
+  .summary {
+    font-size: 0.95rem;
+
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .description {
+    font-size: 0.9rem;
+  }
+}
+---
+widgets/ModSidebar/
+index.tsx
+import LikeButton from "@/features/interactions/components/LikeButton";
+import FavoriteButton from "@/features/interactions/components/FavoriteButton";
+
+import { useState } from "react";
+import {
+  Share2,
+  Download,
+} from "lucide-react";
+
+import styles from "./index.module.css";
+
+type Props = {
+  mod: any;
+};
+
+export default function ModSidebar({
+  mod,
+}: Props) {
+
+  const handleShare = async () => {
+    await navigator.clipboard.writeText(
+      window.location.href
+    );
+
+    setCopied(true);
+
+    setTimeout(() => {
+      setCopied(false);
+    }, 2000);
+  };
+
+  const [copied, setCopied] =
+    useState(false);
+
+  const latestVersion =
+    mod.versions?.[0];
+
+  const links = [
+    {
+      label: "Website",
+      value: mod.links?.websiteUrl,
+    },
+    {
+      label: "Discord",
+      value: mod.links?.discordUrl,
+    },
+    {
+      label: "Source",
+      value: mod.links?.sourceUrl,
+    },
+    {
+      label: "Issues",
+      value: mod.links?.issuesUrl,
+    },
+    {
+      label: "Wiki",
+      value: mod.links?.wikiUrl,
+    },
+    {
+      label: "Donate",
+      value: mod.links?.donationUrl,
+    },
+  ].filter((link) => link.value);
+
+  return (
+    <aside className={styles.sidebar}>
+      {/* ACTIONS */}
+
+      <section className={styles.card}>
+        <h3 className={styles.title}>
+          Actions
+        </h3>
+
+        <div className={styles.actions}>
+          <LikeButton
+            modId={mod.id}
+            slug={mod.slug}
+          />
+
+          <FavoriteButton
+            modId={mod.id}
+            slug={mod.slug}
+          />
+
+          <button
+            onClick={handleShare}
+            className={styles.iconButton}
+          >
+            {copied ? "✓" : <Share2 size={18} />}
+          </button>
+
+          <button
+            className={styles.iconButton}
+            onClick={() =>
+              window.open(
+                `${import.meta.env.VITE_API_URL}/versions/${latestVersion.id}/download`,
+                "_blank"
+              )
+            }
+          >
+            <Download size={18} />
+          </button>
+        </div>
+      </section>
+
+      {/* DETAILS */}
+
+      <section className={styles.card}>
+        <h3 className={styles.title}>
+          Details
+        </h3>
+
+        <div className={styles.info}>
+          <div>
+            <strong>
+              Created
+            </strong>
+
+            <span>
+              {new Date(
+                mod.createdAt
+              ).toLocaleDateString()}
+            </span>
+          </div>
+
+          <div>
+            <strong>
+              Type
+            </strong>
+
+            <span>
+              {mod.type}
+            </span>
+          </div>
+
+          <div>
+            <strong>
+              Platform
+            </strong>
+
+            <span>
+              {mod.platform}
+            </span>
+          </div>
+
+          <div>
+            <strong>
+              Loader
+            </strong>
+
+            <span>
+              {mod.loader || "-"}
+            </span>
+          </div>
+
+          <div>
+            <strong>
+              License
+            </strong>
+
+            <span>
+              {mod.license || "-"}
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* CATEGORIES */}
+
+      <section className={styles.card}>
+        <h3 className={styles.title}>
+          Categories
+        </h3>
+
+        <div className={styles.tags}>
+          {mod.categories?.length
+            ? mod.categories.map(
+                (
+                  category: string
+                ) => (
+                  <span
+                    key={category}
+                    className={
+                      styles.tag
+                    }
+                  >
+                    {category}
+                  </span>
+                )
+              )
+            : "-"}
+        </div>
+      </section>
+
+      {/* TAGS */}
+
+      <section className={styles.card}>
+        <h3 className={styles.title}>
+          Tags
+        </h3>
+
+        <div className={styles.tags}>
+          {mod.tags?.length
+            ? mod.tags.map(
+                (tag: any) => (
+                  <span
+                    key={tag.id}
+                    className={
+                      styles.tag
+                    }
+                  >
+                    {tag.name}
+                  </span>
+                )
+              )
+            : "-"}
+        </div>
+      </section>
+
+      {/* LINKS */}
+
+      {links.length > 0 && (
+        <section
+          className={
+            styles.card
+          }
+        >
+          <h3
+            className={
+              styles.title
+            }
+          >
+            Links
+          </h3>
+
+          <div
+            className={
+              styles.links
+            }
+          >
+            {links.map(
+              (link) => (
+                <a
+                  key={
+                    link.label
+                  }
+                  href={
+                    link.value
+                  }
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {
+                    link.label
+                  }
+                </a>
+              )
+            )}
+          </div>
+        </section>
+      )}
+    </aside>
+  );
+}
+---
+index.module.css
+.sidebar {
+  position: sticky;
+  top: 20px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.card {
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.title {
+  margin: 0 0 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid
+    rgba(255, 255, 255, 0.08);
+}
+
+.iconButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  height: 42px;
+
+  border: none;
+  border-radius: 10px;
+
+  background: rgba(
+    255,
+    255,
+    255,
+    0.05
+  );
+
+  cursor: pointer;
+
+  transition: 0.2s;
+}
+
+.iconButton:hover {
+  background: rgba(
+    255,
+    255,
+    255,
+    0.1
+  );
+
+  transform: translateY(-1px);
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: repeat(
+    4,
+    1fr
+  );
+  gap: 8px;
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.info div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(
+    255,
+    255,
+    255,
+    0.08
+  );
+  font-size: 12px;
+}
+
+.links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.links a {
+  text-decoration: none;
+}
+---
+widgets/ModVersions/index.tsx
+import styles from "./index.module.css";
+
+import EmptyState from "@/shared/ui/EmptyState";
+
+import {
+  getVersionDownloadUrl,
+} from "@/features/versions/api";
+
+type Props = {
+  versions: any[];
+  modId: number;
+  isOwner?: boolean;
+};
+
+export default function VersionsTable({
+  versions,
+}: Props) {
+  if (!versions?.length) {
+    return (
+      <EmptyState message="No versions yet" />
+    );
+  }
+
+  return (
+    <div className={styles.list}>
+      {versions.map((v) => {
+        const file = v.files?.[0];
+
+        return (
+          <div
+            key={v.id}
+            className={styles.card}
+          >
+            <div className={styles.left}>
+              <h3>
+                {v.version}
+              </h3>
+
+              <div
+                className={
+                  styles.meta
+                }
+              >
+                <span>
+                  {file?.releaseType ||
+                    "Release"}
+                </span>
+
+                <span>
+                  Minecraft{" "}
+                  {v.minecraftVersion ||
+                    "-"}
+                </span>
+
+                <span>
+                  {v.loader ||
+                    "-"}
+                </span>
+              </div>
+            </div>
+
+            <div
+              className={
+                styles.stats
+              }
+            >
+              <div>
+                <small>
+                  Published
+                </small>
+
+                <span>
+                  {new Date(
+                    v.createdAt
+                  ).toLocaleDateString()}
+                </span>
+              </div>
+
+              <div>
+                <small>
+                  Downloads
+                </small>
+
+                <span>
+                  {file?.downloads ||
+                    0}
+                </span>
+              </div>
+
+              <div>
+                <small>
+                  Size
+                </small>
+
+                <span>
+                  {file
+                    ? `${(
+                        file.size /
+                        1024 /
+                        1024
+                      ).toFixed(
+                        2
+                      )} MB`
+                    : "-"}
+                </span>
+              </div>
+            </div>
+
+            <button
+              className={
+                styles.download
+              }
+              onClick={() =>
+                window.open(
+                  getVersionDownloadUrl(
+                    v.id
+                  ),
+                  "_blank"
+                )
+              }
+            >
+              ⬇ Download
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+---
+index.module.css
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+
+  padding: 18px;
+
+  border-radius: 12px;
+
+  background: var(--surface);
+
+  border: 1px solid
+    rgba(255, 255, 255, 0.08);
+}
+
+.left {
+  flex: 1;
+}
+
+.left h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.meta span {
+  padding: 4px 8px;
+
+  border-radius: 999px;
+
+  font-size: 0.85rem;
+
+  background: rgba(
+    255,
+    255,
+    255,
+    0.08
+  );
+}
+
+.stats {
+  display: flex;
+  gap: 24px;
+}
+
+.stats div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stats small {
+  opacity: 0.6;
+}
+
+.download {
+  border: none;
+
+  cursor: pointer;
+
+  padding: 10px 14px;
+
+  border-radius: 8px;
+
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .stats {
+    justify-content: space-between;
+  }
+
+  .download {
+    width: 100%;
+  }
 }
 ---
 widgets/navbar/
@@ -14691,20 +17089,43 @@ modpack = adventure rpg, combat, expert, exploration, extra large, hardcore, hor
 shader = fantasy, realistic, vanilla
 
 
-┌───────────────┬───────────────────────────────┐
+┌───────────────────────────────────────────────┐
 
-│ Search Bar    │ Results                       │
+│                 Search Bar                    │
 
-│               │                               │
+│        Type          │       Category         │
 
-│ Filters       │ ModCard                       │
+│       Loader         │         Sort           │
 
-│ Type          │ ModCard                       │
+└───────────────────────────────────────────────┘
+┌───────────────────────────────────────────────┐
 
-│ Category      │ ModCard                       │
+│                   ModCard                     │
 
-│ Loader        │ ModCard                       │
+│                   ModCard                     │
 
-│ Sort          │ ModCard                       │
+│                   ModCard                     │
 
-└───────────────┴───────────────────────────────┘
+└───────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ Icon │ Title                                                │
+│      │ Summary                                              │
+│──────┘                                                      │
+│ Description corta                                           │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────┬───────────────────┐
+│ Description                             │ Like              │
+│ Gallery                                 │ Favorite          │
+│ Versions                                │ Share             │
+│ Comments                                │ Download          │
+│                                         │───────────────────│
+│                                         │ Created           │
+│                                         │ Type              │
+│                                         │ Category          │
+│                                         │ Loaders           │
+│                                         │ Versions          │
+│                                         │ Tags              │
+│                                         │ Links             │
+└─────────────────────────────────────────┴───────────────────┘

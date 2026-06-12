@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Heart } from "lucide-react";
 
 import {
@@ -31,21 +32,47 @@ export default function LikeButton({
   const likes =
     data?.likesCount || 0;
 
+  const [localLiked, setLocalLiked] =
+    useState(liked);
+
+  const [localLikes, setLocalLikes] =
+    useState(likes);
+
+  useEffect(() => {
+    setLocalLiked(liked);
+    setLocalLikes(likes);
+  }, [liked, likes]);
+
   return (
     <button
       className={`${styles.button} ${
-        liked ? styles.active : ""
+        localLiked
+          ? styles.active
+          : ""
       }`}
-      onClick={() =>
-        mutation.mutate()
-      }
+      onClick={() => {
+        setLocalLiked(
+          !localLiked
+        );
+
+        setLocalLikes(
+          localLiked
+            ? localLikes - 1
+            : localLikes + 1
+        );
+
+        mutation.mutate();
+      }}
       disabled={
         mutation.isPending
       }
     >
-      <Heart size={16} />
+      <Heart
+        size={18}
+        strokeWidth={2.2}
+      />
 
-      <span>{likes}</span>
+      <span>{localLikes}</span>
     </button>
   );
 }

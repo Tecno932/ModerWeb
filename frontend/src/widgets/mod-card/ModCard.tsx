@@ -3,11 +3,9 @@ import { Link } from "react-router-dom";
 import {
   Download,
   Heart,
-  Eye,
+  Star,
+  ClockFading,
 } from "lucide-react";
-
-import LikeButton from "@/features/interactions/components/LikeButton";
-import FavoriteButton from "@/features/interactions/components/FavoriteButton";
 
 import styles from "./ModCard.module.css";
 
@@ -49,37 +47,43 @@ export default function ModCard({
                 {mod.title}
               </h3>
 
-              <p className={styles.author}>
-                by{" "}
-                {mod.author?.username ||
-                  "Unknown"}
+              {/* SUMMARY */}
+
+              <p className={styles.summary}>
+                {mod.summary ||
+                  mod.description}
               </p>
             </div>
 
-            <div
-              className={styles.actions}
-              onClick={(e) =>
-                e.preventDefault()
-              }
-            >
-              <LikeButton
-                modId={mod.id}
-                slug={mod.slug}
-              />
+            <div className={styles.rightColumn}>
+              <div className={styles.actions}>
+                <div className={styles.statButton}>
+                  <Download size={16} />
+                  <span>{mod.downloads}</span>
+                </div>
 
-              <FavoriteButton
-                modId={mod.id}
-                slug={mod.slug}
-              />
+                <div className={styles.statButton}>
+                  <Heart size={16} />
+                  <span>{mod.likesCount}</span>
+                </div>
+
+                <div className={styles.statButton}>
+                  <Star size={16} />
+                  <span>{mod.favoritesCount}</span>
+                </div>
+              </div>
+
+              <div className={styles.date}>
+                <ClockFading size={14} />
+
+                <span>
+                  {new Date(
+                    mod.createdAt
+                  ).toLocaleDateString()}
+                </span>
+              </div>
             </div>
           </div>
-
-          {/* SUMMARY */}
-
-          <p className={styles.summary}>
-            {mod.summary ||
-              mod.description}
-          </p>
 
           {/* BADGES */}
 
@@ -109,50 +113,6 @@ export default function ModCard({
                 {mod.loader}
               </span>
             )}
-          </div>
-
-          {/* FOOTER */}
-
-          <div className={styles.footer}>
-            <div
-              className={styles.stats}
-            >
-              <span>
-                <Download
-                  size={14}
-                />
-
-                {
-                  mod.downloads
-                }
-              </span>
-
-              <span>
-                <Heart
-                  size={14}
-                />
-
-                {
-                  mod.likesCount
-                }
-              </span>
-
-              <span>
-                <Eye size={14} />
-
-                {mod.views}
-              </span>
-            </div>
-
-            <div
-              className={
-                styles.updated
-              }
-            >
-              {new Date(
-                mod.updatedAt
-              ).toLocaleDateString()}
-            </div>
           </div>
         </div>
       </Link>

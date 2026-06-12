@@ -1,0 +1,95 @@
+.description {
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.content {
+  line-height: 1.7;
+}
+
+.content h1,
+.content h2,
+.content h3 {
+  margin-top: 24px;
+  margin-bottom: 12px;
+}
+
+.content p {
+  margin: 12px 0;
+}
+
+.content img {
+  max-width: 100%;
+  border-radius: 12px;
+}
+
+.content ul,
+.content ol {
+  padding-left: 24px;
+}
+
+.content blockquote {
+  border-left: 4px solid var(--accent);
+  padding-left: 16px;
+  opacity: 0.85;
+}
+
+.jsonPreview {
+  white-space: pre-wrap;
+  overflow-x: auto;
+  font-family: monospace;
+}
+
+.code {
+  background: #111;
+  padding: 16px;
+  border-radius: 12px;
+  overflow-x: auto;
+}
+
+.details {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.details summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.callout {
+  padding: 14px;
+  border-radius: 12px;
+}
+
+.info {
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.warning {
+  background: rgba(245, 158, 11, 0.15);
+}
+
+.danger {
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table td {
+  border: 1px solid var(--border);
+  padding: 10px;
+}
+
+.unsupported {
+  padding: 12px;
+  border-radius: 12px;
+  background: #2a2a2a;
+  color: #9ca3af;
+  font-family: monospace;
+}

@@ -1,0 +1,114 @@
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.content h1 {
+  font-size: 2rem;
+}
+
+.content h2 {
+  font-size: 1.5rem;
+}
+
+.content h3 {
+  font-size: 1.25rem;
+}
+
+.content p {
+  line-height: 1.7;
+}
+
+.content img {
+  max-width: 100%;
+  border-radius: 12px;
+}
+
+.content blockquote {
+  border-left: 4px solid #666;
+  padding-left: 16px;
+  opacity: 0.8;
+}
+
+.content ul,
+.content ol {
+  padding-left: 24px;
+}
+
+.content mark {
+  color: inherit;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.code {
+  padding: 16px;
+  border-radius: 12px;
+  overflow-x: auto;
+  font-family: monospace;
+  background: #111;
+}
+
+.unsupported {
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px dashed #666;
+  opacity: 0.7;
+}
+
+.content hr {
+  border: none;
+  height: 1px;
+  background: #444;
+}
+
+details {
+  border: 1px solid #333;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+details summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.calloutInfo {
+  padding: 16px;
+  border-radius: 10px;
+  border-left: 4px solid #3b82f6;
+}
+
+.calloutSuccess {
+  padding: 16px;
+  border-radius: 10px;
+  border-left: 4px solid #22c55e;
+}
+
+.calloutWarning {
+  padding: 16px;
+  border-radius: 10px;
+  border-left: 4px solid #f59e0b;
+}
+
+.calloutError {
+  padding: 16px;
+  border-radius: 10px;
+  border-left: 4px solid #ef4444;
+}
+
+.content table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.content td,
+.content th {
+  border: 1px solid #333;
+  padding: 10px;
+}
+
+.content th {
+  text-align: left;
+}

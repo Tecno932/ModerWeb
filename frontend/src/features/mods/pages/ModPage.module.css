@@ -1,0 +1,111 @@
+.page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 24px;
+  align-items: start;
+  overflow-x: hidden;
+}
+
+.sidebar {
+  position: sticky;
+  top: 24px;
+
+  align-self: start;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+
+.section {
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin: 24px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid
+    rgba(255, 255, 255, 0.08);
+  overflow-x: auto;
+}
+
+.tabs button {
+  border: none;
+  background: transparent;
+  color: inherit;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.tabs button:hover {
+  background: rgba(
+    255,
+    255,
+    255,
+    0.05
+  );
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.actions button {
+  width: 100%;
+  min-width: 0;
+}
+
+.activeTab {
+  background: rgba(
+    255,
+    255,
+    255,
+    0.08
+  ) !important;
+
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .page {
+    padding: 12px;
+  }
+
+  .tabs {
+    gap: 4px;
+    margin: 16px 0;
+  }
+
+  .tabs button {
+    padding: 8px 10px;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+
+  .actions {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

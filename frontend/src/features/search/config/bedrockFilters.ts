@@ -1,6 +1,5 @@
 export const BEDROCK_TYPES =
   [
-    "all",
     "addon",
     "map",
     "texture",

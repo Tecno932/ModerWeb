@@ -1,23 +1,37 @@
-.select {
-  height: 42px;
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.item {
+  width: 100%;
+
+  background: transparent;
+  border: none;
+
+  text-align: left;
+
+  padding: 10px 12px;
 
   border-radius: 10px;
 
-  border: 1px solid #2f2f2f;
+  cursor: pointer;
 
-  background: #151515;
+  color: #bdbdbd;
 
-  color: white;
+  font-size: 14px;
 
-  padding: 0 12px;
-
-  min-width: 180px;
-
-  transition: 0.2s;
+  transition: 0.15s;
 }
 
-.select:focus {
-  outline: none;
+.item:hover {
+  background: #202020;
+  color: white;
+}
 
-  border-color: #4ade80;
+.active {
+  background: #2a2a2a;
+  color: white;
+  font-weight: 600;
 }

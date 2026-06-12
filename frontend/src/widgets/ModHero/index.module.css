@@ -1,0 +1,66 @@
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.header {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.cover {
+  width: 140px;
+  height: 140px;
+  object-fit: cover;
+  border-radius: 16px;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+}
+
+.summary {
+  font-size: 1.1rem;
+  margin-bottom: 12px;
+  opacity: 0.9;
+}
+
+.description {
+  opacity: 0.8;
+  line-height: 1.6;
+}
+
+@media (max-width: 768px) {
+  .header {
+    gap: 12px;
+  }
+
+  .cover {
+    width: 90px;
+    height: 90px;
+  }
+
+  .content h1 {
+    font-size: 1.4rem;
+    line-height: 1.2;
+  }
+
+  .summary {
+    font-size: 0.95rem;
+
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .description {
+    font-size: 0.9rem;
+  }
+}

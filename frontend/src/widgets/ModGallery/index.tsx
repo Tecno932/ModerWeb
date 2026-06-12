@@ -1,20 +1,28 @@
-export default function ModGallery({ images }: any) {
-  if (!images?.length) return null;
+import.meta.env.VITE_API_URL
+import styles from "./index.module.css";
 
-  const BASE = "http://192.168.0.110:3000";
-  
+type Props = {
+  images: any[];
+};
+
+export default function ModGallery({
+  images,
+}: Props) {
+  if (!images?.length) {
+    return null;
+  }
+
+  const API_URL =
+    import.meta.env.VITE_API_URL;
+
   return (
-    <div style={{ display: "flex", gap: 10, overflowX: "auto" }}>
+    <div className={styles.gallery}>
       {images.map((img: any) => (
         <img
           key={img.id}
-          src={BASE + img.url}
-          style={{
-            width: 200,
-            height: 120,
-            objectFit: "cover",
-            borderRadius: 8,
-          }}
+          src={`${API_URL}${img.url}`}
+          alt=""
+          className={styles.image}
         />
       ))}
     </div>

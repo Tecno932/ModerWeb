@@ -8,15 +8,38 @@ export function mapMod(
     ////////////////////////////////////////////////////
 
     id: mod.id,
+    title: mod.title,
     slug: mod.slug,
 
-    title: mod.title,
+    summary: mod.summary,
+
     description: mod.description,
-    content: mod.content,
+    content: (() => {
+      try {
+        return mod.content
+          ? JSON.parse(mod.content)
+          : null;
+      } catch {
+        return null;
+      }
+    })(),
+
+    icon: mod.icon,
 
     platform: mod.platform,
     loader: mod.loader,
     type: mod.type,
+
+    categories: mod.categories,
+
+    links: {
+      sourceUrl: mod.sourceUrl,
+      issuesUrl: mod.issuesUrl,
+      discordUrl: mod.discordUrl,
+      websiteUrl: mod.websiteUrl,
+      wikiUrl: mod.wikiUrl,
+      donationUrl: mod.donationUrl,
+    },
 
     createdAt: mod.createdAt,
     updatedAt: mod.updatedAt,

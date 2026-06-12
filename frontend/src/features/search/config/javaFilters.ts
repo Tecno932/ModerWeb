@@ -1,5 +1,4 @@
 export const JAVA_TYPES = [
-  "all",
   "plugin",
   "addon",
   "mod",
