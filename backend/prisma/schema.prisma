@@ -71,38 +71,122 @@ enum Visibility {
   PRIVATE
 }
 
+enum SystemRole {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+enum CosmeticType {
+  AVATAR_FRAME
+  CHAT_BUBBLE
+  PROFILE_BACKGROUND
+  BADGE
+}
+
+enum CosmeticRarity {
+  COMMON
+  UNCOMMON
+  RARE
+  EPIC
+  LEGENDARY
+  MYTHIC
+}
+
+enum SocialPlatform {
+  INSTAGRAM
+  YOUTUBE
+  DISCORD
+  X
+  WEBSITE
+  TIKTOK
+  TWITCH
+  BLUESKY
+}
+
 //////////////////////
 // USER
 //////////////////////
 
 model User {
-  id          Int          @id @default(autoincrement())
-  role        String       @default("user")
+  id Int @id @default(autoincrement())
 
   username String @unique
-  email    String @unique
+  email String @unique
   password String
 
-  avatar String?
-  bio    String?
+  role SystemRole @default(USER)
 
   isVerified Boolean @default(false)
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lastLoginAt DateTime?
 
-  mods      Mod[]
-  likes     ModLike[]
-  favorites Favorite[]
-  comments  Comment[]
+  profile UserProfile?
+  inventory UserInventory[]
+
+  refreshTokens RefreshToken[]
+
+  mods Mod[]
+  comments Comment[]
 
   following Follow[] @relation("following")
   followers Follow[] @relation("followers")
 
-  teamMembers TeamMember[]
-  userRoles    UserRole[]
-  userFeatures UserFeature[]
+  teamMemberships TeamMember[]
+  userRoles UserRole[]
+  features UserFeature[]
+  likes ModLike[]
+  favorites Favorite[]
+}
 
-  @@index([username])
+model UserProfile {
+  id Int @id @default(autoincrement())
+
+  userId Int @unique
+
+  displayName String?
+
+  avatarUrl String?
+  bannerUrl String?
+
+  bio String?
+
+  accentColor String?
+
+  inventoryPublic Boolean @default(true)
+  equippedCosmetics EquippedCosmetic[]
+
+  user User @relation(fields: [userId], references: [id])
+
+  socials ProfileSocial[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+//////////////////////
+// REFRESH TOKENS
+//////////////////////
+
+model RefreshToken {
+  id Int @id @default(autoincrement())
+
+  token String @unique
+
+  userId Int
+
+  expiresAt DateTime
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([token])
 }
 
 //////////////////////
@@ -421,4 +505,106 @@ model Follow {
   following User @relation("following", fields: [followingId], references: [id])
 
   @@id([followerId, followingId])
+
+  @@index([followerId])
+  @@index([followingId])
+}
+
+//////////////////////
+// USER INVENTORY
+//////////////////////
+
+model UserInventory {
+  id Int @id @default(autoincrement())
+
+  userId Int
+
+  itemId Int
+
+  quantity Int @default(1)
+
+  obtainedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  item CosmeticItem @relation(fields: [itemId], references: [id])
+
+  @@unique([userId, itemId])
+
+  @@index([userId])
+  @@index([itemId])
+}
+
+//////////////////////
+// LIKN SOCIAL
+//////////////////////
+
+model ProfileSocial {
+  id Int @id @default(autoincrement())
+
+  profileId Int
+
+  platform SocialPlatform
+
+  url String
+
+  profile UserProfile @relation(fields: [profileId], references: [id])
+
+  @@unique([profileId, platform])
+
+  @@index([profileId])
+}
+
+//////////////////////
+// COSMETIC
+//////////////////////
+
+model CosmeticItem {
+  id Int @id @default(autoincrement())
+
+  name String
+
+  slug String @unique
+
+  description String?
+
+  imageUrl String
+
+  rarity CosmeticRarity
+
+  type CosmeticType
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  inventory UserInventory[]
+  equipped EquippedCosmetic[]
+
+  @@index([type])
+  @@index([rarity])
+  @@index([isActive])
+}
+
+//////////////////////
+// COSMETIC EQUIPPED
+//////////////////////
+
+model EquippedCosmetic {
+  id Int @id @default(autoincrement())
+
+  profileId Int
+
+  cosmeticId Int
+
+  type CosmeticType
+
+  profile UserProfile @relation(fields: [profileId], references: [id])
+
+  cosmetic CosmeticItem @relation(fields: [cosmeticId], references: [id])
+
+  @@unique([profileId, type])
+
+  @@index([profileId])
+  @@index([cosmeticId])
 }

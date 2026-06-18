@@ -13,7 +13,7 @@ import {
 
 import { useMod } from "@/features/mods/hooks";
 
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/features/auth/context/AuthContext";
 
 import Skeleton from "@/shared/ui/Skeleton";
 

@@ -5,7 +5,7 @@ import { router } from "./router";
 import { ToastProvider } from "@/shared/components/ToastProvider";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { AuthProvider } from "./context/AuthContext";
+import { AuthProvider } from "@/features/auth/context/AuthContext";
 import UploadCenter from "@/features/uploads/components/UploadCenter";
 
 import "@/style/globals.css";

@@ -101,7 +101,7 @@ export default function ModPage() {
                 setTab("comments")
               }
             >
-              Comments ({data.stats.comments})
+              Comments
             </button>
           </div>
 

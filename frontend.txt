@@ -13,7 +13,7 @@ import { router } from "./router";
 import { ToastProvider } from "@/shared/components/ToastProvider";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { AuthProvider } from "./context/AuthContext";
+import { AuthProvider } from "@/features/auth/context/AuthContext";
 import UploadCenter from "@/features/uploads/components/UploadCenter";
 
 import "@/style/globals.css";
@@ -179,99 +179,6 @@ export default function ProtectedRoute() {
   }
 
   return <Outlet />;
-}
----
-context/
-AuthContext.tsx
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-} from "react";
-
-interface User {
-  id: number;
-
-  username?: string;
-
-  avatar?: string;
-
-  email?: string;
-}
-
-interface AuthContextType {
-  user: User | null;
-}
-
-const AuthContext =
-  createContext<AuthContextType>({
-    user: null,
-  });
-
-export function AuthProvider({
-  children,
-}: any) {
-  const [user, setUser] =
-    useState<User | null>(
-      null
-    );
-
-  useEffect(() => {
-    const token =
-      localStorage.getItem(
-        "token"
-      );
-
-    if (!token) return;
-
-    try {
-      const payload = JSON.parse(
-        atob(token.split(".")[1])
-      );
-
-      setUser({
-        id: payload.userId,
-
-        username:
-          payload.username,
-
-        avatar: payload.avatar,
-
-        email: payload.email,
-      });
-    } catch {
-      setUser(null);
-    }
-  }, []);
-
-  return (
-    <AuthContext.Provider
-      value={{ user }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
-}
-
-export const useAuth = () =>
-  useContext(AuthContext);
-
-export function logout() {
-  console.log(
-    "👋 Logout manual"
-  );
-
-  localStorage.removeItem(
-    "token"
-  );
-
-  localStorage.removeItem(
-    "user"
-  );
-
-  window.location.href =
-    "/login";
 }
 ---
 dto/
@@ -489,41 +396,92 @@ export const BEDROCK_CATEGORIES = {
   SCRIPT: [],
 };
 ---
-feactures/auth
-api.ts
-const API_URL = "http://192.168.0.110:3000";
+feactures/auth/api.ts
+import { API_URL } from "../../shared/config/env";
 
-export const login = async (data: { email: string; password: string }) => {
-  const res = await fetch(`${API_URL}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-
-  if (!res.ok) throw new Error("Error en login");
-
-  return res.json();
-};
-
-export const register = async (data: {
-  email: string;
-  password: string;
-  username: string;
-}) => {
-  const res = await fetch(`${API_URL}/auth/register`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
+export const login = async (
+  data: {
+    email: string;
+    password: string;
+  }
+) => {
+  const res = await fetch(
+    `${API_URL}/auth/login`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type":
+          "application/json",
+      },
+      body: JSON.stringify(data),
+    }
+  );
 
   if (!res.ok) {
-    const data = await res.json();
-    console.log("❌ BACKEND ERROR:", data);
-    throw new Error(data.error || "Error en register");
+    throw new Error(
+      "Error en login"
+    );
   }
 
   return res.json();
 };
+
+export const register = async (
+  data: {
+    email: string;
+    password: string;
+    username: string;
+  }
+) => {
+  const res = await fetch(
+    `${API_URL}/auth/register`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type":
+          "application/json",
+      },
+      body: JSON.stringify(data),
+    }
+  );
+
+  if (!res.ok) {
+    const error =
+      await res.json();
+
+    throw new Error(
+      error.error ||
+      "Error en register"
+    );
+  }
+
+  return res.json();
+};
+
+//////////////////////////////////////////////////
+// ME
+//////////////////////////////////////////////////
+
+export const getMe =
+  async (token: string) => {
+    const res = await fetch(
+      `${API_URL}/auth/me`,
+      {
+        headers: {
+          Authorization:
+            `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!res.ok) {
+      throw new Error(
+        "No autorizado"
+      );
+    }
+
+    return res.json();
+  };
 ---
 hooks.ts
 import { useMutation } from "@tanstack/react-query";
@@ -538,6 +496,460 @@ export function useLogin() {
 export function useRegister() {
   return useMutation({
     mutationFn: register,
+  });
+}
+---
+types.tsx
+export interface AuthUser {
+  id: number;
+
+  username: string;
+
+  email: string;
+
+  avatar: string | null;
+
+  bio: string | null;
+
+  role: string;
+
+  isVerified: boolean;
+
+  createdAt: string;
+
+  updatedAt: string;
+
+  lastLoginAt: string | null;
+}
+---
+feactures/auth/context/
+AuthContext.tsx
+import {
+  createContext,
+  useContext,
+} from "react";
+
+import { useMe } from "../hooks/useMe";
+import type { AuthUser } from "../types";
+
+//////////////////////////////////////////////////
+// TYPES
+//////////////////////////////////////////////////
+
+interface AuthContextType {
+  user: AuthUser | null;
+
+  loading: boolean;
+
+  isAuthenticated: boolean;
+
+  logout: () => void;
+}
+
+//////////////////////////////////////////////////
+// CONTEXT
+//////////////////////////////////////////////////
+
+const AuthContext =
+  createContext<AuthContextType>({
+    user: null,
+
+    loading: true,
+
+    isAuthenticated: false,
+
+    logout: () => {},
+  });
+
+//////////////////////////////////////////////////
+// PROVIDER
+//////////////////////////////////////////////////
+
+export function AuthProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const token =
+    localStorage.getItem("token");
+
+  const {
+    data: user,
+    isLoading,
+  } = useMe(token);
+
+  function logout() {
+    localStorage.removeItem(
+      "token"
+    );
+
+    window.location.href =
+      "/login";
+  }
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user: user ?? null,
+
+        loading: isLoading,
+
+        isAuthenticated:
+          !!user,
+
+        logout,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+//////////////////////////////////////////////////
+// HOOK
+//////////////////////////////////////////////////
+
+export function useAuth() {
+  return useContext(
+    AuthContext
+  );
+}
+---
+feactures/auth/hooks/
+useMe.ts
+import { useQuery }
+  from "@tanstack/react-query";
+
+import { getMe }
+  from "../api";
+
+export function useMe(
+  token: string | null
+) {
+  return useQuery({
+    queryKey: ["me"],
+
+    queryFn: () =>
+      getMe(token!),
+
+    enabled: !!token,
+  });
+}
+---
+feactures/comments/
+api.ts
+import { apiFetch } from "@/shared/api/client";
+import { authFetch } from "@/shared/lib/authFetch";
+
+import type { Comment } from "./types";
+
+//////////////////////////////////////////////////
+// GET COMMENTS
+//////////////////////////////////////////////////
+
+export function getComments(
+  modId: number
+) {
+  return apiFetch<Comment[]>(
+    `/comments/mod/${modId}`
+  );
+}
+
+//////////////////////////////////////////////////
+// CREATE COMMENT
+//////////////////////////////////////////////////
+
+export async function createComment(
+  modId: number,
+  content: string
+) {
+  const res = await authFetch(
+    `${import.meta.env.VITE_API_URL}/comments/mod/${modId}`,
+    {
+      method: "POST",
+
+      headers: {
+        "Content-Type":
+          "application/json",
+      },
+
+      body: JSON.stringify({
+        content,
+      }),
+    }
+  );
+
+  return res.json();
+}
+
+//////////////////////////////////////////////////
+// UPDATE COMMENT
+//////////////////////////////////////////////////
+
+export async function updateComment(
+  commentId: number,
+  content: string
+) {
+  const res = await authFetch(
+    `${import.meta.env.VITE_API_URL}/comments/${commentId}`,
+    {
+      method: "PATCH",
+
+      headers: {
+        "Content-Type":
+          "application/json",
+      },
+
+      body: JSON.stringify({
+        content,
+      }),
+    }
+  );
+
+  return res.json();
+}
+
+//////////////////////////////////////////////////
+// DELETE COMMENT
+//////////////////////////////////////////////////
+
+export async function deleteComment(
+  commentId: number
+) {
+  const res = await authFetch(
+    `${import.meta.env.VITE_API_URL}/comments/${commentId}`,
+    {
+      method: "DELETE",
+    }
+  );
+  
+  return res.json();
+}
+
+//////////////////////////////////////////////////
+// CREATE REPLY
+//////////////////////////////////////////////////
+
+export async function createReply(
+  commentId: number,
+  content: string
+) {
+  const res = await authFetch(
+    `${import.meta.env.VITE_API_URL}/comments/${commentId}/replies`,
+    {
+      method: "POST",
+
+      headers: {
+        "Content-Type":
+          "application/json",
+      },
+
+      body: JSON.stringify({
+        content,
+      }),
+    }
+  );
+
+  return res.json();
+}
+---
+types.tsx
+export type CommentUser = {
+  id: number;
+  username: string;
+  avatar: string | null;
+};
+
+export type Comment = {
+  id: number;
+
+  modId: number;
+  userId: number;
+
+  parentId: number | null;
+
+  content: string;
+
+  deleted: boolean;
+
+  createdAt: string;
+  updatedAt: string;
+
+  user: CommentUser;
+
+  replies?: Comment[];
+};
+---
+feactures/comments/hooks/
+useComments.ts
+import { useQuery } from "@tanstack/react-query";
+
+import { getComments } from "../api";
+
+import { queryKeys } from "@/shared/lib/queryKeys";
+
+export function useComments(
+  modId: number
+) {
+  return useQuery({
+    queryKey:
+      queryKeys.comments.byMod(
+        modId
+      ),
+
+    queryFn: () =>
+      getComments(modId),
+  });
+}
+---
+useCreateComment.ts
+import {
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
+
+import { createComment } from "../api";
+
+import { queryKeys } from "@/shared/lib/queryKeys";
+
+export function useCreateComment(
+  modId: number
+) {
+  const queryClient =
+    useQueryClient();
+
+  return useMutation({
+    mutationFn: (
+      content: string
+    ) =>
+      createComment(
+        modId,
+        content
+      ),
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey:
+          queryKeys.comments.byMod(
+            modId
+          ),
+      });
+    },
+  });
+}
+---
+useCreateReply.ts
+import {
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
+
+import { createReply } from "../api";
+
+import { queryKeys } from "@/shared/lib/queryKeys";
+
+export function useCreateReply(
+  modId: number
+) {
+  const queryClient =
+    useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      commentId,
+      content,
+    }: {
+      commentId: number;
+      content: string;
+    }) =>
+      createReply(
+        commentId,
+        content
+      ),
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey:
+          queryKeys.comments.byMod(
+            modId
+          ),
+      });
+    },
+  });
+}
+---
+useUpdateComment.ts
+import {
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
+
+import { updateComment } from "../api";
+
+import { queryKeys } from "@/shared/lib/queryKeys";
+
+export function useUpdateComment(
+  modId: number
+) {
+  const queryClient =
+    useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      commentId,
+      content,
+    }: {
+      commentId: number;
+      content: string;
+    }) =>
+      updateComment(
+        commentId,
+        content
+      ),
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey:
+          queryKeys.comments.byMod(
+            modId
+          ),
+      });
+    },
+  });
+}
+---
+useDeleteComment.ts
+import {
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
+
+import { deleteComment } from "../api";
+
+import { queryKeys } from "@/shared/lib/queryKeys";
+
+export function useDeleteComment(
+  modId: number
+) {
+  const queryClient =
+    useQueryClient();
+
+  return useMutation({
+    mutationFn: (
+      commentId: number
+    ) =>
+      deleteComment(
+        commentId
+      ),
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey:
+          queryKeys.comments.byMod(
+            modId
+          ),
+      });
+    },
   });
 }
 ---
@@ -3899,8 +4311,7 @@ export function useMod(
   });
 }
 ---
-feactures/mods/page/
-ModPage.tsx
+feactures/mods/page/ModPage.tsx
 import { useParams } from "react-router-dom";
 import { useState } from "react";
 import { useMod } from "../hooks";
@@ -4030,7 +4441,9 @@ export default function ModPage() {
             )}
 
             {tab === "comments" && (
-              <ModComments />
+              <ModComments
+                modId={data.id}
+              />
             )}
           </main>
 
@@ -8230,6 +8643,382 @@ export const useUploadStore =
     )
   );
 ---
+src/feactures/users/api.ts
+import { API_URL }
+  from "@/shared/config/env";
+
+export async function getProfile(
+  username: string
+) {
+  const res = await fetch(
+    `${API_URL}/users/${username}`
+  );
+
+  if (!res.ok) {
+    throw new Error(
+      "Usuario no encontrado"
+    );
+  }
+
+  return res.json();
+}
+
+//////////////////////////////////////////////////
+// GET CURRENT USER
+//////////////////////////////////////////////////
+
+export async function getMe(
+  token: string
+) {
+  const res = await fetch(
+    `${API_URL}/users/me`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  if (!res.ok) {
+    throw new Error(
+      "Error obteniendo usuario"
+    );
+  }
+
+  return res.json();
+}
+
+//////////////////////////////////////////////////
+// UPDATE PROFILE
+//////////////////////////////////////////////////
+
+export async function updateProfile(
+  token: string,
+  data: {
+    username?: string;
+    bio?: string;
+  }
+) {
+  const res = await fetch(
+    `${API_URL}/users/me`,
+    {
+      method: "PATCH",
+
+      headers: {
+        "Content-Type":
+          "application/json",
+
+        Authorization: `Bearer ${token}`,
+      },
+
+      body: JSON.stringify(data),
+    }
+  );
+
+  if (!res.ok) {
+    const error =
+      await res.json();
+
+    throw new Error(
+      error.error ||
+        "Error actualizando perfil"
+    );
+  }
+
+  return res.json();
+}
+---
+types.ts
+export interface UserStats {
+  mods: number;
+  comments: number;
+  followers: number;
+  following: number;
+}
+
+export interface PublicProfile {
+  id: number;
+
+  username: string;
+
+  avatar: string | null;
+
+  bio: string | null;
+
+  createdAt: string;
+
+  stats: UserStats;
+}
+---
+src/feactures/users/components/ProfileHeader.tsx
+import styles from "./ProfileHeader.module.css";
+
+interface Props {
+  username: string;
+  bio: string | null;
+  avatar: string | null;
+  createdAt: string;
+
+  canEdit?: boolean;
+  onEdit?: () => void;
+}
+
+export default function ProfileHeader({
+  username,
+  bio,
+  avatar,
+  createdAt,
+  canEdit,
+  onEdit,
+}: Props) {
+  const memberSince =
+    new Date(
+      createdAt
+    ).toLocaleDateString();
+
+  return (
+    <div className={styles.header}>
+      <div className={styles.avatar}>
+        {avatar ? (
+          <img
+            src={avatar}
+            alt={username}
+          />
+        ) : (
+          username
+            .charAt(0)
+            .toUpperCase()
+        )}
+      </div>
+
+      <h1>{username}</h1>
+
+      <p className={styles.bio}>
+        {bio ??
+          "No biography yet."}
+      </p>
+
+      <span
+        className={
+          styles.memberSince
+        }
+      >
+        Member since {memberSince}
+      </span>
+      
+      {canEdit && (
+        <button
+          className={
+            styles.editButton
+          }
+          onClick={onEdit}
+        >
+          Edit Profile
+        </button>
+      )}
+    </div>
+  );
+}
+---
+ProfileHeader.module.css
+.header {
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: center;
+
+  text-align: center;
+
+  gap: 1rem;
+}
+
+.avatar {
+  width: 120px;
+  height: 120px;
+
+  border-radius: 50%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 3rem;
+  font-weight: bold;
+
+  background: #202020;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+
+  object-fit: cover;
+
+  border-radius: inherit;
+}
+
+.bio {
+  max-width: 600px;
+  opacity: 0.8;
+}
+
+.memberSince {
+  opacity: 0.6;
+  font-size: 0.9rem;
+}
+---
+ProfileStats.tsx
+interface Props {
+  mods: number;
+  comments: number;
+  followers: number;
+  following: number;
+}
+
+import styles from "./ProfileStats.module.css";
+
+export default function ProfileStats({
+  mods,
+  comments,
+  followers,
+  following,
+}: Props) {
+  return (
+    <div className={styles.stats}>
+      <div>
+        <strong>{mods}</strong>
+        <span>Mods</span>
+      </div>
+
+      <div>
+        <strong>{comments}</strong>
+        <span>Comments</span>
+      </div>
+
+      <div>
+        <strong>{followers}</strong>
+        <span>Followers</span>
+      </div>
+
+      <div>
+        <strong>{following}</strong>
+        <span>Following</span>
+      </div>
+    </div>
+  );
+}
+---
+ProfileStats.module.css
+.stats {
+  display: grid;
+
+  grid-template-columns:
+    repeat(4, 1fr);
+
+  gap: 1rem;
+
+  margin-top: 2rem;
+}
+
+.stats div {
+  display: flex;
+  flex-direction: column;
+
+  align-items: center;
+
+  padding: 1rem;
+
+  border-radius: 12px;
+
+  background: var(--surface);
+}
+
+.stats strong {
+  font-size: 1.5rem;
+}
+
+.stats span {
+  opacity: 0.7;
+}
+
+@media (max-width: 768px) {
+  .stats {
+    grid-template-columns:
+      repeat(2, 1fr);
+  }
+}
+---
+src/feactures/users/hooks/useProfile.ts
+import { useQuery }
+  from "@tanstack/react-query";
+
+import { getProfile }
+  from "../api";
+
+export function useProfile(
+  username: string
+) {
+  return useQuery({
+    queryKey: [
+      "profile",
+      username,
+    ],
+
+    queryFn: () =>
+      getProfile(username),
+
+    enabled: !!username,
+  });
+}
+---
+useUpdateProfile.ts
+import {
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
+
+import { updateProfile }
+  from "../api";
+
+export function useUpdateProfile(
+  token: string
+) {
+  const queryClient =
+    useQueryClient();
+
+  return useMutation({
+    mutationFn: (
+      data: {
+        username?: string;
+        bio?: string;
+      }
+    ) =>
+      updateProfile(
+        token,
+        data
+      ),
+
+    onSuccess: () => {
+      //////////////////////////////////////////////////
+      // REFRESH USER
+      //////////////////////////////////////////////////
+
+      queryClient.invalidateQueries({
+        queryKey: ["me"],
+      });
+
+      //////////////////////////////////////////////////
+      // REFRESH PROFILES
+      //////////////////////////////////////////////////
+
+      queryClient.invalidateQueries({
+        queryKey: ["profile"],
+      });
+    },
+  });
+}
+---
 feactures/versions/
 api.ts
 import { apiFetch } from "@/shared/api/client";
@@ -8542,9 +9331,17 @@ export default function LoginPage() {
         password: e.target.password.value,
       });
 
-      localStorage.setItem("token", data.token);
+    localStorage.setItem(
+      "token",
+      data.token
+    );
 
-      navigate("/");
+    localStorage.setItem(
+      "user",
+      JSON.stringify(data.user)
+    );
+
+    navigate("/");
     } catch (err: any) {
       setError(err?.message || "Credenciales incorrectas");
     }
@@ -8617,6 +9414,142 @@ export default function RegisterPage() {
     </form>
   );
 }
+---
+pages/EditProfilePage/EditProfilePage.tsx
+import { useEffect, useState } from "react";
+
+import { useNavigate } from "react-router-dom";
+
+import { useAuth }
+  from "@/features/auth/context/AuthContext";
+
+import { useUpdateProfile }
+  from "@/features/users/hooks/useUpdateProfile";
+
+export default function EditProfilePage() {
+  const navigate =
+    useNavigate();
+
+  const {
+    user,
+    loading,
+  } = useAuth();
+
+  const token =
+    localStorage.getItem(
+      "token"
+    );
+
+  const updateProfile =
+    useUpdateProfile(
+      token ?? ""
+    );
+
+  const [username, setUsername] =
+    useState("");
+
+  const [bio, setBio] =
+    useState("");
+
+  //////////////////////////////////////////////////
+  // LOAD USER
+  //////////////////////////////////////////////////
+
+  useEffect(() => {
+    if (!user) return;
+
+    setUsername(
+      user.username
+    );
+
+    setBio(
+      user.bio ?? ""
+    );
+  }, [user]);
+
+  //////////////////////////////////////////////////
+  // SUBMIT
+  //////////////////////////////////////////////////
+
+  async function handleSubmit(
+    e: React.FormEvent
+  ) {
+    e.preventDefault();
+
+    try {
+      await updateProfile.mutateAsync({
+        username,
+        bio,
+      });
+
+      navigate(
+        `/users/${username}`
+      );
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  //////////////////////////////////////////////////
+  // LOADING
+  //////////////////////////////////////////////////
+
+  if (loading) {
+    return (
+      <div>
+        Cargando...
+      </div>
+    );
+  }
+
+  //////////////////////////////////////////////////
+  // RENDER
+  //////////////////////////////////////////////////
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+    >
+      <h1>
+        Edit Profile
+      </h1>
+
+      <input
+        value={username}
+        onChange={(e) =>
+          setUsername(
+            e.target.value
+          )
+        }
+        placeholder="Username"
+      />
+
+      <textarea
+        value={bio}
+        onChange={(e) =>
+          setBio(
+            e.target.value
+          )
+        }
+        placeholder="Biography"
+      />
+
+      <button
+        disabled={
+          updateProfile.isPending
+        }
+        type="submit"
+      >
+        {updateProfile.isPending
+          ? "Saving..."
+          : "Save Changes"}
+      </button>
+    </form>
+  );
+}
+---
+EditProfilePage.module.css
+
 ---
 pages/HomePage/
 HomePage.tsx
@@ -8729,6 +9662,75 @@ HomePage.module.css
 
     flex-wrap: wrap;
   }
+}
+---
+pages/ProfilePage/ProfilePage.tsx
+import { useParams, useNavigate } from "react-router-dom";
+import { useAuth } from "@/features/auth/context/AuthContext";
+
+import { useProfile } from "@/features/users/hooks/useProfile";
+import Container from "@/shared/ui/container/Container";
+
+import ProfileHeader from "@/features/users/components/ProfileHeader";
+import ProfileStats from "@/features/users/components/ProfileStats";
+
+export default function ProfilePage() {
+  const { username } =
+    useParams();
+
+  const {
+    data,
+    isLoading,
+    error,
+  } = useProfile(
+    username ?? ""
+  );
+
+  const navigate =
+    useNavigate();
+
+  const authUser =
+    useAuth();
+
+  if (isLoading) {
+    return <div>Cargando...</div>;
+  }
+
+  if (error || !data) {
+    return <div>Usuario no encontrado</div>;
+  }
+
+  const isOwner =
+    authUser.user?.id ===
+    data.id;
+
+  return (
+    <Container>
+      <ProfileHeader
+        username={data.username}
+        avatar={data.avatar}
+        bio={data.bio}
+        createdAt={data.createdAt}
+        canEdit={isOwner}
+        onEdit={() =>
+          navigate("/profile/edit")
+        }
+      />
+
+      <ProfileStats
+        mods={data.stats.mods}
+        comments={
+          data.stats.comments
+        }
+        followers={
+          data.stats.followers
+        }
+        following={
+          data.stats.following
+        }
+      />
+    </Container>
+  );
 }
 ---
 pages/Project/
@@ -12535,8 +13537,7 @@ SearchPage.module.css
   }
 }
 ---
-router/
-index.tsx
+router/index.tsx
 import { createBrowserRouter } from "react-router-dom";
 import AppLayout from "@/app/layouts/AppLayout/AppLayout";
 
@@ -12551,6 +13552,13 @@ import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
 
 //////////////////////////////////////////////////
+// USER PAGES
+//////////////////////////////////////////////////
+
+import ProfilePage from "@/pages/ProfilePage/ProfilePage";
+import EditProfilePage from "@/pages/EditProfilePage/EditProfilePage";
+
+//////////////////////////////////////////////////
 // DASHBOARD LAYOUT
 //////////////////////////////////////////////////
 
@@ -12560,7 +13568,7 @@ import DashboardLayout from "@/app/layouts/DashboardLayout/DashboardLayout";
 // DASHBOARD PAGES
 //////////////////////////////////////////////////
 
-import CreateModPage from "@/pages/CreateModPage";
+import CreateModPage from "@/pages/CreateMod/CreateModPage";
 import ProjectsPage from "@/pages/project/ProjectsPage";
 import ProjectDashboard from "@/pages/project/ProjectDashboard";
 
@@ -12668,6 +13676,20 @@ export const router =
           element: <DashboardLayout />,
 
           children: [
+            //////////////////////////////////////////////////
+            // USER PAGE
+            //////////////////////////////////////////////////
+
+            {
+              path: "/users/:username",
+              element: <ProfilePage />,
+            },
+
+            {
+              path: "/profile/edit",
+              element: <EditProfilePage />,
+            },
+
             //////////////////////////////////////////////////
             // PROJECTS PAGE
             //////////////////////////////////////////////////
@@ -12912,6 +13934,10 @@ export function ToastProvider({ children }: any) {
 
 export const useToast = () => useContext(ToastContext);
 ---
+shared/config/env.ts
+export const API_URL =
+  import.meta.env.VITE_API_URL;
+---
 shaders/hooks/
 useDebounce.ts
 import {
@@ -13053,6 +14079,20 @@ export const queryKeys = {
 isOwner.ts
 export function isOwner(userId: number, authorId: number) {
   return userId === authorId;
+}
+---
+timeAgo.ts
+import { formatDistanceToNow } from "date-fns";
+
+export function timeAgo(
+  date: string
+) {
+  return formatDistanceToNow(
+    new Date(date),
+    {
+      addSuffix: true,
+    }
+  );
 }
 ---
 shared/ui/
@@ -14663,15 +15703,725 @@ ModCard.module.css
   }
 }
 ---
-widgets/ModComment/
-index.tsx
-export default function ModComments() {
-  return (
-    <section>
-      <h2>Comments</h2>
+widgets/ModComment/index.tsx
+import { useComments } from "@/features/comments/hooks/useComments";
 
-      <p>Coming soon...</p>
+import { useCreateComment } from "@/features/comments/hooks/useCreateComment";
+
+import CommentForm from "./CommentForm";
+import CommentList from "./CommentList";
+
+import styles from "./index.module.css";
+
+type Props = {
+  modId: number;
+};
+
+export default function ModComments({
+  modId,
+}: Props) {
+  const {
+    data,
+    isLoading,
+    error,
+  } = useComments(modId);
+
+  console.log("COMMENTS", data);
+  console.log("ERROR", error);
+
+  const createComment =
+    useCreateComment(modId);
+
+  if (isLoading) {
+    console.log("COMMENTS", data);
+    return (
+      <section className={styles.wrapper}>
+        <h2 className={styles.title}>
+          Comments
+        </h2>
+        <p>Cargando...</p>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className={styles.wrapper}>
+        <h2 className={styles.title}>
+          Comments ({data?.length || 0})
+        </h2>
+        <p className={styles.empty}>
+          Error cargando comentarios
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className={styles.wrapper}>
+      <h2>
+        Comments (
+        {data?.length || 0}
+        )
+      </h2>
+
+      <CommentForm
+        loading={
+          createComment.isPending
+        }
+        onSubmit={(
+          content
+        ) =>
+          createComment.mutate(
+            content
+          )
+        }
+      />
+
+      {data?.length ===
+        0 && (
+        <p className={styles.empty}>
+          No comments yet
+        </p>
+      )}
+
+      <CommentList
+        comments={
+          data || []
+        }
+        modId={modId}
+        />
     </section>
+  );
+}
+---
+CommentList.tsx
+import CommentItem from "./CommentItem";
+
+type Props = {
+  comments: any[];
+  modId: number;
+};
+
+export default function CommentList({
+  comments,
+  modId,
+}: Props) {
+  return (
+    <>
+      {comments.map(
+        (comment) => (
+          <CommentItem
+            key={comment.id}
+            comment={comment}
+            modId={modId}
+          />
+        )
+      )}
+    </>
+  );
+}
+---
+CommentItem.tsx
+import { useState } from "react";
+import { timeAgo } from "@/shared/lib/timeAgo";
+
+import { useUpdateComment } from "@/features/comments/hooks/useUpdateComment";
+import { useDeleteComment } from "@/features/comments/hooks/useDeleteComment";
+import ReplyForm from "./ReplyForm";
+import { useCreateReply } from "@/features/comments/hooks/useCreateReply";
+import ReplyItem from "./ReplyItem";
+
+import styles from "./CommentItem.module.css";
+
+type Props = {
+  comment: any;
+  modId: number;
+};
+
+export default function CommentItem({
+  comment,
+  modId,
+}: Props) {
+
+  console.log("COMMENT ITEM", comment);
+
+  const [replying, setReplying] =
+    useState(false);
+
+  const [editing, setEditing] =
+    useState(false);
+
+  const [editContent, setEditContent] =
+    useState(comment.content);
+
+  const createReply =
+    useCreateReply(modId);
+
+  const updateComment =
+    useUpdateComment(modId);
+
+  const deleteComment =
+    useDeleteComment(modId);
+
+  const storedUser =
+    localStorage.getItem("user");
+
+  const user =
+    storedUser
+      ? JSON.parse(storedUser)
+      : null;
+
+  const isOwner =
+    user?.id === comment.user.id;
+
+  return (
+    <article className={styles.comment}>
+      <header className={styles.header}>
+        <strong className={styles.username}>
+          {comment.user.username}
+        </strong>
+
+        <small className={styles.date}>
+          {timeAgo(
+            comment.createdAt
+          )}
+        </small>
+      </header>
+
+      {!editing && (
+        <p className={styles.content}>
+          {comment.content}
+        </p>
+      )}
+
+      <button className={styles.replyButton}
+        onClick={() =>
+          setReplying(
+            !replying
+          )
+        }
+      >
+        Reply
+      </button>
+
+      {isOwner && (
+        <>
+          <button
+            className={styles.actionButton}
+            onClick={() =>
+              setEditing(!editing)
+            }
+          >
+            Edit
+          </button>
+
+          <button
+            className={styles.deleteButton}
+            onClick={() => {
+              if (
+                confirm(
+                  "Delete this comment?"
+                )
+              ) {
+                deleteComment.mutate(
+                  comment.id
+                );
+              }
+            }}
+          >
+            Delete
+          </button>
+        </>
+      )}
+
+      {editing && (
+        <div className={styles.editBox}>
+          <textarea
+            value={editContent}
+            onChange={(e) =>
+              setEditContent(
+                e.target.value
+              )
+            }
+            className={styles.editTextarea}
+          />
+
+          <div
+            className={styles.editActions}
+          >
+            <button
+              onClick={() =>
+                setEditing(false)
+              }
+            >
+              Cancel
+            </button>
+
+            <button
+              onClick={() => {
+                const value =
+                  editContent.trim();
+
+                if (!value) return;
+
+                updateComment.mutate({
+                  commentId: comment.id,
+                  content: value,
+                });
+
+                setEditing(false);
+              }}
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      )}
+
+      {replying && (
+        <ReplyForm
+          loading={
+            createReply.isPending
+          }
+          onCancel={() =>
+            setReplying(false)
+          }
+          onSubmit={(
+            content
+          ) => {
+            createReply.mutate({
+              commentId:
+                comment.id,
+
+              content,
+            });
+
+            setReplying(false);
+          }}
+        />
+      )}
+
+      {comment.replies?.length >
+        0 && (
+        <div className={styles.replies}>
+          {comment.replies.map(
+            (reply: any) => (
+              <ReplyItem
+                key={reply.id}
+                reply={reply}
+                modId={modId}
+              />
+            )
+          )}
+        </div>
+      )}
+    </article>
+  );
+}
+---
+CommentItem.module.css
+.comment {
+  padding: 18px;
+
+  border: 1px solid #242424;
+  border-radius: 12px;
+
+  background: #111;
+
+  margin-bottom: 16px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  margin-bottom: 10px;
+}
+
+.username {
+  font-weight: 700;
+}
+
+.date {
+  color: #8b8b8b;
+  font-size: 0.85rem;
+}
+
+.content {
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.actionButton {
+  margin-left: 8px;
+}
+
+.deleteButton {
+  margin-left: 8px;
+  color: #ef4444;
+}
+
+.editBox {
+  margin-top: 1rem;
+}
+
+.editTextarea {
+  width: 100%;
+  min-height: 100px;
+
+  padding: 12px;
+
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.editActions {
+  display: flex;
+  gap: 10px;
+
+  margin-top: 10px;
+}
+
+.replyButton {
+  margin-top: 12px;
+
+  border: none;
+  background: transparent;
+
+  cursor: pointer;
+
+  font-weight: 600;
+}
+
+.replies {
+  margin-top: 16px;
+  margin-left: 40px;
+  border-left: 2px solid #222;
+  padding-left: 16px;
+}
+
+.reply {
+  padding-top: 12px;
+}
+
+.reply + .reply {
+  margin-top: 12px;
+}
+---
+ReplyItem.tsx
+import { useState } from "react";
+
+import { timeAgo } from "@/shared/lib/timeAgo";
+
+import { useUpdateComment } from "@/features/comments/hooks/useUpdateComment";
+import { useDeleteComment } from "@/features/comments/hooks/useDeleteComment";
+
+import styles from "./CommentItem.module.css";
+
+type Props = {
+  reply: any;
+  modId: number;
+};
+
+export default function ReplyItem({
+  reply,
+  modId,
+}: Props) {
+  const [editing, setEditing] =
+    useState(false);
+
+  const [editContent, setEditContent] =
+    useState(reply.content);
+
+  const updateComment =
+    useUpdateComment(modId);
+
+  const deleteComment =
+    useDeleteComment(modId);
+
+  const storedUser =
+    localStorage.getItem("user");
+
+  const user =
+    storedUser
+      ? JSON.parse(storedUser)
+      : null;
+
+  const isOwner =
+    user?.id === reply.user.id;
+
+  return (
+    <article className={styles.reply}>
+      <strong className={styles.username}>
+        {reply.user.username}
+      </strong>
+
+      <small className={styles.date}>
+        {timeAgo(reply.createdAt)}
+      </small>
+
+      {!editing && (
+        <p className={styles.content}>
+          {reply.content}
+        </p>
+      )}
+
+      {isOwner && (
+        <>
+          <button
+            className={styles.actionButton}
+            onClick={() =>
+              setEditing(!editing)
+            }
+          >
+            Edit
+          </button>
+
+          <button
+            className={styles.deleteButton}
+            onClick={() => {
+              if (
+                confirm(
+                  "Delete this reply?"
+                )
+              ) {
+                deleteComment.mutate(
+                  reply.id
+                );
+              }
+            }}
+          >
+            Delete
+          </button>
+        </>
+      )}
+
+      {editing && (
+        <div className={styles.editBox}>
+          <textarea
+            value={editContent}
+            className={
+              styles.editTextarea
+            }
+            onChange={(e) =>
+              setEditContent(
+                e.target.value
+              )
+            }
+          />
+
+          <div
+            className={styles.editActions}
+          >
+            <button
+              onClick={() =>
+                setEditing(false)
+              }
+            >
+              Cancel
+            </button>
+
+            <button
+              onClick={() => {
+                const value =
+                  editContent.trim();
+
+                if (!value) return;
+
+                updateComment.mutate({
+                  commentId:
+                    reply.id,
+                  content: value,
+                });
+
+                setEditing(false);
+              }}
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      )}
+    </article>
+  );
+}
+---
+CommentForm.tsx
+import { useState } from "react";
+import styles from "./CommentForm.module.css";
+
+type Props = {
+  onSubmit: (
+    content: string
+  ) => void;
+
+  loading?: boolean;
+};
+
+export default function CommentForm({
+  onSubmit,
+  loading,
+}: Props) {
+  const [content, setContent] =
+    useState("");
+
+  const handleSubmit = (
+    e: React.FormEvent
+  ) => {
+    e.preventDefault();
+
+    const value =
+      content.trim();
+
+    if (!value) return;
+
+    onSubmit(value);
+
+    setContent("");
+  };
+
+  return (
+    <form
+    className={styles.form}
+    onSubmit={handleSubmit}
+    >
+      <textarea
+        value={content}
+        className={styles.textarea}
+        onChange={(e) =>
+          setContent(
+            e.target.value
+          )
+        }
+        placeholder="Write a comment..."
+        rows={4}
+      />
+
+      <button
+        type="submit"
+        className={styles.button}
+        disabled={loading}
+      >
+        Post Comment
+      </button>
+    </form>
+  );
+}
+---
+CommentForm.module.css
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  margin-bottom: 24px;
+}
+
+.textarea {
+  width: 100%;
+
+  min-height: 110px;
+
+  resize: vertical;
+
+  padding: 12px;
+
+  border: 1px solid #2a2a2a;
+  border-radius: 10px;
+
+  background: #141414;
+  color: white;
+}
+
+.button {
+  align-self: flex-end;
+
+  padding: 10px 16px;
+
+  border: none;
+  border-radius: 8px;
+
+  cursor: pointer;
+
+  font-weight: 600;
+}
+---
+ReplyForm.tsx
+import { useState } from "react";
+import styles from "./ReplyForm.module.css";
+
+type Props = {
+  loading?: boolean;
+
+  onSubmit: (
+    content: string
+  ) => void;
+
+  onCancel: () => void;
+};
+
+export default function ReplyForm({
+  loading,
+  onSubmit,
+  onCancel,
+}: Props) {
+  const [content, setContent] =
+    useState("");
+
+  const handleSubmit = (
+    e: React.FormEvent
+  ) => {
+    e.preventDefault();
+
+    const value =
+      content.trim();
+
+    if (!value) return;
+
+    onSubmit(value);
+
+    setContent("");
+  };
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className={styles.form}
+    >
+      <textarea
+        rows={3}
+        value={content}
+        className={styles.textarea}
+        onChange={(e) =>
+          setContent(
+            e.target.value
+          )
+        }
+        placeholder="Write a reply..."
+      />
+
+      <div className={styles.actions} >
+        <button
+          type="button"
+          className={styles.button}
+          onClick={
+            onCancel
+          }
+        >
+          Cancel
+        </button>
+
+        <button
+          type="submit"
+          className={styles.button}
+          disabled={loading}
+        >
+          Reply
+        </button>
+      </div>
+    </form>
   );
 }
 ---
@@ -16682,16 +18432,14 @@ SearchResultCard.module.css
   margin-left: auto;
 }
 ---
-widgets/user-menu/
-UserMenu.tsx
-import { logout } from "@/context/AuthContext";
-
-import { useAuth } from "@/context/AuthContext";
+widgets/user-menu/UserMenu.tsx
+import { useAuth } from "@/features/auth/context/AuthContext";
 
 import styles from "./UserMenu.module.css";
 
 export default function UserMenu() {
   const { user } = useAuth();
+  const { logout } = useAuth();
 
   return (
     <div className={styles.menu}>
@@ -16699,9 +18447,11 @@ export default function UserMenu() {
         {user?.username?.[0]}
       </div>
 
-      <button onClick={logout}>
-        Logout
-      </button>
+        <button
+          onClick={logout}
+        >
+          Salir
+        </button>
     </div>
   );
 }

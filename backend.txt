@@ -27,8 +27,7 @@ R2_SECRET_ACCESS_KEY=32cf321527131dd5ff1dd2b04e3a7c32c72f647988d7f68d2b5b46229b5
 R2_PUBLIC_URL=https://pub-4c284f3a6f124cfeb3982bca32ce1159.r2.dev
 R2_BUCKET=mod-site
 ---
-prisma/
-schema.prisma
+prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -102,38 +101,122 @@ enum Visibility {
   PRIVATE
 }
 
+enum SystemRole {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+enum CosmeticType {
+  AVATAR_FRAME
+  CHAT_BUBBLE
+  PROFILE_BACKGROUND
+  BADGE
+}
+
+enum CosmeticRarity {
+  COMMON
+  UNCOMMON
+  RARE
+  EPIC
+  LEGENDARY
+  MYTHIC
+}
+
+enum SocialPlatform {
+  INSTAGRAM
+  YOUTUBE
+  DISCORD
+  X
+  WEBSITE
+  TIKTOK
+  TWITCH
+  BLUESKY
+}
+
 //////////////////////
 // USER
 //////////////////////
 
 model User {
-  id          Int          @id @default(autoincrement())
-  role        String       @default("user")
+  id Int @id @default(autoincrement())
 
   username String @unique
-  email    String @unique
+  email String @unique
   password String
 
-  avatar String?
-  bio    String?
+  role SystemRole @default(USER)
 
   isVerified Boolean @default(false)
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lastLoginAt DateTime?
 
-  mods      Mod[]
-  likes     ModLike[]
-  favorites Favorite[]
-  comments  Comment[]
+  profile UserProfile?
+  inventory UserInventory[]
+
+  refreshTokens RefreshToken[]
+
+  mods Mod[]
+  comments Comment[]
 
   following Follow[] @relation("following")
   followers Follow[] @relation("followers")
 
-  teamMembers TeamMember[]
-  userRoles    UserRole[]
-  userFeatures UserFeature[]
+  teamMemberships TeamMember[]
+  userRoles UserRole[]
+  features UserFeature[]
+  likes ModLike[]
+  favorites Favorite[]
+}
 
-  @@index([username])
+model UserProfile {
+  id Int @id @default(autoincrement())
+
+  userId Int @unique
+
+  displayName String?
+
+  avatarUrl String?
+  bannerUrl String?
+
+  bio String?
+
+  accentColor String?
+
+  inventoryPublic Boolean @default(true)
+  equippedCosmetics EquippedCosmetic[]
+
+  user User @relation(fields: [userId], references: [id])
+
+  socials ProfileSocial[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+//////////////////////
+// REFRESH TOKENS
+//////////////////////
+
+model RefreshToken {
+  id Int @id @default(autoincrement())
+
+  token String @unique
+
+  userId Int
+
+  expiresAt DateTime
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([token])
 }
 
 //////////////////////
@@ -452,6 +535,108 @@ model Follow {
   following User @relation("following", fields: [followingId], references: [id])
 
   @@id([followerId, followingId])
+
+  @@index([followerId])
+  @@index([followingId])
+}
+
+//////////////////////
+// USER INVENTORY
+//////////////////////
+
+model UserInventory {
+  id Int @id @default(autoincrement())
+
+  userId Int
+
+  itemId Int
+
+  quantity Int @default(1)
+
+  obtainedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  item CosmeticItem @relation(fields: [itemId], references: [id])
+
+  @@unique([userId, itemId])
+
+  @@index([userId])
+  @@index([itemId])
+}
+
+//////////////////////
+// LIKN SOCIAL
+//////////////////////
+
+model ProfileSocial {
+  id Int @id @default(autoincrement())
+
+  profileId Int
+
+  platform SocialPlatform
+
+  url String
+
+  profile UserProfile @relation(fields: [profileId], references: [id])
+
+  @@unique([profileId, platform])
+
+  @@index([profileId])
+}
+
+//////////////////////
+// COSMETIC
+//////////////////////
+
+model CosmeticItem {
+  id Int @id @default(autoincrement())
+
+  name String
+
+  slug String @unique
+
+  description String?
+
+  imageUrl String
+
+  rarity CosmeticRarity
+
+  type CosmeticType
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  inventory UserInventory[]
+  equipped EquippedCosmetic[]
+
+  @@index([type])
+  @@index([rarity])
+  @@index([isActive])
+}
+
+//////////////////////
+// COSMETIC EQUIPPED
+//////////////////////
+
+model EquippedCosmetic {
+  id Int @id @default(autoincrement())
+
+  profileId Int
+
+  cosmeticId Int
+
+  type CosmeticType
+
+  profile UserProfile @relation(fields: [profileId], references: [id])
+
+  cosmetic CosmeticItem @relation(fields: [cosmeticId], references: [id])
+
+  @@unique([profileId, type])
+
+  @@index([profileId])
+  @@index([cosmeticId])
 }
 
 ---
@@ -470,12 +655,13 @@ import versionRoutes from "./routes/version";
 import fileRoutes from "./routes/file";
 import downloadRoutes from "./routes/download";
 import { rateLimit } from "./middleware/rateLimit.middleware";
+import usersRoutes from "./modules/users/users.routes";
 
-import { register, login } from "./routes/auth";
-import { authMiddleware } from "./middleware/auth.middleware";
+import authRoutes from "./modules/auth/auth";
 import { errorHandler } from "./middleware/errorHandler.middleware";
 
 import interactionsRoutes from "./modules/interactions/interactions.routes";
+import commentRoutes from "./routes/comment";
 
 const app = express();
 
@@ -489,8 +675,10 @@ app.use(cors({
 }));
 
 // AUTH
-app.post("/auth/register", register);
-app.post("/auth/login", login);
+app.use ("/auth", authRoutes );
+
+// USER
+app.use("/users", usersRoutes );
 
 // MODS
 app.use("/mods", modRoutes);
@@ -508,6 +696,9 @@ app.use("/uploads", uploadsRoutes);
 
 // ❤️ Likes & Favoritos
 app.use("/mods", interactionsRoutes);
+
+// 💬 Comments
+app.use("/comments", commentRoutes);
 
 // HEALTH
 app.get("/", (_, res) => {
@@ -533,93 +724,98 @@ app.listen(3000, () => {
 });
 ---
 Controller/
-auth.controller.ts
-import { prisma } from "../lib/prisma";
-import bcrypt from "bcryptjs";
-import {  BadRequestError, NotFoundError, UnauthorizedError,} from "../utils/errors";
+comment.controller.ts
+import { Response } from "express";
 
-interface RegisterInput {
-  username: string;
-  email: string;
-  password: string;
-}
+import { asyncHandler } from "../utils/asyncHandler";
 
-export async function registerUser(data: RegisterInput) {
-  const { username, email, password } = data;
+import { AuthRequest } from "../middleware/auth.middleware";
 
-  // validación básica
-  if (!username || !email || !password) {
-    throw new BadRequestError("Faltan campos obligatorios");
-  }
+import { CommentService } from "../services/comment.service";
 
-  if (password.length < 8) {
-    throw new BadRequestError("La contraseña es muy corta");
-  }
+export const getComments =
+  asyncHandler(
+    async (
+      req: any,
+      res: Response
+    ) => {
+      const comments =
+        await CommentService.getComments(
+          Number(req.params.modId)
+        );
 
-  // validar duplicados
-  const existingUser = await prisma.user.findFirst({
-    where: {
-      OR: [{ username }, { email }],
-    },
-  });
-
-  if (existingUser) {
-    throw new BadRequestError("Usuario o email ya existe");
-  }
-
-  const hashed = await bcrypt.hash(password, 10);
-
-  const user = await prisma.user.create({
-    data: {
-      username,
-      email,
-      password: hashed,
-    },
-  });
-
-  // eliminar password
-  const { password: _, ...safeUser } = user;
-
-  return safeUser;
-}
-
-// ---- Login ---- 
-import jwt from "jsonwebtoken";
-
-export async function loginUser(data: {
-  email: string;
-  password: string;
-}) {
-  const { email, password } = data;
-
-  if (!email || !password) {
-    throw new BadRequestError("Faltan campos");
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { email },
-  });
-
-  if (!user) {
-    throw new NotFoundError("Usuario no encontrado");
-  }
-
-  const valid = await bcrypt.compare(password, user.password);
-
-  if (!valid) {
-    throw new UnauthorizedError("Contraseña incorrecta");
-  }
-
-  const token = jwt.sign(
-    { userId: user.id },
-    process.env.JWT_SECRET || "secret",
-    { expiresIn: "7d" }
+      res.json(comments);
+    }
   );
 
-  const { password: _, ...safeUser } = user;
+export const createComment =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+      const comment =
+        await CommentService.createComment(
+          Number(req.params.modId),
+          req.userId!,
+          req.body.content
+        );
 
-  return { user: safeUser, token };
-}
+      res
+        .status(201)
+        .json(comment);
+    }
+  );
+
+export const updateComment =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+      const comment =
+        await CommentService.updateComment(
+          Number(req.params.id),
+          req.userId!,
+          req.body.content
+        );
+
+      res.json(comment);
+    }
+  );
+
+export const deleteComment =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+      const result =
+        await CommentService.deleteComment(
+          Number(req.params.id),
+          req.userId!
+        );
+
+      res.json(result);
+    }
+  );
+
+export const createReply =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+      const reply =
+        await CommentService.createReply(
+          Number(req.params.id),
+          req.userId!,
+          req.body.content
+        );
+
+      res.status(201).json(reply);
+    }
+  );
 ---
 download.controller.ts
 import { Request, Response } from "express";
@@ -1887,6 +2083,374 @@ export function antiAbuse(req: Request, res: Response, next: NextFunction) {
 }
 ---
 modules/interactions/
+auth.controller.ts
+import { Request, Response } from "express";
+import { AuthRequest } from "../../middleware/auth.middleware";
+
+import {
+  loginUser,
+  registerUser,
+  getCurrentUser
+} from "./auth.service";
+
+//////////////////////////////////////////////////
+// REGISTER
+//////////////////////////////////////////////////
+
+export async function register(
+  req: Request,
+  res: Response
+) {
+  try {
+    const {
+      username,
+      email,
+      password,
+    } = req.body;
+
+    const user =
+      await registerUser({
+        username,
+        email,
+        password,
+      });
+
+    res
+      .status(201)
+      .json(user);
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Error desconocido";
+
+    res.status(400).json({
+      error: message,
+    });
+  }
+}
+
+//////////////////////////////////////////////////
+// LOGIN
+//////////////////////////////////////////////////
+
+export async function login(
+  req: Request,
+  res: Response
+) {
+  try {
+    const {
+      email,
+      password,
+    } = req.body;
+
+    const result =
+      await loginUser({
+        email,
+        password,
+      });
+
+    res.json(result);
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Error desconocido";
+
+    res.status(400).json({
+      error: message,
+    });
+  }
+}
+
+//////////////////////////////////////////////////
+// ME
+//////////////////////////////////////////////////
+
+export async function me(
+  req: AuthRequest,
+  res: Response
+) {
+  try {
+    const userId = req.userId;
+
+    if (!userId) {
+      return res
+        .status(401)
+        .json({
+          error: "No autorizado",
+        });
+    }
+
+    const user =
+      await getCurrentUser(
+        userId
+      );
+
+    res.json(user);
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Error desconocido";
+
+    res.status(400).json({
+      error: message,
+    });
+  }
+}
+---
+auth.service.ts
+import { prisma } from "../../lib/prisma";
+
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+
+import {
+  BadRequestError,
+  NotFoundError,
+  UnauthorizedError,
+} from "../../utils/errors";
+
+import {
+  RegisterInput,
+  LoginInput,
+} from "./auth.types";
+
+//////////////////////////////////////////////////
+// REGISTER
+//////////////////////////////////////////////////
+
+export async function registerUser(
+  data: RegisterInput
+) {
+  const {
+    username,
+    email,
+    password,
+  } = data;
+
+  if (!username || !email || !password) {
+    throw new BadRequestError(
+      "Faltan campos obligatorios"
+    );
+  }
+
+  if (password.length < 8) {
+    throw new BadRequestError(
+      "La contraseña es muy corta"
+    );
+  }
+
+  const existingUser =
+    await prisma.user.findFirst({
+      where: {
+        OR: [
+          { username },
+          { email },
+        ],
+      },
+    });
+
+  if (existingUser) {
+    throw new BadRequestError(
+      "Usuario o email ya existe"
+    );
+  }
+
+  const hashed =
+    await bcrypt.hash(password, 10);
+
+  const user =
+    await prisma.user.create({
+      data: {
+        username,
+        email,
+        password: hashed,
+      },
+    });
+
+  const { password: _, ...safeUser } = user;
+
+  return safeUser;
+}
+
+//////////////////////////////////////////////////
+// LOGIN
+//////////////////////////////////////////////////
+
+export async function loginUser(
+  data: LoginInput
+) {
+  const {
+    email,
+    password,
+  } = data;
+
+  if (!email || !password) {
+    throw new BadRequestError(
+      "Faltan campos"
+    );
+  }
+
+  const user =
+    await prisma.user.findUnique({
+      where: {
+        email,
+      },
+    });
+
+  if (!user) {
+    throw new NotFoundError(
+      "Usuario no encontrado"
+    );
+  }
+
+  const valid =
+    await bcrypt.compare(
+      password,
+      user.password
+    );
+
+  if (!valid) {
+    throw new UnauthorizedError(
+      "Contraseña incorrecta"
+    );
+  }
+
+  await prisma.user.update({
+    where: {
+      id: user.id,
+    },
+    data: {
+      lastLoginAt: new Date(),
+    },
+  });
+
+  const token = jwt.sign(
+    {
+      userId: user.id,
+    },
+    process.env.JWT_SECRET || "secret",
+    {
+      expiresIn: "7d",
+    }
+  );
+
+  const { password: _, ...safeUser } = user;
+
+  return {
+    user: safeUser,
+    token,
+  };
+}
+
+//////////////////////////////////////////////////
+// GET CURRENT USER
+//////////////////////////////////////////////////
+
+export async function getCurrentUser(
+  userId: number
+) {
+  const user =
+    await prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
+
+      select: {
+        id: true,
+        username: true,
+        email: true,
+
+        avatar: true,
+        bio: true,
+
+        role: true,
+
+        isVerified: true,
+
+        createdAt: true,
+        updatedAt: true,
+
+        lastLoginAt: true,
+      },
+    });
+
+  if (!user) {
+    throw new NotFoundError(
+      "Usuario no encontrado"
+    );
+  }
+
+  return user;
+}
+---
+auth.ts
+import { Router } from "express";
+
+import { authMiddleware, } from "../../middleware/auth.middleware";
+import {
+  login,
+  register,
+  me,
+} from "./auth.controller";
+
+const router = Router();
+
+//////////////////////////////////////////////////
+// AUTH
+//////////////////////////////////////////////////
+
+router.post(
+  "/register",
+  register
+);
+
+router.post(
+  "/login",
+  login
+);
+
+router.get(
+  "/me",
+  authMiddleware,
+  me
+);
+
+export default router;
+---
+auth.type.ts
+export interface RegisterInput {
+  username: string;
+  email: string;
+  password: string;
+}
+
+export interface LoginInput {
+  email: string;
+  password: string;
+}
+
+export interface AuthUser {
+  id: number;
+  username: string;
+  email: string;
+
+  avatar: string | null;
+  bio: string | null;
+
+  role: string;
+
+  isVerified: boolean;
+
+  createdAt: Date;
+  updatedAt: Date;
+
+  lastLoginAt: Date | null;
+}
+---
+modules/interactions/
 interactions.controller.ts
 import { Request, Response } from "express";
 import { InteractionsService } from "./interactions.service";
@@ -2573,46 +3137,474 @@ export async function completeMultipartUpload(
   }
 }
 ---
-routes/
-auth.ts
-import { Request, Response } from "express";
-import { registerUser, loginUser } from "../controllers/auth.controller.js";
+modules/users/users.controller.ts
+import { Response } from "express";
 
-export async function register(req: Request, res: Response) {
-  try {
-    const { username, email, password } = req.body;
+import { asyncHandler } from "../../utils/asyncHandler";
+import { AuthRequest } from "../../middleware/auth.middleware";
+import { UsersService } from "./users.service";
 
-    const user = await registerUser({
-      username,
-      email,
-      password,
-    });
+//////////////////////////////////////////////////
+// GET CURRENT PROFILE
+//////////////////////////////////////////////////
 
-    res.status(201).json(user);
-  } catch (error: unknown) {
-    const message =
-      error instanceof Error ? error.message : "Error desconocido";
+export const getCurrentProfile =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+      const profile =
+        await UsersService.getCurrentProfile(
+          req.userId!
+        );
 
-    res.status(400).json({ error: message });
+      res.json(profile);
+    }
+  );
+
+//////////////////////////////////////////////////
+// UPDATE PROFILE
+//////////////////////////////////////////////////
+
+export const updateProfile =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+      const profile =
+        await UsersService.updateProfile(
+          req.userId!,
+          req.body
+        );
+
+      res.json(profile);
+    }
+  );
+
+//////////////////////////////////////////////////
+// GET PUBLIC PROFILE
+//////////////////////////////////////////////////
+
+export const getPublicProfile =
+  asyncHandler(
+    async (
+      req: any,
+      res: Response
+    ) => {
+      const profile =
+        await UsersService.getPublicProfile(
+          req.params.username
+        );
+
+      res.json(profile);
+    }
+  );
+
+export const updateAvatar =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+      const user =
+      await UsersService.updateAvatar(
+        req.userId!,
+        req.body.avatar
+      );
+
+      res.json(user);
+    }
+  );
+---
+users.routes.ts
+import { Router } from "express";
+
+import { authMiddleware }
+  from "../../middleware/auth.middleware";
+
+import {
+  getCurrentProfile,
+  updateProfile,
+  getPublicProfile,
+  updateAvatar,
+} from "./users.controller";
+
+const router = Router();
+
+//////////////////////////////////////////////////
+// CURRENT USER
+//////////////////////////////////////////////////
+
+router.get(
+  "/me",
+  authMiddleware,
+  getCurrentProfile
+);
+
+//////////////////////////////////////////////////
+// UPDATE PROFILE
+//////////////////////////////////////////////////
+
+router.patch(
+  "/me",
+  authMiddleware,
+  updateProfile
+);
+
+//////////////////////////////////////////////////
+// PUBLIC PROFILE
+//////////////////////////////////////////////////
+
+router.get(
+  "/:username",
+  getPublicProfile
+);
+
+//////////////////////////////////////////////////
+// EDIT PROFILE
+//////////////////////////////////////////////////
+
+router.patch(
+  "/avatar",
+  authMiddleware,
+  updateAvatar
+);
+
+export default router;
+---
+users.service.ts
+import { prisma } from "../../lib/prisma";
+
+import {
+  BadRequestError,
+  NotFoundError,
+} from "../../utils/errors";
+
+import { UpdateProfileInput } from "./users.types";
+
+export class UsersService {
+  //////////////////////////////////////////////////
+  // GET CURRENT PROFILE
+  //////////////////////////////////////////////////
+
+  static async getCurrentProfile(
+    userId: number
+  ) {
+    const user =
+      await prisma.user.findUnique({
+        where: {
+          id: userId,
+        },
+
+        select: {
+          id: true,
+          username: true,
+          email: true,
+
+          avatar: true,
+          bio: true,
+
+          role: true,
+
+          isVerified: true,
+
+          createdAt: true,
+          updatedAt: true,
+
+          lastLoginAt: true,
+
+          _count: {
+            select: {
+              mods: true,
+              comments: true,
+              followers: true,
+              following: true,
+            },
+          },
+        },
+      });
+
+    if (!user) {
+      throw new NotFoundError(
+        "Usuario no encontrado"
+      );
+    }
+
+    const {
+      _count,
+      ...safeUser
+    } = user;
+
+    return {
+      ...safeUser,
+
+      stats: {
+        mods: _count.mods,
+        comments: _count.comments,
+        followers: _count.followers,
+        following: _count.following,
+      },
+    };
   }
-}
 
-// 👇 NUEVO
-export async function login(req: Request, res: Response) {
-  try {
-    const { email, password } = req.body;
+  //////////////////////////////////////////////////
+  // UPDATE PROFILE
+  //////////////////////////////////////////////////
 
-    const data = await loginUser({ email, password });
+  static async updateProfile(
+    userId: number,
+    data: UpdateProfileInput
+  ) {
+    const user =
+      await prisma.user.findUnique({
+        where: {
+          id: userId,
+        },
+      });
 
-    res.json(data);
-  } catch (error: unknown) {
-    const message =
-      error instanceof Error ? error.message : "Error desconocido";
+    if (!user) {
+      throw new NotFoundError(
+        "Usuario no encontrado"
+      );
+    }
 
-    res.status(400).json({ error: message });
+    const username =
+      data.username?.trim();
+
+    const bio =
+      data.bio?.trim();
+
+    //////////////////////////////////////////////////
+    // USERNAME
+    //////////////////////////////////////////////////
+
+    if (username) {
+      if (username.length < 3) {
+        throw new BadRequestError(
+          "Username muy corto"
+        );
+      }
+
+      if (username.length > 30) {
+        throw new BadRequestError(
+          "Username muy largo"
+        );
+      }
+
+      const existingUser =
+        await prisma.user.findFirst({
+          where: {
+            username,
+
+            NOT: {
+              id: userId,
+            },
+          },
+        });
+
+      if (existingUser) {
+        throw new BadRequestError(
+          "Username ya existe"
+        );
+      }
+    }
+
+    //////////////////////////////////////////////////
+    // BIO
+    //////////////////////////////////////////////////
+
+    if (
+      bio &&
+      bio.length > 500
+    ) {
+      throw new BadRequestError(
+        "La biografía es demasiado larga"
+      );
+    }
+
+    //////////////////////////////////////////////////
+    // UPDATE
+    //////////////////////////////////////////////////
+
+    const updatedUser =
+      await prisma.user.update({
+        where: {
+          id: userId,
+        },
+
+        data: {
+          username:
+            username ??
+            undefined,
+
+          bio:
+            bio ??
+            undefined,
+        },
+
+        select: {
+          id: true,
+          username: true,
+          email: true,
+
+          avatar: true,
+          bio: true,
+
+          role: true,
+
+          isVerified: true,
+
+          createdAt: true,
+          updatedAt: true,
+
+          lastLoginAt: true,
+        },
+      });
+
+    return updatedUser;
+  }
+
+  //////////////////////////////////////////////////
+  // GET PUBLIC PROFILE
+  //////////////////////////////////////////////////
+
+  static async getPublicProfile(
+    username: string
+  ) {
+    const user =
+      await prisma.user.findUnique({
+        where: {
+          username,
+        },
+
+        select: {
+          id: true,
+
+          username: true,
+
+          avatar: true,
+
+          bio: true,
+
+          createdAt: true,
+
+          _count: {
+            select: {
+              mods: true,
+              comments: true,
+              followers: true,
+              following: true,
+            },
+          },
+        },
+      });
+
+    if (!user) {
+      throw new NotFoundError(
+        "Usuario no encontrado"
+      );
+    }
+
+    return {
+      id: user.id,
+
+      username:
+        user.username,
+
+      avatar:
+        user.avatar,
+
+      bio: user.bio,
+
+      createdAt:
+        user.createdAt,
+
+      stats: {
+        mods:
+          user._count.mods,
+
+        comments:
+          user._count.comments,
+
+        followers:
+          user._count.followers,
+
+        following:
+          user._count.following,
+      },
+    };
+  }
+  
+  //////////////////////////////////////////////////
+  // UPDATE AVATAR
+  //////////////////////////////////////////////////
+
+  static async updateAvatar(
+    userId: number,
+    avatar: string
+  ) {
+    if (!avatar?.trim()) {
+      throw new BadRequestError(
+        "Avatar requerido"
+      );
+    }
+
+    const user =
+      await prisma.user.findUnique({
+        where: {
+          id: userId,
+        },
+      });
+
+    if (!user) {
+      throw new NotFoundError(
+        "Usuario no encontrado"
+      );
+    }
+
+    return prisma.user.update({
+      where: {
+        id: userId,
+      },
+
+      data: {
+        avatar,
+      },
+
+      select: {
+        id: true,
+        username: true,
+        email: true,
+
+        avatar: true,
+        bio: true,
+
+        role: true,
+
+        isVerified: true,
+
+        createdAt: true,
+        updatedAt: true,
+
+        lastLoginAt: true,
+      },
+    });
   }
 }
 ---
+users.type.ts
+//////////////////////////////////////////////////
+// UPDATE PROFILE
+//////////////////////////////////////////////////
+
+export interface UpdateProfileInput {
+  username?: string;
+  bio?: string;
+}
+---
+routes/
 file.ts
 import { Router } from "express";
 import { upload } from "../lib/multer.js";
@@ -2627,6 +3619,72 @@ router.post(
   authMiddleware,
   upload.single("file"),
   asyncHandler(uploadVersionFile)
+);
+
+export default router;
+---
+comment.ts
+import { Router } from "express";
+
+import { authMiddleware } from "../middleware/auth.middleware";
+
+import {
+  getComments,
+  createComment,
+  updateComment,
+  deleteComment,
+  createReply,
+} from "../controllers/comment.controller";
+
+const router = Router();
+
+//////////////////////////////////////////////////
+// GET COMMENTS
+//////////////////////////////////////////////////
+
+router.get(
+  "/mod/:modId",
+  getComments
+);
+
+//////////////////////////////////////////////////
+// CREATE COMMENT
+//////////////////////////////////////////////////
+
+router.post(
+  "/mod/:modId",
+  authMiddleware,
+  createComment
+);
+
+//////////////////////////////////////////////////
+// EDIT COMMENT
+//////////////////////////////////////////////////
+
+router.patch(
+  "/:id",
+  authMiddleware,
+  updateComment
+);
+
+//////////////////////////////////////////////////
+// DELATE COMMENT
+//////////////////////////////////////////////////
+
+router.delete(
+  "/:id",
+  authMiddleware,
+  deleteComment
+);
+
+//////////////////////////////////////////////////
+// 
+//////////////////////////////////////////////////
+
+router.post(
+  "/:id/replies",
+  authMiddleware,
+  createReply
 );
 
 export default router;
@@ -3113,7 +4171,288 @@ export const fileSchema = z.object({
   versionId: z.number(),
 });
 ---
-services/
+services/comment.service.ts
+import { prisma } from "../lib/prisma";
+
+import {
+  BadRequestError,
+  NotFoundError,
+  ForbiddenError,
+} from "../utils/errors";
+
+import { sanitizeText } from "../utils/sanitize";
+
+export class CommentService {
+  //////////////////////////////////////////////////
+  // GET COMMENTS
+  //////////////////////////////////////////////////
+
+  static async getComments(
+    modId: number
+  ) {
+    const comments =
+      await prisma.comment.findMany({
+        where: {
+          modId,
+          deleted: false,
+          parentId: null,
+        },
+
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+              avatar: true,
+            },
+          },
+
+          replies: {
+            where: {
+              deleted: false,
+            },
+
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  username: true,
+                  avatar: true,
+                },
+              },
+            },
+
+            orderBy: {
+              createdAt: "asc",
+            },
+          },
+        },
+
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+
+    return comments;
+  }
+
+  //////////////////////////////////////////////////
+  // CREATE COMMENT
+  //////////////////////////////////////////////////
+
+  static async createComment(
+    modId: number,
+    userId: number,
+    content: string
+  ) {
+    if (!content?.trim()) {
+      throw new BadRequestError(
+        "Comentario vacío"
+      );
+    }
+
+    const mod =
+      await prisma.mod.findUnique({
+        where: {
+          id: modId,
+        },
+      });
+
+    if (!mod) {
+      throw new NotFoundError(
+        "Mod no encontrado"
+      );
+    }
+
+    const comment =
+      await prisma.comment.create({
+        data: {
+          modId,
+          userId,
+
+          content:
+            sanitizeText(
+              content.trim()
+            ),
+        },
+
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+              avatar: true,
+            },
+          },
+        },
+      });
+
+    return comment;
+  }
+
+  //////////////////////////////////////////////////
+  // EDIT COMMNET
+  //////////////////////////////////////////////////
+
+  static async updateComment(
+    commentId: number,
+    userId: number,
+    content: string
+  ) {
+    const comment =
+      await prisma.comment.findUnique({
+        where: {
+          id: commentId,
+        },
+      });
+
+    if (
+      !comment ||
+      comment.deleted
+    ) {
+      throw new NotFoundError(
+        "Comentario no encontrado"
+      );
+    }
+
+    if (
+      comment.userId !== userId
+    ) {
+      throw new ForbiddenError(
+        "No autorizado"
+      );
+    }
+
+    if (!content?.trim()) {
+      throw new BadRequestError(
+        "Comentario vacío"
+      );
+    }
+
+    return prisma.comment.update({
+      where: {
+        id: commentId,
+      },
+
+      data: {
+        content:
+          sanitizeText(
+            content.trim()
+          ),
+      },
+    });
+  }
+
+  //////////////////////////////////////////////////
+  // DELATE COMMENT
+  //////////////////////////////////////////////////
+
+  static async deleteComment(
+    commentId: number,
+    userId: number
+  ) {
+    const comment =
+      await prisma.comment.findUnique({
+        where: {
+          id: commentId,
+        },
+      });
+
+    if (
+      !comment ||
+      comment.deleted
+    ) {
+      throw new NotFoundError(
+        "Comentario no encontrado"
+      );
+    }
+
+    if (
+      comment.userId !== userId
+    ) {
+      throw new ForbiddenError(
+        "No autorizado"
+      );
+    }
+
+    await prisma.comment.update({
+      where: {
+        id: commentId,
+      },
+
+      data: {
+        deleted: true,
+      },
+    });
+
+    return {
+      success: true,
+    };
+  }
+
+    //////////////////////////////////////////////////
+    // CREATE REPLY
+    //////////////////////////////////////////////////
+
+  static async createReply(
+    parentId: number,
+    userId: number,
+    content: string
+  ) {
+    const parent =
+      await prisma.comment.findUnique({
+        where: {
+          id: parentId,
+        },
+      });
+
+    if (!parent) {
+      throw new NotFoundError(
+        "Comentario no encontrado"
+      );
+    }
+
+    if (
+      parent.parentId !== null
+    ) {
+      throw new BadRequestError(
+        "Solo un nivel de respuestas permitido"
+      );
+    }
+
+    if (!content?.trim()) {
+      throw new BadRequestError(
+        "Comentario vacío"
+      );
+    }
+
+    return prisma.comment.create({
+      data: {
+        modId: parent.modId,
+
+        userId,
+
+        parentId,
+
+        content:
+          sanitizeText(
+            content.trim()
+          ),
+      },
+
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            avatar: true,
+          },
+        },
+      },
+    });
+  }
+}
+---
 favorite.service.ts
 import { prisma } from "../lib/prisma";
 

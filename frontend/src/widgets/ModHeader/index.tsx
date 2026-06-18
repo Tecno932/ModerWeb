@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/features/auth/context/AuthContext";
 
 import LikeButton from "@/features/interactions/components/LikeButton";
 import FavoriteButton from "@/features/interactions/components/FavoriteButton";

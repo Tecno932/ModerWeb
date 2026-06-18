@@ -12,6 +12,13 @@ import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
 
 //////////////////////////////////////////////////
+// USER PAGES
+//////////////////////////////////////////////////
+
+import ProfilePage from "@/pages/ProfilePage/ProfilePage";
+import EditProfilePage from "@/pages/EditProfilePage/EditProfilePage";
+
+//////////////////////////////////////////////////
 // DASHBOARD LAYOUT
 //////////////////////////////////////////////////
 
@@ -129,6 +136,19 @@ export const router =
           element: <DashboardLayout />,
 
           children: [
+            //////////////////////////////////////////////////
+            // USER PAGE
+            //////////////////////////////////////////////////
+
+            {
+              path: "/users/:username",
+              element: <ProfilePage />,
+            },
+
+            {
+              path: "/profile/edit",
+              element: <EditProfilePage />,
+            },
             //////////////////////////////////////////////////
             // PROJECTS PAGE
             //////////////////////////////////////////////////

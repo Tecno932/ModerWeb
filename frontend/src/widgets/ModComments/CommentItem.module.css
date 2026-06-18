@@ -1,0 +1,88 @@
+.comment {
+  padding: 18px;
+
+  border: 1px solid #242424;
+  border-radius: 12px;
+
+  background: #111;
+
+  margin-bottom: 16px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  margin-bottom: 10px;
+}
+
+.username {
+  font-weight: 700;
+}
+
+.date {
+  color: #8b8b8b;
+  font-size: 0.85rem;
+}
+
+.content {
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.actionButton {
+  margin-left: 8px;
+}
+
+.deleteButton {
+  margin-left: 8px;
+  color: #ef4444;
+}
+
+.editBox {
+  margin-top: 1rem;
+}
+
+.editTextarea {
+  width: 100%;
+  min-height: 100px;
+
+  padding: 12px;
+
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.editActions {
+  display: flex;
+  gap: 10px;
+
+  margin-top: 10px;
+}
+
+.replyButton {
+  margin-top: 12px;
+
+  border: none;
+  background: transparent;
+
+  cursor: pointer;
+
+  font-weight: 600;
+}
+
+.replies {
+  margin-top: 16px;
+  margin-left: 40px;
+  border-left: 2px solid #222;
+  padding-left: 16px;
+}
+
+.reply {
+  padding-top: 12px;
+}
+
+.reply + .reply {
+  margin-top: 12px;
+}

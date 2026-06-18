@@ -18,9 +18,17 @@ export default function LoginPage() {
         password: e.target.password.value,
       });
 
-      localStorage.setItem("token", data.token);
+    localStorage.setItem(
+      "token",
+      data.token
+    );
 
-      navigate("/");
+    localStorage.setItem(
+      "user",
+      JSON.stringify(data.user)
+    );
+
+    navigate("/");
     } catch (err: any) {
       setError(err?.message || "Credenciales incorrectas");
     }

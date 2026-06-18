@@ -130,7 +130,7 @@ export default function DashboardSidebar() {
           className={styles.profileCard}
           onClick={() =>
             navigate(
-              `/user/${user.username}`
+              `/users/${user.username}`
             )
           }
         >

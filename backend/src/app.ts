@@ -11,9 +11,9 @@ import versionRoutes from "./routes/version";
 import fileRoutes from "./routes/file";
 import downloadRoutes from "./routes/download";
 import { rateLimit } from "./middleware/rateLimit.middleware";
+import usersRoutes from "./modules/users/users.routes";
 
-import { register, login } from "./routes/auth";
-import { authMiddleware } from "./middleware/auth.middleware";
+import authRoutes from "./modules/auth/auth";
 import { errorHandler } from "./middleware/errorHandler.middleware";
 
 import interactionsRoutes from "./modules/interactions/interactions.routes";
@@ -31,8 +31,10 @@ app.use(cors({
 }));
 
 // AUTH
-app.post("/auth/register", register);
-app.post("/auth/login", login);
+app.use ("/auth", authRoutes );
+
+// USER
+app.use("/users", usersRoutes );
 
 // MODS
 app.use("/mods", modRoutes);

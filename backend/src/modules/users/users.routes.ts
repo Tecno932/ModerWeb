@@ -1,0 +1,54 @@
+import { Router } from "express";
+
+import { authMiddleware }
+  from "../../middleware/auth.middleware";
+
+import {
+  getCurrentProfile,
+  updateProfile,
+  getPublicProfile,
+  updateAvatar,
+} from "./users.controller";
+
+const router = Router();
+
+//////////////////////////////////////////////////
+// CURRENT USER
+//////////////////////////////////////////////////
+
+router.get(
+  "/me",
+  authMiddleware,
+  getCurrentProfile
+);
+
+//////////////////////////////////////////////////
+// UPDATE PROFILE
+//////////////////////////////////////////////////
+
+router.patch(
+  "/me",
+  authMiddleware,
+  updateProfile
+);
+
+//////////////////////////////////////////////////
+// PUBLIC PROFILE
+//////////////////////////////////////////////////
+
+router.get(
+  "/:username",
+  getPublicProfile
+);
+
+//////////////////////////////////////////////////
+// EDIT PROFILE
+//////////////////////////////////////////////////
+
+router.patch(
+  "/avatar",
+  authMiddleware,
+  updateAvatar
+);
+
+export default router;

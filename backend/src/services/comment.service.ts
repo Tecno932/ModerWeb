@@ -120,153 +120,161 @@ export class CommentService {
   // EDIT COMMNET
   //////////////////////////////////////////////////
 
-static async updateComment(
-  commentId: number,
-  userId: number,
-  content: string
-) {
-  const comment =
-    await prisma.comment.findUnique({
+  static async updateComment(
+    commentId: number,
+    userId: number,
+    content: string
+  ) {
+    const comment =
+      await prisma.comment.findUnique({
+        where: {
+          id: commentId,
+        },
+      });
+
+    if (
+      !comment ||
+      comment.deleted
+    ) {
+      throw new NotFoundError(
+        "Comentario no encontrado"
+      );
+    }
+
+    if (
+      comment.userId !== userId
+    ) {
+      throw new ForbiddenError(
+        "No autorizado"
+      );
+    }
+
+    if (!content?.trim()) {
+      throw new BadRequestError(
+        "Comentario vacío"
+      );
+    }
+
+    return prisma.comment.update({
       where: {
         id: commentId,
       },
+
+      data: {
+        content:
+          sanitizeText(
+            content.trim()
+          ),
+      },
     });
-
-  if (
-    !comment ||
-    comment.deleted
-  ) {
-    throw new NotFoundError(
-      "Comentario no encontrado"
-    );
   }
-
-  if (
-    comment.userId !== userId
-  ) {
-    throw new ForbiddenError(
-      "No autorizado"
-    );
-  }
-
-  return prisma.comment.update({
-    where: {
-      id: commentId,
-    },
-
-    data: {
-      content:
-        sanitizeText(
-          content.trim()
-        ),
-    },
-  });
-}
 
   //////////////////////////////////////////////////
   // DELATE COMMENT
   //////////////////////////////////////////////////
 
-static async deleteComment(
-  commentId: number,
-  userId: number
-) {
-  const comment =
-    await prisma.comment.findUnique({
+  static async deleteComment(
+    commentId: number,
+    userId: number
+  ) {
+    const comment =
+      await prisma.comment.findUnique({
+        where: {
+          id: commentId,
+        },
+      });
+
+    if (
+      !comment ||
+      comment.deleted
+    ) {
+      throw new NotFoundError(
+        "Comentario no encontrado"
+      );
+    }
+
+    if (
+      comment.userId !== userId
+    ) {
+      throw new ForbiddenError(
+        "No autorizado"
+      );
+    }
+
+    await prisma.comment.update({
       where: {
         id: commentId,
       },
+
+      data: {
+        deleted: true,
+      },
     });
 
-  if (
-    !comment ||
-    comment.deleted
-  ) {
-    throw new NotFoundError(
-      "Comentario no encontrado"
-    );
+    return {
+      success: true,
+    };
   }
-
-  if (
-    comment.userId !== userId
-  ) {
-    throw new ForbiddenError(
-      "No autorizado"
-    );
-  }
-
-  await prisma.comment.update({
-    where: {
-      id: commentId,
-    },
-
-    data: {
-      deleted: true,
-    },
-  });
-
-  return {
-    success: true,
-  };
-}
 
     //////////////////////////////////////////////////
     // CREATE REPLY
     //////////////////////////////////////////////////
 
-//////////////////////////////////////////////////
-// CREATE REPLY
-//////////////////////////////////////////////////
-
-static async createReply(
-  parentId: number,
-  userId: number,
-  content: string
-) {
-  const parent =
-    await prisma.comment.findUnique({
-      where: {
-        id: parentId,
-      },
-    });
-
-  if (!parent) {
-    throw new NotFoundError(
-      "Comentario no encontrado"
-    );
-  }
-
-  if (
-    parent.parentId !== null
+  static async createReply(
+    parentId: number,
+    userId: number,
+    content: string
   ) {
-    throw new BadRequestError(
-      "Solo un nivel de respuestas permitido"
-    );
-  }
+    const parent =
+      await prisma.comment.findUnique({
+        where: {
+          id: parentId,
+        },
+      });
 
-  return prisma.comment.create({
-    data: {
-      modId: parent.modId,
+    if (!parent) {
+      throw new NotFoundError(
+        "Comentario no encontrado"
+      );
+    }
 
-      userId,
+    if (
+      parent.parentId !== null
+    ) {
+      throw new BadRequestError(
+        "Solo un nivel de respuestas permitido"
+      );
+    }
 
-      parentId,
+    if (!content?.trim()) {
+      throw new BadRequestError(
+        "Comentario vacío"
+      );
+    }
 
-      content:
-        sanitizeText(
-          content.trim()
-        ),
-    },
+    return prisma.comment.create({
+      data: {
+        modId: parent.modId,
 
-    include: {
-      user: {
-        select: {
-          id: true,
-          username: true,
-          avatar: true,
+        userId,
+
+        parentId,
+
+        content:
+          sanitizeText(
+            content.trim()
+          ),
+      },
+
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            avatar: true,
+          },
         },
       },
-    },
-  });
-}
+    });
+  }
 }
