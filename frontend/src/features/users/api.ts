@@ -4,8 +4,21 @@ import { API_URL }
 export async function getProfile(
   username: string
 ) {
+  const token =
+    localStorage.getItem(
+      "token"
+    );
+
   const res = await fetch(
-    `${API_URL}/users/${username}`
+    `${API_URL}/users/${username}`,
+    {
+      headers: token
+        ? {
+            Authorization:
+              `Bearer ${token}`,
+          }
+        : {},
+    }
   );
 
   if (!res.ok) {
@@ -50,7 +63,16 @@ export async function updateProfile(
   token: string,
   data: {
     username?: string;
+
+    displayName?: string;
+
     bio?: string;
+
+    avatarUrl?: string;
+
+    bannerUrl?: string;
+
+    accentColor?: string;
   }
 ) {
   const res = await fetch(

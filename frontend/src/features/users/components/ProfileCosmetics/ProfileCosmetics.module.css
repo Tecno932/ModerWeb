@@ -1,0 +1,38 @@
+.container {
+  margin-top: 2rem;
+}
+
+.grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      auto-fill,
+      minmax(
+        180px,
+        1fr
+      )
+    );
+
+  gap: 1rem;
+}
+
+.card {
+  border: 1px solid #333;
+
+  border-radius: 12px;
+
+  padding: 1rem;
+
+  text-align: center;
+}
+
+.card img {
+  width: 100%;
+
+  height: 120px;
+
+  object-fit: cover;
+
+  border-radius: 8px;
+}

@@ -4,14 +4,16 @@ import { useQuery }
 import { getMe }
   from "../api";
 
-export function useMe(
-  token: string | null
-) {
+export function useMe() {
+  const token =
+    localStorage.getItem(
+      "token"
+    );
+
   return useQuery({
     queryKey: ["me"],
 
-    queryFn: () =>
-      getMe(token!),
+    queryFn: getMe,
 
     enabled: !!token,
   });

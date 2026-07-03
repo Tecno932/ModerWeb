@@ -1,0 +1,118 @@
+.profileLayout {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* FOLLOW BUTTON */
+.followWrap {
+  display: flex;
+  justify-content: center;
+}
+
+/* TABS estilo app moderna (sin cajas raras) */
+.tabs {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.tab {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  opacity: 0.6;
+  padding: 0.25rem 0.5rem;
+  transition: 0.2s ease;
+  color: inherit;
+}
+
+.tab:hover {
+  opacity: 1;
+}
+
+.tab:focus {
+  outline: none;
+}
+
+.profileButton {
+  height: 26px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+
+  gap: .45rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.08);
+
+  background: rgba(255,255,255,.05);
+  color: inherit;
+  cursor: pointer;
+
+  font-size: .9rem;
+  font-weight: 600;
+  transition: .2s;
+}
+
+.profileButton:hover {
+  background: rgba(255,255,255,.09);
+}
+
+/* mobile behavior: horizontal but clean */
+@media (max-width: 768px) {
+  .layout{
+      display:flex;
+      flex-direction:column;
+  }
+
+  .profileButton {
+    height: 26px;
+    padding: 0 6px;
+    font-size: .8rem;
+    font-weight: 600;
+    transition: .2s;
+  }
+
+  .tabs {
+    justify-content: flex-start;
+    overflow-x: auto;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .tab {
+    white-space: nowrap;
+  }
+
+  /* remove ugly scrollbar */
+  .tabs::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  .profileLayout{
+      display:grid;
+      grid-template-columns:540px minmax(0,1fr);
+      gap:2rem;
+      align-items:start;
+  }
+
+  .sidebar{
+      display:flex;
+      flex-direction:column;
+      gap:1.5rem;
+  }
+
+  .content{
+      min-width:0;
+      border-left: 1px solid rgba(255,255,255,0.06);
+      border-right: 1px solid rgba(255,255,255,0.06);
+  }
+}

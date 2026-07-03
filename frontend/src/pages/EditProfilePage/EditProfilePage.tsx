@@ -1,131 +1,109 @@
+import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 
-import { useNavigate } from "react-router-dom";
+import Container from "@/shared/ui/container/Container";
 
-import { useAuth }
-  from "@/features/auth/context/AuthContext";
+import { useAuth } from "@/features/auth/context/AuthContext";
+import { useUpdateProfile } from "@/features/users/hooks/useUpdateProfile";
+import { useMyInventory } from "@/features/inventory/hooks/useMyInventory";
 
-import { useUpdateProfile }
-  from "@/features/users/hooks/useUpdateProfile";
+import EditProfileHeader from "@/features/users/components/EditProfileForm/EditProfileForm";
+import SocialsManager from "@/features/socials/components/SocialsManager/SocialsManager";
+
+import InventoryGrid from "@/features/inventory/components/InventoryGrid";
+
+import styles from "./EditProfilePage.module.css";
 
 export default function EditProfilePage() {
-  const navigate =
-    useNavigate();
+  const navigate = useNavigate();
 
-  const {
-    user,
-    loading,
-  } = useAuth();
+  const { user, loading } = useAuth();
+  const token = localStorage.getItem("token");
 
-  const token =
-    localStorage.getItem(
-      "token"
-    );
+  const updateProfile = useUpdateProfile(token ?? "");
+  const inventory = useMyInventory();
 
-  const updateProfile =
-    useUpdateProfile(
-      token ?? ""
-    );
-
-  const [username, setUsername] =
-    useState("");
-
-  const [bio, setBio] =
-    useState("");
-
-  //////////////////////////////////////////////////
-  // LOAD USER
-  //////////////////////////////////////////////////
+  const [form, setForm] = useState({
+    username: "",
+    displayName: "",
+    bio: "",
+    avatarUrl: "",
+    bannerUrl: "",
+    accentColor: "",
+  });
 
   useEffect(() => {
     if (!user) return;
 
-    setUsername(
-      user.username
-    );
-
-    setBio(
-      user.bio ?? ""
-    );
+    setForm({
+      username: user.username,
+      displayName: user.profile?.displayName ?? "",
+      bio: user.profile?.bio ?? "",
+      avatarUrl: user.profile?.avatarUrl ?? "",
+      bannerUrl: user.profile?.bannerUrl ?? "",
+      accentColor: user.profile?.accentColor ?? "",
+    });
   }, [user]);
 
-  //////////////////////////////////////////////////
-  // SUBMIT
-  //////////////////////////////////////////////////
-
-  async function handleSubmit(
-    e: React.FormEvent
-  ) {
-    e.preventDefault();
-
-    try {
-      await updateProfile.mutateAsync({
-        username,
-        bio,
-      });
-
-      navigate(
-        `/users/${username}`
-      );
-    } catch (error) {
-      console.error(error);
-    }
-  }
-
-  //////////////////////////////////////////////////
-  // LOADING
-  //////////////////////////////////////////////////
-
   if (loading) {
-    return (
-      <div>
-        Cargando...
-      </div>
-    );
+    return <Container>Cargando...</Container>;
   }
 
-  //////////////////////////////////////////////////
-  // RENDER
-  //////////////////////////////////////////////////
+  if (!user) {
+    return <Container>No autorizado</Container>;
+  }
+
+  async function handleSubmit(data: {
+    username: string;
+    displayName: string;
+    bio: string;
+    avatarUrl: string;
+    bannerUrl: string;
+    accentColor: string;
+  }) {
+    await updateProfile.mutateAsync(data);
+    navigate(`/users/${data.username}`);
+  }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-    >
-      <h1>
-        Edit Profile
-      </h1>
+    <Container>
+      <div className={styles.layout}>
 
-      <input
-        value={username}
-        onChange={(e) =>
-          setUsername(
-            e.target.value
-          )
-        }
-        placeholder="Username"
-      />
+        {/* SIDEBAR = EDICIÓN */}
+        <aside className={styles.sidebar}>
 
-      <textarea
-        value={bio}
-        onChange={(e) =>
-          setBio(
-            e.target.value
-          )
-        }
-        placeholder="Biography"
-      />
+          <EditProfileHeader
+              form={form}
+              setForm={setForm}
+              loading={updateProfile.isPending}
+              onSubmit={handleSubmit}
+          />
 
-      <button
-        disabled={
-          updateProfile.isPending
-        }
-        type="submit"
-      >
-        {updateProfile.isPending
-          ? "Saving..."
-          : "Save Changes"}
-      </button>
-    </form>
+          <SocialsManager token={token ?? ""} />
+
+        </aside>
+
+        {/* CONTENT = INVENTARIO */}
+        <main className={styles.content}>
+
+          <div className={styles.section}>
+            <h2>Cosméticos</h2>
+            <p className={styles.description}>
+              Equipá marcos, fondos, insignias y otros elementos visuales de tu perfil.
+            </p>
+          </div>
+
+          {inventory.isLoading ? (
+            <p>Cargando inventario...</p>
+          ) : inventory.error ? (
+            <p>Error cargando el inventario.</p>
+          ) : (
+            <InventoryGrid items={inventory.data ?? []} />
+          )}
+
+        </main>
+
+      </div>
+    </Container>
   );
 }

@@ -1,0 +1,45 @@
+.links {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+
+  margin-top: 0.75rem;
+}
+
+/* cada icono = solo clickable glyph */
+.link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 30px;
+  height: 30px;
+
+  border-radius: 6px;
+
+  text-decoration: none;
+
+  font-size: 1rem;
+
+  opacity: 0.7;
+
+  transition: 0.15s ease;
+}
+
+.link:hover {
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+/* mobile más compacto */
+@media (max-width: 768px) {
+  .links {
+    gap: 0.6rem;
+  }
+
+  .link {
+    width: 28px;
+    height: 28px;
+    font-size: 0.95rem;
+  }
+}

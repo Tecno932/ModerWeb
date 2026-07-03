@@ -26,8 +26,25 @@ export class UsersService {
           username: true,
           email: true,
 
-          avatar: true,
-          bio: true,
+        profile: {
+          select: {
+            displayName: true,
+
+            avatarUrl: true,
+            bannerUrl: true,
+
+            bio: true,
+
+            accentColor: true,
+
+            socials: true,
+            equippedCosmetics: {
+              include: {
+                cosmetic: true,
+              },
+            }
+          },
+        },
 
           role: true,
 
@@ -147,42 +164,62 @@ export class UsersService {
       );
     }
 
-    //////////////////////////////////////////////////
-    // UPDATE
-    //////////////////////////////////////////////////
-
-    const updatedUser =
+    if (username) {
       await prisma.user.update({
         where: {
           id: userId,
         },
 
         data: {
-          username:
-            username ??
-            undefined,
+          username,
+        },
+      });
+    }
 
-          bio:
-            bio ??
-            undefined,
+    //////////////////////////////////////////////////
+    // UPDATE
+    //////////////////////////////////////////////////
+
+    const updatedUser =
+      await prisma.userProfile.upsert({
+        where: {
+          userId,
         },
 
-        select: {
-          id: true,
-          username: true,
-          email: true,
+        create: {
+          userId,
 
-          avatar: true,
-          bio: true,
+          displayName:
+            data.displayName,
 
-          role: true,
+          bio:
+            data.bio,
 
-          isVerified: true,
+          avatarUrl:
+            data.avatarUrl,
 
-          createdAt: true,
-          updatedAt: true,
+          bannerUrl:
+            data.bannerUrl,
 
-          lastLoginAt: true,
+          accentColor:
+            data.accentColor,
+        },
+
+        update: {
+          displayName:
+            data.displayName,
+
+          bio:
+            data.bio,
+
+          avatarUrl:
+            data.avatarUrl,
+
+          bannerUrl:
+            data.bannerUrl,
+
+          accentColor:
+            data.accentColor,
         },
       });
 
@@ -194,7 +231,8 @@ export class UsersService {
   //////////////////////////////////////////////////
 
   static async getPublicProfile(
-    username: string
+    username: string,
+    viewerId?: number
   ) {
     const user =
       await prisma.user.findUnique({
@@ -207,9 +245,26 @@ export class UsersService {
 
           username: true,
 
-          avatar: true,
+        profile: {
+          select: {
+            displayName: true,
 
-          bio: true,
+            avatarUrl: true,
+
+            bannerUrl: true,
+
+            bio: true,
+
+            accentColor: true,
+
+            socials: true,
+            equippedCosmetics: {
+              include: {
+                cosmetic: true,
+              },
+            }
+          },
+        },
 
           createdAt: true,
 
@@ -230,19 +285,57 @@ export class UsersService {
       );
     }
 
+    let isFollowing = false;
+
+    if (
+      viewerId &&
+      viewerId !== user.id
+    ) {
+      const follow =
+        await prisma.follow.findUnique({
+          where: {
+            followerId_followingId: {
+              followerId: viewerId,
+              followingId: user.id,
+            },
+          },
+        });
+
+      isFollowing = !!follow;
+    }
+
     return {
       id: user.id,
 
-      username:
-        user.username,
+      username: user.username,
 
-      avatar:
-        user.avatar,
+      profile: {
+        displayName:
+          user.profile?.displayName ?? null,
 
-      bio: user.bio,
+        avatarUrl:
+          user.profile?.avatarUrl ?? null,
+
+        bannerUrl:
+          user.profile?.bannerUrl ?? null,
+
+        bio:
+          user.profile?.bio ?? null,
+
+        accentColor:
+          user.profile?.accentColor ?? null,
+
+        socials:
+          user.profile?.socials ?? [],
+
+        equippedCosmetics:
+          user.profile?.equippedCosmetics ?? [],
+      },
 
       createdAt:
         user.createdAt,
+
+      isFollowing,
 
       stats: {
         mods:
@@ -258,61 +351,5 @@ export class UsersService {
           user._count.following,
       },
     };
-  }
-  
-  //////////////////////////////////////////////////
-  // UPDATE AVATAR
-  //////////////////////////////////////////////////
-
-  static async updateAvatar(
-    userId: number,
-    avatar: string
-  ) {
-    if (!avatar?.trim()) {
-      throw new BadRequestError(
-        "Avatar requerido"
-      );
-    }
-
-    const user =
-      await prisma.user.findUnique({
-        where: {
-          id: userId,
-        },
-      });
-
-    if (!user) {
-      throw new NotFoundError(
-        "Usuario no encontrado"
-      );
-    }
-
-    return prisma.user.update({
-      where: {
-        id: userId,
-      },
-
-      data: {
-        avatar,
-      },
-
-      select: {
-        id: true,
-        username: true,
-        email: true,
-
-        avatar: true,
-        bio: true,
-
-        role: true,
-
-        isVerified: true,
-
-        createdAt: true,
-        updatedAt: true,
-
-        lastLoginAt: true,
-      },
-    });
   }
 }

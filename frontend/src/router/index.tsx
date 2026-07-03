@@ -17,6 +17,7 @@ import RegisterPage from "@/pages/RegisterPage";
 
 import ProfilePage from "@/pages/ProfilePage/ProfilePage";
 import EditProfilePage from "@/pages/EditProfilePage/EditProfilePage";
+import InventoryPage from "@/pages/InventoryPage/InventoryPage";
 
 //////////////////////////////////////////////////
 // DASHBOARD LAYOUT
@@ -149,6 +150,12 @@ export const router =
               path: "/profile/edit",
               element: <EditProfilePage />,
             },
+
+            {
+              path: "/profile/inventory",
+              element: <InventoryPage />,
+            },
+
             //////////////////////////////////////////////////
             // PROJECTS PAGE
             //////////////////////////////////////////////////

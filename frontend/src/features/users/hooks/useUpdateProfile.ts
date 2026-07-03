@@ -16,7 +16,16 @@ export function useUpdateProfile(
     mutationFn: (
       data: {
         username?: string;
+
+        displayName?: string;
+
         bio?: string;
+
+        avatarUrl?: string;
+
+        bannerUrl?: string;
+
+        accentColor?: string;
       }
     ) =>
       updateProfile(

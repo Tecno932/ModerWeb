@@ -94,14 +94,16 @@ enum CosmeticRarity {
 }
 
 enum SocialPlatform {
-  INSTAGRAM
-  YOUTUBE
+  GITHUB
   DISCORD
-  X
-  WEBSITE
-  TIKTOK
+  YOUTUBE
+  INSTAGRAM
+  PATREON
+  KOFI
   TWITCH
-  BLUESKY
+  X
+  TIKTOK
+  WEBSITE
 }
 
 //////////////////////
@@ -229,7 +231,6 @@ model TeamInvite {
 
   team Team @relation(fields: [teamId], references: [id])
 }
-
 
 //////////////////////
 // User Role
@@ -511,6 +512,26 @@ model Follow {
 }
 
 //////////////////////
+// LIKN SOCIAL
+//////////////////////
+
+model ProfileSocial {
+  id Int @id @default(autoincrement())
+
+  profileId Int
+
+  platform SocialPlatform
+
+  url String
+
+  profile UserProfile @relation(fields: [profileId], references: [id])
+
+  @@unique([profileId, platform])
+
+  @@index([profileId])
+}
+
+//////////////////////
 // USER INVENTORY
 //////////////////////
 
@@ -533,26 +554,6 @@ model UserInventory {
 
   @@index([userId])
   @@index([itemId])
-}
-
-//////////////////////
-// LIKN SOCIAL
-//////////////////////
-
-model ProfileSocial {
-  id Int @id @default(autoincrement())
-
-  profileId Int
-
-  platform SocialPlatform
-
-  url String
-
-  profile UserProfile @relation(fields: [profileId], references: [id])
-
-  @@unique([profileId, platform])
-
-  @@index([profileId])
 }
 
 //////////////////////

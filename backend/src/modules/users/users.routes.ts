@@ -1,13 +1,12 @@
 import { Router } from "express";
 
-import { authMiddleware }
-  from "../../middleware/auth.middleware";
+import { authMiddleware } from "../../middleware/auth.middleware";
+import { optionalAuthMiddleware } from "../../middleware/optionalAuth.middleware";
 
 import {
   getCurrentProfile,
   updateProfile,
   getPublicProfile,
-  updateAvatar,
 } from "./users.controller";
 
 const router = Router();
@@ -38,17 +37,8 @@ router.patch(
 
 router.get(
   "/:username",
+  optionalAuthMiddleware,
   getPublicProfile
-);
-
-//////////////////////////////////////////////////
-// EDIT PROFILE
-//////////////////////////////////////////////////
-
-router.patch(
-  "/avatar",
-  authMiddleware,
-  updateAvatar
 );
 
 export default router;

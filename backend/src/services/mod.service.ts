@@ -339,7 +339,11 @@ export class ModService {
             select: {
               id: true,
               username: true,
-              avatar: true,
+              profile: {
+                select: {
+                  avatarUrl: true,
+                },
+              },
             },
           },
         },
@@ -537,7 +541,11 @@ sort=${sort}
               select: {
                 id: true,
                 username: true,
-                avatar: true,
+                profile: {
+                  select: {
+                    avatarUrl: true,
+                  },
+                },
               },
             },
           },
@@ -614,7 +622,11 @@ sort=${sort}
             select: {
               id: true,
               username: true,
-              avatar: true,
+              profile: {
+                select: {
+                  avatarUrl: true,
+                },
+              },
             },
           },
 

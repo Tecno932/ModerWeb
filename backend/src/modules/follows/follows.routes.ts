@@ -1,0 +1,53 @@
+import { Router } from "express";
+
+import {
+  followUser,
+  unfollowUser,
+  getFollowers,
+  getFollowing,
+} from "./follows.controller";
+
+import { authMiddleware }
+  from "../../middleware/auth.middleware";
+
+const router = Router();
+
+//////////////////////////////////////////////////
+// FOLLOW
+//////////////////////////////////////////////////
+
+router.post(
+  "/:username",
+  authMiddleware,
+  followUser
+);
+
+//////////////////////////////////////////////////
+// UNFOLLOW
+//////////////////////////////////////////////////
+
+router.delete(
+  "/:username",
+  authMiddleware,
+  unfollowUser
+);
+
+//////////////////////////////////////////////////
+// FOLLOWERS
+//////////////////////////////////////////////////
+
+router.get(
+  "/:username/followers",
+  getFollowers
+);
+
+//////////////////////////////////////////////////
+// FOLLOWING
+//////////////////////////////////////////////////
+
+router.get(
+  "/:username/following",
+  getFollowing
+);
+
+export default router;

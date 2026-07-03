@@ -1,13 +1,16 @@
 import { prisma } from "../../lib/prisma";
-
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 
 import {
   BadRequestError,
   NotFoundError,
   UnauthorizedError,
 } from "../../utils/errors";
+
+import {
+  generateAccessToken,
+  generateRefreshToken,
+} from "./auth.tokens";
 
 import {
   RegisterInput,
@@ -33,9 +36,45 @@ export async function registerUser(
     );
   }
 
+  if (username.length < 3) {
+    throw new BadRequestError(
+      "El usuario debe tener al menos 3 caracteres"
+    );
+  }
+
+  if (username.length > 32) {
+    throw new BadRequestError(
+      "El usuario no puede superar los 32 caracteres"
+    );
+  }
+
+  const usernameRegex =
+    /^[a-zA-Z0-9_-]+$/;
+
+  if (!usernameRegex.test(username)) {
+    throw new BadRequestError(
+      "Username inválido"
+    );
+  }
+
+  const emailRegex =
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!emailRegex.test(email)) {
+    throw new BadRequestError(
+      "Email inválido"
+    );
+  }
+
   if (password.length < 8) {
     throw new BadRequestError(
       "La contraseña es muy corta"
+    );
+  }
+
+  if (password.length > 128) {
+    throw new BadRequestError(
+      "La contraseña es demasiado larga"
     );
   }
 
@@ -59,15 +98,30 @@ export async function registerUser(
     await bcrypt.hash(password, 10);
 
   const user =
-    await prisma.user.create({
-      data: {
-        username,
-        email,
-        password: hashed,
-      },
-    });
+    await prisma.$transaction(
+      async (tx) => {
+        const createdUser =
+          await tx.user.create({
+            data: {
+              username,
+              email,
+              password: hashed,
+            },
+          });
 
-  const { password: _, ...safeUser } = user;
+        await tx.userProfile.create({
+          data: {
+            userId:
+              createdUser.id,
+          },
+        });
+
+        return createdUser;
+      }
+    );
+
+  const { password: _, ...safeUser } =
+    user;
 
   return safeUser;
 }
@@ -98,8 +152,8 @@ export async function loginUser(
     });
 
   if (!user) {
-    throw new NotFoundError(
-      "Usuario no encontrado"
+    throw new UnauthorizedError(
+      "Credenciales inválidas"
     );
   }
 
@@ -111,7 +165,7 @@ export async function loginUser(
 
   if (!valid) {
     throw new UnauthorizedError(
-      "Contraseña incorrecta"
+      "Credenciales inválidas"
     );
   }
 
@@ -124,21 +178,67 @@ export async function loginUser(
     },
   });
 
-  const token = jwt.sign(
-    {
-      userId: user.id,
-    },
-    process.env.JWT_SECRET || "secret",
-    {
-      expiresIn: "7d",
-    }
-  );
+  const safeUser =
+    await prisma.user.findUnique({
+      where: {
+        id: user.id,
+      },
 
-  const { password: _, ...safeUser } = user;
+      select: {
+        id: true,
+
+        username: true,
+        email: true,
+
+        role: true,
+
+        isVerified: true,
+
+        createdAt: true,
+        updatedAt: true,
+
+        lastLoginAt: true,
+
+        profile: {
+          select: {
+            displayName: true,
+
+            avatarUrl: true,
+            bannerUrl: true,
+
+            bio: true,
+
+            accentColor: true,
+          },
+        },
+      },
+    });
+
+  const accessToken =
+    generateAccessToken(
+      user.id
+    );
+
+  const refreshToken =
+    generateRefreshToken();
+
+  await prisma.refreshToken.create({
+    data: {
+      token: refreshToken,
+      userId: user.id,
+
+      expiresAt: new Date(
+        Date.now() +
+        1000 * 60 * 60 * 24 * 30
+      ),
+    },
+});
 
   return {
     user: safeUser,
-    token,
+
+    accessToken,
+    refreshToken,
   };
 }
 
@@ -157,11 +257,9 @@ export async function getCurrentUser(
 
       select: {
         id: true,
+
         username: true,
         email: true,
-
-        avatar: true,
-        bio: true,
 
         role: true,
 
@@ -171,6 +269,19 @@ export async function getCurrentUser(
         updatedAt: true,
 
         lastLoginAt: true,
+
+        profile: {
+          select: {
+            displayName: true,
+
+            avatarUrl: true,
+            bannerUrl: true,
+
+            bio: true,
+
+            accentColor: true,
+          },
+        },
       },
     });
 
@@ -181,4 +292,102 @@ export async function getCurrentUser(
   }
 
   return user;
+}
+
+//////////////////////////////////////////////////
+// TOKEN
+//////////////////////////////////////////////////
+
+export async function refreshAccessToken(
+  refreshToken: string
+) {
+  if (!refreshToken) {
+    throw new BadRequestError(
+      "Refresh token requerido"
+    );
+  }
+
+  const storedToken =
+    await prisma.refreshToken.findUnique({
+      where: {
+        token: refreshToken,
+      },
+
+      include: {
+        user: true,
+      },
+    });
+
+  if (!storedToken) {
+    throw new UnauthorizedError(
+      "Refresh token inválido"
+    );
+  }
+
+  if (
+    storedToken.expiresAt <
+    new Date()
+  ) {
+    await prisma.refreshToken.delete({
+      where: {
+        id: storedToken.id,
+      },
+    });
+
+    throw new UnauthorizedError(
+      "Refresh token expirado"
+    );
+  }
+
+  const accessToken =
+    generateAccessToken(
+      storedToken.userId
+    );
+
+  return {
+    accessToken,
+  };
+}
+
+//////////////////////////////////////////////////
+// LOGOUT
+//////////////////////////////////////////////////
+
+export async function logoutUser(
+  refreshToken: string
+) {
+  if (!refreshToken) {
+    throw new BadRequestError(
+      "Refresh token requerido"
+    );
+  }
+
+  await prisma.refreshToken.deleteMany({
+    where: {
+      token: refreshToken,
+    },
+  });
+
+  return {
+    message: "Sesión cerrada",
+  };
+}
+
+//////////////////////////////////////////////////
+// LOGOUT ALL
+//////////////////////////////////////////////////
+
+export async function logoutAllSessions(
+  userId: number
+) {
+  await prisma.refreshToken.deleteMany({
+    where: {
+      userId,
+    },
+  });
+
+  return {
+    message:
+      "Todas las sesiones cerradas",
+  };
 }

@@ -5,6 +5,7 @@ import {
 
 import { useMe } from "../hooks/useMe";
 import type { AuthUser } from "../types";
+import { logout as logoutApi } from "../api";
 
 //////////////////////////////////////////////////
 // TYPES
@@ -44,17 +45,37 @@ export function AuthProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const token =
-    localStorage.getItem("token");
-
   const {
     data: user,
     isLoading,
-  } = useMe(token);
+  } = useMe();
 
-  function logout() {
+  async function logout() {
+    try {
+      const refreshToken =
+        localStorage.getItem(
+          "refreshToken"
+        );
+
+      if (refreshToken) {
+        await logoutApi(
+          refreshToken
+        );
+      }
+    } catch (err) {
+      console.error(err);
+    }
+
     localStorage.removeItem(
       "token"
+    );
+
+    localStorage.removeItem(
+      "refreshToken"
+    );
+
+    localStorage.removeItem(
+      "user"
     );
 
     window.location.href =

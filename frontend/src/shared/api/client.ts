@@ -1,4 +1,5 @@
 import { normalizeError } from "./error";
+import { refreshAccessToken, } from "@/features/auth/api";
 
 const API_URL =
   import.meta.env.VITE_API_URL ||
@@ -52,17 +53,75 @@ export async function apiFetch<T = any>(
   ////////////////////////////////////////////////////
 
   if (res.status === 401) {
+    const refreshToken =
+      localStorage.getItem(
+        "refreshToken"
+      );
+
+    if (refreshToken) {
+      try {
+        const result =
+          await refreshAccessToken(
+            refreshToken
+          );
+
+        localStorage.setItem(
+          "token",
+          result.accessToken
+        );
+
+        //////////////////////////////////////////////////
+        // REPEAT REQUEST
+        //////////////////////////////////////////////////
+
+        const retry =
+          await fetch(
+            `${API_URL}${endpoint}`,
+            {
+              ...options,
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+
+                Authorization:
+                  `Bearer ${result.accessToken}`,
+
+                ...options.headers,
+              },
+            }
+          );
+
+        const retryData =
+          await retry.json();
+
+        if (!retry.ok) {
+          throw new Error();
+        }
+
+        return retryData;
+      } catch {
+        console.log(
+          "Refresh expirado"
+        );
+      }
+    }
+
+    //////////////////////////////////////////////////
+    // LOGOUT
+    //////////////////////////////////////////////////
+
     localStorage.removeItem(
       "token"
     );
 
     localStorage.removeItem(
-      "user"
+      "refreshToken"
     );
 
-    //////////////////////////////////////////////////
-    // REDIRECT
-    //////////////////////////////////////////////////
+    localStorage.removeItem(
+      "user"
+    );
 
     if (
       window.location.pathname !==

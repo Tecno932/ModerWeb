@@ -1,0 +1,37 @@
+.button {
+  height: 28px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  font-size: .9rem;
+  font-weight: 600;
+  transition: .2s;
+}
+
+.follow {
+  background: #1d9bf0;
+  color: white;
+}
+
+.follow:hover {
+  background: #198cd8;
+}
+
+.following {
+  background: rgba(255,255,255,.08);
+  color: inherit;
+}
+
+.following:hover {
+  background: rgba(255,255,255,.12);
+}
+
+@media (max-width: 768px) {
+  .button {
+    height: 24px;
+    padding: 0 14px;
+    font-size: .9rem;
+    font-weight: 600;
+  }
+}

@@ -11,7 +11,8 @@
 # one found in a remote Prisma Postgres URL, does not contain any sensitive information.
 
 DATABASE_URL="postgresql://nahuel:3438@localhost:5432/mods_platform"
-JWT_SECRET="supersecret"
+JWT_ACCESS_SECRET="aff9e37be78f9590add7a2db7be58be18da7400e28d7ad3d72629d803003ca6d578e845858394e0683603a0ad834b2cc15ba4358e4961e4d65df0596156b7368"
+JWT_REFRESH_SECRET="06453c48ef9f58b3250b1c65143c4e262892d4e768fbcc671fabb0c8dfb5eefe08cb3bc2a707e402504ea955af9348e65f4c139dd968f82939535ade38dee0a4"
 
 # 🔥 NUEVO (CDN READY)
 CDN_URL="http://192.168.0.110:3000"
@@ -662,6 +663,12 @@ import { errorHandler } from "./middleware/errorHandler.middleware";
 
 import interactionsRoutes from "./modules/interactions/interactions.routes";
 import commentRoutes from "./routes/comment";
+import followsRoutes from "./modules/follows/follows.routes";
+import socialsRoutes from "./modules/socials/socials.routes";
+
+import cosmeticsRoutes from "./modules/cosmetics/cosmetics.routes";
+import inventoryRoutes from "./modules/inventory/inventory.routes";
+import equippedRoutes from "./modules/equipped/equipped.routes";
 
 const app = express();
 
@@ -699,6 +706,17 @@ app.use("/mods", interactionsRoutes);
 
 // 💬 Comments
 app.use("/comments", commentRoutes);
+
+// Follows
+app.use("/follows", followsRoutes);
+
+// Socials
+app.use("/socials", socialsRoutes);
+
+// Inventory
+app.use("/cosmetics", cosmeticsRoutes);
+app.use("/inventory", inventoryRoutes);
+app.use("/equipped", equippedRoutes);
 
 // HEALTH
 app.get("/", (_, res) => {
@@ -1952,10 +1970,16 @@ export function mapMod(
 ---
 middleware/
 auth.middleware.ts
-import { Request, Response, NextFunction } from "express";
+import {
+  Request,
+  Response,
+  NextFunction,
+} from "express";
+
 import jwt from "jsonwebtoken";
 
-export interface AuthRequest extends Request {
+export interface AuthRequest
+  extends Request {
   userId?: number;
 }
 
@@ -1964,48 +1988,91 @@ export function authMiddleware(
   res: Response,
   next: NextFunction
 ) {
-  const authHeader = req.headers.authorization;
+  const authHeader =
+    req.headers.authorization;
 
-  console.log("🔐 Authorization header:", authHeader);
-
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    console.log("❌ Token requerido o mal formato");
-    return res.status(401).json({ error: "Token requerido" });
-  }
-
-  const token = authHeader.split(" ")[1];
-
-  console.log("🔑 Token extraído:", token);
-
-  try {
-    if (!process.env.JWT_SECRET) {
-      console.log("❌ JWT_SECRET no configurado");
-      throw new Error("JWT_SECRET no configurado");
-    }
-
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET
-    ) as { userId: number };
-
-    console.log("✅ Token decodificado:", decoded);
-
-    if (!decoded.userId) {
-      console.log("❌ userId no presente en token");
-      return res.status(401).json({ error: "Token inválido" });
-    }
-
-    req.userId = decoded.userId;
-
-    next();
-  } catch (err: any) {
-    console.log("❌ Error verificando token:", err.message);
-
+  if (
+    !authHeader ||
+    !authHeader.startsWith(
+      "Bearer "
+    )
+  ) {
     return res.status(401).json({
-      error: "Token inválido",
-      detail: err.message,
+      error: "Token requerido",
     });
   }
+
+  const token =
+    authHeader.split(" ")[1];
+
+  try {
+    const decoded =
+      jwt.verify(
+        token,
+        process.env
+          .JWT_ACCESS_SECRET!
+      ) as {
+        userId: number;
+      };
+
+    req.userId =
+      decoded.userId;
+
+    next();
+  } catch {
+    return res.status(401).json({
+      error: "Token inválido",
+    });
+  }
+}
+---
+optionalAuth.middleware.ts
+import {
+  Response,
+  NextFunction,
+} from "express";
+
+import jwt from "jsonwebtoken";
+
+import { AuthRequest }
+  from "./auth.middleware";
+
+export function optionalAuthMiddleware(
+  req: AuthRequest,
+  _res: Response,
+  next: NextFunction
+) {
+  const authHeader =
+    req.headers.authorization;
+
+  if (
+    !authHeader ||
+    !authHeader.startsWith(
+      "Bearer "
+    )
+  ) {
+    return next();
+  }
+
+  try {
+    const token =
+      authHeader.split(" ")[1];
+
+    const decoded =
+      jwt.verify(
+        token,
+        process.env.JWT_ACCESS_SECRET!
+      ) as {
+        userId: number;
+      };
+
+    req.userId =
+      decoded.userId;
+  } catch {
+    // ignorar token inválido
+  }
+
+  next();
 }
 ---
 rateLimit.middleware.ts
@@ -2063,6 +2130,66 @@ export function rateLimit(options: {
   };
 }
 ---
+role.middleware.ts
+import {
+  Response,
+  NextFunction,
+} from "express";
+
+import { prisma }
+  from "../lib/prisma";
+
+import { AuthRequest }
+  from "./auth.middleware";
+
+import { SystemRole }
+  from "@prisma/client";
+
+export function roleMiddleware(
+  ...roles: SystemRole[]
+) {
+  return async (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ) => {
+    if (!req.userId) {
+      return res.status(401).json({
+        error: "No autorizado",
+      });
+    }
+
+    const user =
+      await prisma.user.findUnique({
+        where: {
+          id: req.userId,
+        },
+
+        select: {
+          role: true,
+        },
+      });
+
+    if (!user) {
+      return res.status(404).json({
+        error: "Usuario no encontrado",
+      });
+    }
+
+    if (
+      !roles.includes(
+        user.role
+      )
+    ) {
+      return res.status(403).json({
+        error: "Permisos insuficientes",
+      });
+    }
+
+    next();
+  };
+}
+---
 antiAbuse.middleware.ts
 import { Request, Response, NextFunction } from "express";
 
@@ -2082,7 +2209,7 @@ export function antiAbuse(req: Request, res: Response, next: NextFunction) {
   next();
 }
 ---
-modules/interactions/
+modules/auth/
 auth.controller.ts
 import { Request, Response } from "express";
 import { AuthRequest } from "../../middleware/auth.middleware";
@@ -2090,7 +2217,10 @@ import { AuthRequest } from "../../middleware/auth.middleware";
 import {
   loginUser,
   registerUser,
-  getCurrentUser
+  getCurrentUser,
+  refreshAccessToken,
+  logoutUser,
+  logoutAllSessions,
 } from "./auth.service";
 
 //////////////////////////////////////////////////
@@ -2199,18 +2329,116 @@ export async function me(
     });
   }
 }
+
+//////////////////////////////////////////////////
+// TOKEN
+//////////////////////////////////////////////////
+
+export async function refresh(
+  req: Request,
+  res: Response
+) {
+  try {
+    const {
+      refreshToken,
+    } = req.body;
+
+    const result =
+      await refreshAccessToken(
+        refreshToken
+      );
+
+    res.json(result);
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Error desconocido";
+
+    res.status(401).json({
+      error: message,
+    });
+  }
+}
+
+//////////////////////////////////////////////////
+// LOGOUT
+//////////////////////////////////////////////////
+
+export async function logout(
+  req: Request,
+  res: Response
+) {
+  try {
+    const {
+      refreshToken,
+    } = req.body;
+
+    const result =
+      await logoutUser(
+        refreshToken
+      );
+
+    res.json(result);
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Error desconocido";
+
+    res.status(400).json({
+      error: message,
+    });
+  }
+}
+
+//////////////////////////////////////////////////
+// LOGOUT ALL
+//////////////////////////////////////////////////
+
+export async function logoutAll(
+  req: AuthRequest,
+  res: Response
+) {
+  try {
+    if (!req.userId) {
+      return res.status(401).json({
+        error: "No autorizado",
+      });
+    }
+
+    const result =
+      await logoutAllSessions(
+        req.userId
+      );
+
+    res.json(result);
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Error desconocido";
+
+    res.status(400).json({
+      error: message,
+    });
+  }
+}
 ---
 auth.service.ts
 import { prisma } from "../../lib/prisma";
-
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 
 import {
   BadRequestError,
   NotFoundError,
   UnauthorizedError,
 } from "../../utils/errors";
+
+import {
+  generateAccessToken,
+  generateRefreshToken,
+} from "./auth.tokens";
 
 import {
   RegisterInput,
@@ -2236,9 +2464,45 @@ export async function registerUser(
     );
   }
 
+  if (username.length < 3) {
+    throw new BadRequestError(
+      "El usuario debe tener al menos 3 caracteres"
+    );
+  }
+
+  if (username.length > 32) {
+    throw new BadRequestError(
+      "El usuario no puede superar los 32 caracteres"
+    );
+  }
+
+  const usernameRegex =
+    /^[a-zA-Z0-9_-]+$/;
+
+  if (!usernameRegex.test(username)) {
+    throw new BadRequestError(
+      "Username inválido"
+    );
+  }
+
+  const emailRegex =
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!emailRegex.test(email)) {
+    throw new BadRequestError(
+      "Email inválido"
+    );
+  }
+
   if (password.length < 8) {
     throw new BadRequestError(
       "La contraseña es muy corta"
+    );
+  }
+
+  if (password.length > 128) {
+    throw new BadRequestError(
+      "La contraseña es demasiado larga"
     );
   }
 
@@ -2262,15 +2526,30 @@ export async function registerUser(
     await bcrypt.hash(password, 10);
 
   const user =
-    await prisma.user.create({
-      data: {
-        username,
-        email,
-        password: hashed,
-      },
-    });
+    await prisma.$transaction(
+      async (tx) => {
+        const createdUser =
+          await tx.user.create({
+            data: {
+              username,
+              email,
+              password: hashed,
+            },
+          });
 
-  const { password: _, ...safeUser } = user;
+        await tx.userProfile.create({
+          data: {
+            userId:
+              createdUser.id,
+          },
+        });
+
+        return createdUser;
+      }
+    );
+
+  const { password: _, ...safeUser } =
+    user;
 
   return safeUser;
 }
@@ -2301,8 +2580,8 @@ export async function loginUser(
     });
 
   if (!user) {
-    throw new NotFoundError(
-      "Usuario no encontrado"
+    throw new UnauthorizedError(
+      "Credenciales inválidas"
     );
   }
 
@@ -2314,7 +2593,7 @@ export async function loginUser(
 
   if (!valid) {
     throw new UnauthorizedError(
-      "Contraseña incorrecta"
+      "Credenciales inválidas"
     );
   }
 
@@ -2327,21 +2606,67 @@ export async function loginUser(
     },
   });
 
-  const token = jwt.sign(
-    {
-      userId: user.id,
-    },
-    process.env.JWT_SECRET || "secret",
-    {
-      expiresIn: "7d",
-    }
-  );
+  const safeUser =
+    await prisma.user.findUnique({
+      where: {
+        id: user.id,
+      },
 
-  const { password: _, ...safeUser } = user;
+      select: {
+        id: true,
+
+        username: true,
+        email: true,
+
+        role: true,
+
+        isVerified: true,
+
+        createdAt: true,
+        updatedAt: true,
+
+        lastLoginAt: true,
+
+        profile: {
+          select: {
+            displayName: true,
+
+            avatarUrl: true,
+            bannerUrl: true,
+
+            bio: true,
+
+            accentColor: true,
+          },
+        },
+      },
+    });
+
+  const accessToken =
+    generateAccessToken(
+      user.id
+    );
+
+  const refreshToken =
+    generateRefreshToken();
+
+  await prisma.refreshToken.create({
+    data: {
+      token: refreshToken,
+      userId: user.id,
+
+      expiresAt: new Date(
+        Date.now() +
+        1000 * 60 * 60 * 24 * 30
+      ),
+    },
+});
 
   return {
     user: safeUser,
-    token,
+
+    accessToken,
+    refreshToken,
   };
 }
 
@@ -2360,11 +2685,9 @@ export async function getCurrentUser(
 
       select: {
         id: true,
+
         username: true,
         email: true,
-
-        avatar: true,
-        bio: true,
 
         role: true,
 
@@ -2374,6 +2697,19 @@ export async function getCurrentUser(
         updatedAt: true,
 
         lastLoginAt: true,
+
+        profile: {
+          select: {
+            displayName: true,
+
+            avatarUrl: true,
+            bannerUrl: true,
+
+            bio: true,
+
+            accentColor: true,
+          },
+        },
       },
     });
 
@@ -2385,15 +2721,144 @@ export async function getCurrentUser(
 
   return user;
 }
+
+//////////////////////////////////////////////////
+// TOKEN
+//////////////////////////////////////////////////
+
+export async function refreshAccessToken(
+  refreshToken: string
+) {
+  if (!refreshToken) {
+    throw new BadRequestError(
+      "Refresh token requerido"
+    );
+  }
+
+  const storedToken =
+    await prisma.refreshToken.findUnique({
+      where: {
+        token: refreshToken,
+      },
+
+      include: {
+        user: true,
+      },
+    });
+
+  if (!storedToken) {
+    throw new UnauthorizedError(
+      "Refresh token inválido"
+    );
+  }
+
+  if (
+    storedToken.expiresAt <
+    new Date()
+  ) {
+    await prisma.refreshToken.delete({
+      where: {
+        id: storedToken.id,
+      },
+    });
+
+    throw new UnauthorizedError(
+      "Refresh token expirado"
+    );
+  }
+
+  const accessToken =
+    generateAccessToken(
+      storedToken.userId
+    );
+
+  return {
+    accessToken,
+  };
+}
+
+//////////////////////////////////////////////////
+// LOGOUT
+//////////////////////////////////////////////////
+
+export async function logoutUser(
+  refreshToken: string
+) {
+  if (!refreshToken) {
+    throw new BadRequestError(
+      "Refresh token requerido"
+    );
+  }
+
+  await prisma.refreshToken.deleteMany({
+    where: {
+      token: refreshToken,
+    },
+  });
+
+  return {
+    message: "Sesión cerrada",
+  };
+}
+
+//////////////////////////////////////////////////
+// LOGOUT ALL
+//////////////////////////////////////////////////
+
+export async function logoutAllSessions(
+  userId: number
+) {
+  await prisma.refreshToken.deleteMany({
+    where: {
+      userId,
+    },
+  });
+
+  return {
+    message:
+      "Todas las sesiones cerradas",
+  };
+}
+---
+auth.tokens.ts
+import crypto from "crypto";
+import jwt from "jsonwebtoken";
+
+const ACCESS_SECRET =
+  process.env.JWT_ACCESS_SECRET!;
+
+const REFRESH_SECRET =
+  process.env.JWT_REFRESH_SECRET!;
+
+export function generateAccessToken(
+  userId: number
+) {
+  return jwt.sign(
+    { userId },
+    ACCESS_SECRET,
+    {
+      expiresIn: "15m",
+    }
+  );
+}
+
+export function generateRefreshToken() {
+  return crypto
+    .randomBytes(64)
+    .toString("hex");
+}
 ---
 auth.ts
 import { Router } from "express";
 
 import { authMiddleware, } from "../../middleware/auth.middleware";
 import {
-  login,
   register,
+  login,
   me,
+  refresh,
+  logout,
+  logoutAll,
 } from "./auth.controller";
 
 const router = Router();
@@ -2418,6 +2883,30 @@ router.get(
   me
 );
 
+//////////////////////////////////////////////////
+// AUTH
+//////////////////////////////////////////////////
+
+router.post(
+  "/refresh",
+  refresh
+);
+
+//////////////////////////////////////////////////
+// LOGOUT
+//////////////////////////////////////////////////
+
+router.post(
+  "/logout",
+  logout
+);
+
+router.post(
+  "/logout-all",
+  authMiddleware,
+  logoutAll
+);
+
 export default router;
 ---
 auth.type.ts
@@ -2434,11 +2923,9 @@ export interface LoginInput {
 
 export interface AuthUser {
   id: number;
+
   username: string;
   email: string;
-
-  avatar: string | null;
-  bio: string | null;
 
   role: string;
 
@@ -2448,6 +2935,1583 @@ export interface AuthUser {
   updatedAt: Date;
 
   lastLoginAt: Date | null;
+
+  profile: {
+    displayName: string | null;
+
+    avatarUrl: string | null;
+    bannerUrl: string | null;
+
+    bio: string | null;
+
+    accentColor: string | null;
+  } | null;
+}
+
+export interface RefreshInput {
+  refreshToken: string;
+}
+---
+modules/cosmetics/
+cosmetics.controller.ts
+import { Request, Response, } from "express";
+
+import { asyncHandler } from "../../utils/asyncHandler";
+import { CosmeticsService } from "./cosmetics.service";
+
+//////////////////////////////////////////////////
+// GET ALL
+//////////////////////////////////////////////////
+
+export const getCosmetics =
+  asyncHandler(
+    async (
+      req: Request,
+      res: Response
+    ) => {
+      const cosmetics =
+        await CosmeticsService.getAll();
+
+      res.json(cosmetics);
+    }
+  );
+
+//////////////////////////////////////////////////
+// GET ONE
+//////////////////////////////////////////////////
+
+export const getCosmetic =
+  asyncHandler(
+    async (
+      req: Request,
+      res: Response
+    ) => {
+      const slug =
+        req.params.slug;
+
+      if (
+        !slug ||
+        Array.isArray(slug)
+      ) {
+        return res.status(400).json({
+          error: "Slug inválido",
+        });
+      }
+
+      const cosmetic =
+        await CosmeticsService.getBySlug(
+          slug
+        );
+
+      res.json(cosmetic);
+    }
+  );
+
+//////////////////////////////////////////////////
+// CREATE
+//////////////////////////////////////////////////
+
+export const createCosmetic =
+  asyncHandler(
+    async (req: any, res: Response) => {
+      const cosmetic =
+        await CosmeticsService.create(
+          req.body
+        );
+
+      res.status(201).json(
+        cosmetic
+      );
+    }
+  );
+
+//////////////////////////////////////////////////
+// UPDATE
+//////////////////////////////////////////////////
+
+export const updateCosmetic =
+  asyncHandler(
+    async (req: any, res: Response) => {
+      const cosmetic =
+        await CosmeticsService.update(
+          Number(req.params.id),
+          req.body
+        );
+
+      res.json(cosmetic);
+    }
+  );
+
+//////////////////////////////////////////////////
+// ACTIVATE
+//////////////////////////////////////////////////
+
+export const activateCosmetic =
+  asyncHandler(
+    async (req: any, res: Response) => {
+      const cosmetic =
+        await CosmeticsService.activate(
+          Number(req.params.id)
+        );
+
+      res.json(cosmetic);
+    }
+  );
+
+//////////////////////////////////////////////////
+// DEACTIVATE
+//////////////////////////////////////////////////
+
+export const deactivateCosmetic =
+  asyncHandler(
+    async (req: any, res: Response) => {
+      const cosmetic =
+        await CosmeticsService.deactivate(
+          Number(req.params.id)
+        );
+
+      res.json(cosmetic);
+    }
+  );
+
+//////////////////////////////////////////////////
+// DELETE
+//////////////////////////////////////////////////
+
+export const deleteCosmetic =
+  asyncHandler(
+    async (req: any, res: Response) => {
+      const result =
+        await CosmeticsService.delete(
+          Number(req.params.id)
+        );
+
+      res.json(result);
+    }
+  );
+---
+cosmetics.routes.ts
+import { Router } from "express";
+
+import {
+  getCosmetics,
+  getCosmetic,
+  createCosmetic,
+  updateCosmetic,
+  activateCosmetic,
+  deactivateCosmetic,
+  deleteCosmetic,
+} from "./cosmetics.controller";
+
+const router = Router();
+
+//////////////////////////////////////////////////
+// PUBLIC
+//////////////////////////////////////////////////
+
+router.get(
+  "/",
+  getCosmetics
+);
+
+router.get(
+  "/:slug",
+  getCosmetic
+);
+
+//////////////////////////////////////////////////
+// ADMIN
+//////////////////////////////////////////////////
+
+router.post(
+  "/",
+  createCosmetic
+);
+
+router.patch(
+  "/:id",
+  updateCosmetic
+);
+
+router.patch(
+  "/:id/activate",
+  activateCosmetic
+);
+
+router.patch(
+  "/:id/deactivate",
+  deactivateCosmetic
+);
+
+router.delete(
+  "/:id",
+  deleteCosmetic
+);
+
+export default router;
+---
+cosmetics.service.ts
+import { prisma } from "../../lib/prisma";
+
+import {
+  BadRequestError,
+  NotFoundError,
+} from "../../utils/errors";
+
+import {
+  CreateCosmeticInput,
+  UpdateCosmeticInput,
+} from "./cosmetics.types";
+
+export class CosmeticsService {
+  //////////////////////////////////////////////////
+  // GET ALL
+  //////////////////////////////////////////////////
+
+  static async getAll() {
+    return prisma.cosmeticItem.findMany({
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+  }
+
+  //////////////////////////////////////////////////
+  // GET ONE
+  //////////////////////////////////////////////////
+
+  static async getBySlug(
+    slug: string
+  ) {
+    const cosmetic =
+      await prisma.cosmeticItem.findUnique({
+        where: {
+          slug,
+        },
+      });
+
+    if (!cosmetic) {
+      throw new NotFoundError(
+        "Cosmético no encontrado"
+      );
+    }
+
+    return cosmetic;
+  }
+
+  //////////////////////////////////////////////////
+  // CREATE
+  //////////////////////////////////////////////////
+
+  static async create(
+    data: CreateCosmeticInput
+  ) {
+    const exists =
+      await prisma.cosmeticItem.findUnique({
+        where: {
+          slug: data.slug,
+        },
+      });
+
+    if (exists) {
+      throw new BadRequestError(
+        "Slug ya existe"
+      );
+    }
+
+    return prisma.cosmeticItem.create({
+      data,
+    });
+  }
+
+  //////////////////////////////////////////////////
+  // UPDATE
+  //////////////////////////////////////////////////
+
+  static async update(
+    id: number,
+    data: UpdateCosmeticInput
+  ) {
+    const cosmetic =
+      await prisma.cosmeticItem.findUnique({
+        where: {
+          id,
+        },
+      });
+
+    if (!cosmetic) {
+      throw new NotFoundError(
+        "Cosmético no encontrado"
+      );
+    }
+
+    return prisma.cosmeticItem.update({
+      where: {
+        id,
+      },
+
+      data,
+    });
+  }
+
+  //////////////////////////////////////////////////
+  // ACTIVATE
+  //////////////////////////////////////////////////
+
+  static async activate(
+    id: number
+  ) {
+    return prisma.cosmeticItem.update({
+      where: {
+        id,
+      },
+
+      data: {
+        isActive: true,
+      },
+    });
+  }
+
+  //////////////////////////////////////////////////
+  // DEACTIVATE
+  //////////////////////////////////////////////////
+
+  static async deactivate(
+    id: number
+  ) {
+    return prisma.cosmeticItem.update({
+      where: {
+        id,
+      },
+
+      data: {
+        isActive: false,
+      },
+    });
+  }
+
+  //////////////////////////////////////////////////
+  // DELETE
+  //////////////////////////////////////////////////
+
+  static async delete(
+    id: number
+  ) {
+    const cosmetic =
+      await prisma.cosmeticItem.findUnique({
+        where: {
+          id,
+        },
+      });
+
+    if (!cosmetic) {
+      throw new NotFoundError(
+        "Cosmético no encontrado"
+      );
+    }
+
+    await prisma.cosmeticItem.delete({
+      where: {
+        id,
+      },
+    });
+
+    return {
+      message:
+        "Cosmético eliminado",
+    };
+  }
+}
+---
+cosmetics.types.ts
+import {
+  CosmeticType,
+  CosmeticRarity,
+} from "@prisma/client";
+
+export interface CreateCosmeticInput {
+  name: string;
+
+  slug: string;
+
+  description?: string;
+
+  imageUrl: string;
+
+  type: CosmeticType;
+
+  rarity: CosmeticRarity;
+}
+
+export interface UpdateCosmeticInput {
+  name?: string;
+
+  description?: string;
+
+  imageUrl?: string;
+
+  type?: CosmeticType;
+
+  rarity?: CosmeticRarity;
+
+  isActive?: boolean;
+}
+---
+modules/equipped/
+equipped.controller.ts
+import {
+  Request,
+  Response,
+} from "express";
+
+import {
+  CosmeticType,
+} from "@prisma/client";
+
+import { asyncHandler }
+  from "../../utils/asyncHandler";
+
+import { AuthRequest }
+  from "../../middleware/auth.middleware";
+
+import { EquippedService }
+  from "./equipped.service";
+
+export const getMyEquipped =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+      const result =
+        await EquippedService.getMyEquipped(
+          req.userId!
+        );
+
+      res.json(result);
+    }
+  );
+
+export const getUserEquipped =
+  asyncHandler(
+    async (
+      req: Request,
+      res: Response
+    ) => {
+      const username =
+        req.params.username;
+
+      if (
+        !username ||
+        Array.isArray(username)
+      ) {
+        return res.status(400).json({
+          error:
+            "Username inválido",
+        });
+      }
+
+      const result =
+        await EquippedService.getUserEquipped(
+          username
+        );
+
+      res.json(result);
+    }
+  );
+
+export const equip =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+      const result =
+        await EquippedService.equip(
+          req.userId!,
+          req.body.cosmeticId
+        );
+
+      res.json(result);
+    }
+  );
+
+export const unequip =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+      const type =
+        req.params.type as CosmeticType;
+
+      const result =
+        await EquippedService.unequip(
+          req.userId!,
+          type
+        );
+
+      res.json(result);
+    }
+  );
+---
+equipped.routes.ts
+import { Router }
+  from "express";
+
+import {
+  authMiddleware,
+} from "../../middleware/auth.middleware";
+
+import {
+  getMyEquipped,
+  getUserEquipped,
+  equip,
+  unequip,
+} from "./equipped.controller";
+
+const router = Router();
+
+router.get(
+  "/me",
+  authMiddleware,
+  getMyEquipped
+);
+
+router.post(
+  "/equip",
+  authMiddleware,
+  equip
+);
+
+router.delete(
+  "/unequip/:type",
+  authMiddleware,
+  unequip
+);
+
+router.get(
+  "/:username",
+  getUserEquipped
+);
+
+export default router;
+---
+equipped.service.ts
+import {
+  CosmeticType,
+} from "@prisma/client";
+
+import { prisma }
+  from "../../lib/prisma";
+
+import {
+  BadRequestError,
+  NotFoundError,
+} from "../../utils/errors";
+
+export class EquippedService {
+  //////////////////////////////////////////////////
+  // GET MY EQUIPPED
+  //////////////////////////////////////////////////
+
+  static async getMyEquipped(
+    userId: number
+  ) {
+    const profile =
+      await prisma.userProfile.findUnique({
+        where: {
+          userId,
+        },
+
+        include: {
+          equippedCosmetics: {
+            include: {
+              cosmetic: true,
+            },
+          },
+        },
+      });
+
+    if (!profile) {
+      throw new NotFoundError(
+        "Perfil no encontrado"
+      );
+    }
+
+    return profile.equippedCosmetics;
+  }
+
+  //////////////////////////////////////////////////
+  // GET USER EQUIPPED
+  //////////////////////////////////////////////////
+
+  static async getUserEquipped(
+    username: string
+  ) {
+    const user =
+      await prisma.user.findUnique({
+        where: {
+          username,
+        },
+
+        include: {
+          profile: {
+            include: {
+              equippedCosmetics: {
+                include: {
+                  cosmetic: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+    if (!user) {
+      throw new NotFoundError(
+        "Usuario no encontrado"
+      );
+    }
+
+    return (
+      user.profile
+        ?.equippedCosmetics ?? []
+    );
+  }
+
+  //////////////////////////////////////////////////
+  // EQUIP
+  //////////////////////////////////////////////////
+
+  static async equip(
+    userId: number,
+    cosmeticId: number
+  ) {
+    const profile =
+      await prisma.userProfile.findUnique({
+        where: {
+          userId,
+        },
+      });
+
+    if (!profile) {
+      throw new NotFoundError(
+        "Perfil no encontrado"
+      );
+    }
+
+    const cosmetic =
+      await prisma.cosmeticItem.findUnique({
+        where: {
+          id: cosmeticId,
+        },
+      });
+
+    if (!cosmetic) {
+      throw new NotFoundError(
+        "Cosmético no encontrado"
+      );
+    }
+
+    if (!cosmetic.isActive) {
+      throw new BadRequestError(
+        "Cosmético inactivo"
+      );
+    }
+
+    const owned =
+      await prisma.userInventory.findUnique({
+        where: {
+          userId_itemId: {
+            userId,
+            itemId:
+              cosmetic.id,
+          },
+        },
+      });
+
+    if (!owned) {
+      throw new BadRequestError(
+        "No posees este cosmético"
+      );
+    }
+
+    return prisma.equippedCosmetic.upsert({
+      where: {
+        profileId_type: {
+          profileId:
+            profile.id,
+
+          type:
+            cosmetic.type,
+        },
+      },
+
+      create: {
+        profileId:
+          profile.id,
+
+        cosmeticId:
+          cosmetic.id,
+
+        type:
+          cosmetic.type,
+      },
+
+      update: {
+        cosmeticId:
+          cosmetic.id,
+      },
+    });
+  }
+
+  //////////////////////////////////////////////////
+  // UNEQUIP
+  //////////////////////////////////////////////////
+
+  static async unequip(
+    userId: number,
+    type: CosmeticType
+  ) {
+    const profile =
+      await prisma.userProfile.findUnique({
+        where: {
+          userId,
+        },
+      });
+
+    if (!profile) {
+      throw new NotFoundError(
+        "Perfil no encontrado"
+      );
+    }
+
+    await prisma.equippedCosmetic.delete({
+      where: {
+        profileId_type: {
+          profileId:
+            profile.id,
+
+          type,
+        },
+      },
+    });
+
+    return {
+      message:
+        "Cosmético desequipado",
+    };
+  }
+}
+---
+equipped.types.ts
+import {
+  CosmeticType,
+} from "@prisma/client";
+
+export interface EquipCosmeticInput {
+  cosmeticId: number;
+}
+
+export interface UnequipInput {
+  type: CosmeticType;
+}
+---
+modules/follower/
+followers.controller.ts
+import { Response } from "express";
+
+import { asyncHandler } from "../../utils/asyncHandler";
+import { AuthRequest } from "../../middleware/auth.middleware";
+
+import { FollowsService } from "./follows.service";
+
+interface UsernameParams {
+  username: string;
+}
+
+//////////////////////////////////////////////////
+// FOLLOW
+//////////////////////////////////////////////////
+
+export const followUser =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+      const username =
+        req.params.username;
+
+      if (
+        !username ||
+        Array.isArray(username)
+      ) {
+        return res.status(400).json({
+          error: "Username inválido",
+        });
+      }
+
+      const result =
+        await FollowsService.followUser(
+          req.userId!,
+          username
+        );
+
+      res.json(result);
+    }
+  );
+
+//////////////////////////////////////////////////
+// UNFOLLOW
+//////////////////////////////////////////////////
+
+export const unfollowUser =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+      const username =
+        req.params.username;
+
+      if (
+        !username ||
+        Array.isArray(username)
+      ) {
+        return res.status(400).json({
+          error: "Username inválido",
+        });
+      }
+
+      const result =
+        await FollowsService.unfollowUser(
+          req.userId!,
+          username
+        );
+
+      res.json(result);
+    }
+  );
+
+//////////////////////////////////////////////////
+// FOLLOWERS
+//////////////////////////////////////////////////
+
+export const getFollowers =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+      const username =
+        req.params.username;
+
+      if (
+        !username ||
+        Array.isArray(username)
+      ) {
+        return res.status(400).json({
+          error: "Username inválido",
+        });
+      }
+
+      const result =
+        await FollowsService.getFollowers(
+          username
+        );
+
+      res.json(result);
+    }
+  );
+
+//////////////////////////////////////////////////
+// FOLLOWING
+//////////////////////////////////////////////////
+
+export const getFollowing =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+      const username =
+        req.params.username;
+
+      if (
+        !username ||
+        Array.isArray(username)
+      ) {
+        return res.status(400).json({
+          error: "Username inválido",
+        });
+      }
+
+      const result =
+        await FollowsService.getFollowing(
+          username
+        );
+
+      res.json(result);
+    }
+  );
+---
+followers.router.ts
+import { Router } from "express";
+
+import {
+  followUser,
+  unfollowUser,
+  getFollowers,
+  getFollowing,
+} from "./follows.controller";
+
+import { authMiddleware }
+  from "../../middleware/auth.middleware";
+
+const router = Router();
+
+//////////////////////////////////////////////////
+// FOLLOW
+//////////////////////////////////////////////////
+
+router.post(
+  "/:username",
+  authMiddleware,
+  followUser
+);
+
+//////////////////////////////////////////////////
+// UNFOLLOW
+//////////////////////////////////////////////////
+
+router.delete(
+  "/:username",
+  authMiddleware,
+  unfollowUser
+);
+
+//////////////////////////////////////////////////
+// FOLLOWERS
+//////////////////////////////////////////////////
+
+router.get(
+  "/:username/followers",
+  getFollowers
+);
+
+//////////////////////////////////////////////////
+// FOLLOWING
+//////////////////////////////////////////////////
+
+router.get(
+  "/:username/following",
+  getFollowing
+);
+
+export default router;
+---
+followers.service.ts
+import { prisma } from "../../lib/prisma";
+import {
+  BadRequestError,
+  NotFoundError,
+} from "../../utils/errors";
+
+export class FollowsService {
+  static async followUser(
+    followerId: number,
+    username: string
+  ) {
+    const target =
+      await prisma.user.findUnique({
+        where: {
+          username,
+        },
+      });
+
+    if (!target) {
+      throw new NotFoundError(
+        "Usuario no encontrado"
+      );
+    }
+
+    if (target.id === followerId) {
+      throw new BadRequestError(
+        "No puedes seguirte a ti mismo"
+      );
+    }
+
+    const exists =
+      await prisma.follow.findUnique({
+        where: {
+          followerId_followingId: {
+            followerId,
+            followingId: target.id,
+          },
+        },
+      });
+
+    if (exists) {
+      throw new BadRequestError(
+        "Ya sigues a este usuario"
+      );
+    }
+
+    await prisma.follow.create({
+      data: {
+        followerId,
+        followingId: target.id,
+      },
+    });
+
+    return {
+      message: "Usuario seguido",
+    };
+  }
+
+  static async unfollowUser(
+    followerId: number,
+    username: string
+  ) {
+    const target =
+      await prisma.user.findUnique({
+        where: {
+          username,
+        },
+      });
+
+    if (!target) {
+      throw new NotFoundError(
+        "Usuario no encontrado"
+      );
+    }
+
+    await prisma.follow.delete({
+      where: {
+        followerId_followingId: {
+          followerId,
+          followingId: target.id,
+        },
+      },
+    });
+
+    return {
+      message: "Usuario dejado de seguir",
+    };
+  }
+
+  static async getFollowers(
+    username: string
+  ) {
+    const user =
+      await prisma.user.findUnique({
+        where: {
+          username,
+        },
+      });
+
+    if (!user) {
+      throw new NotFoundError(
+        "Usuario no encontrado"
+      );
+    }
+
+    const followers =
+      await prisma.follow.findMany({
+        where: {
+          followingId: user.id,
+        },
+
+        include: {
+          follower: {
+            select: {
+              id: true,
+              username: true,
+            },
+          },
+        },
+      });
+
+    return followers.map(
+      (f) => f.follower
+    );
+  }
+
+  static async getFollowing(
+    username: string
+  ) {
+    const user =
+      await prisma.user.findUnique({
+        where: {
+          username,
+        },
+      });
+
+    if (!user) {
+      throw new NotFoundError(
+        "Usuario no encontrado"
+      );
+    }
+
+    const following =
+      await prisma.follow.findMany({
+        where: {
+          followerId: user.id,
+        },
+
+        include: {
+          following: {
+            select: {
+              id: true,
+              username: true,
+            },
+          },
+        },
+      });
+
+    return following.map(
+      (f) => f.following
+    );
+  }
+}
+---
+followers.type.ts
+export interface FollowParams {
+  username: string;
+}
+---
+modules/inventory/
+inventory.controller.ts
+import {
+  Request,
+  Response,
+} from "express";
+
+import { asyncHandler }
+  from "../../utils/asyncHandler";
+
+import { AuthRequest }
+  from "../../middleware/auth.middleware";
+
+import { InventoryService }
+  from "./inventory.service";
+
+//////////////////////////////////////////////////
+// MY INVENTORY
+//////////////////////////////////////////////////
+
+export const getMyInventory =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+      const inventory =
+        await InventoryService.getMyInventory(
+          req.userId!
+        );
+
+      res.json(inventory);
+    }
+  );
+
+//////////////////////////////////////////////////
+// USER INVENTORY
+//////////////////////////////////////////////////
+
+export const getUserInventory =
+  asyncHandler(
+    async (
+      req: Request,
+      res: Response
+    ) => {
+      const username =
+        req.params.username;
+
+      if (
+        !username ||
+        Array.isArray(username)
+      ) {
+        return res.status(400).json({
+          error:
+            "Username inválido",
+        });
+      }
+
+      const inventory =
+        await InventoryService.getUserInventory(
+          username
+        );
+
+      res.json(inventory);
+    }
+  );
+
+//////////////////////////////////////////////////
+// GRANT
+//////////////////////////////////////////////////
+
+export const grantItem =
+  asyncHandler(
+    async (
+      req: Request,
+      res: Response
+    ) => {
+      const result =
+        await InventoryService.grantItem(
+          req.body
+        );
+
+      res.status(201).json(
+        result
+      );
+    }
+  );
+
+//////////////////////////////////////////////////
+// REMOVE
+//////////////////////////////////////////////////
+
+export const removeItem =
+  asyncHandler(
+    async (
+      req: Request,
+      res: Response
+    ) => {
+      const result =
+        await InventoryService.removeItem(
+          req.body
+        );
+
+      res.json(result);
+    }
+  );
+
+//////////////////////////////////////////////////
+// CHECK OWNERSHIP
+//////////////////////////////////////////////////
+
+export const checkOwnership =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+      const result =
+        await InventoryService.checkOwnership(
+          req.userId!,
+          Number(
+            req.params.itemId
+          )
+        );
+
+      res.json(result);
+    }
+  );
+---
+inventory.routes.ts
+import { Router }
+  from "express";
+
+import {
+  SystemRole,
+} from "@prisma/client";
+
+import {
+  authMiddleware,
+} from "../../middleware/auth.middleware";
+
+import {
+  roleMiddleware,
+} from "../../middleware/role.middleware";
+
+import {
+  getMyInventory,
+  getUserInventory,
+  grantItem,
+  removeItem,
+  checkOwnership,
+} from "./inventory.controller";
+
+const router = Router();
+
+//////////////////////////////////////////////////
+// ME
+//////////////////////////////////////////////////
+
+router.get(
+  "/me",
+  authMiddleware,
+  getMyInventory
+);
+
+router.get(
+  "/check/:itemId",
+  authMiddleware,
+  checkOwnership
+);
+
+//////////////////////////////////////////////////
+// ADMIN
+//////////////////////////////////////////////////
+
+router.post(
+  "/grant",
+  authMiddleware,
+  roleMiddleware(
+    SystemRole.ADMIN
+  ),
+  grantItem
+);
+
+router.delete(
+  "/remove",
+  authMiddleware,
+  roleMiddleware(
+    SystemRole.ADMIN
+  ),
+  removeItem
+);
+
+//////////////////////////////////////////////////
+// PUBLIC
+//////////////////////////////////////////////////
+
+router.get(
+  "/:username",
+  getUserInventory
+);
+
+export default router;
+---
+inventory.service.ts
+import { prisma }
+  from "../../lib/prisma";
+
+import {
+  NotFoundError,
+} from "../../utils/errors";
+
+import {
+  GrantInventoryInput,
+  RemoveInventoryInput,
+} from "./inventory.types";
+
+export class InventoryService {
+  //////////////////////////////////////////////////
+  // MY INVENTORY
+  //////////////////////////////////////////////////
+
+  static async getMyInventory(
+    userId: number
+  ) {
+    return prisma.userInventory.findMany({
+      where: {
+        userId,
+      },
+
+      include: {
+        item: true,
+      },
+
+      orderBy: {
+        obtainedAt: "desc",
+      },
+    });
+  }
+
+  //////////////////////////////////////////////////
+  // PUBLIC INVENTORY
+  //////////////////////////////////////////////////
+
+  static async getUserInventory(
+    username: string
+  ) {
+    const user =
+      await prisma.user.findUnique({
+        where: {
+          username,
+        },
+
+        include: {
+          profile: true,
+        },
+      });
+
+    if (!user) {
+      throw new NotFoundError(
+        "Usuario no encontrado"
+      );
+    }
+
+    if (
+      user.profile &&
+      !user.profile.inventoryPublic
+    ) {
+      throw new NotFoundError(
+        "Inventario privado"
+      );
+    }
+
+    return prisma.userInventory.findMany({
+      where: {
+        userId: user.id,
+      },
+
+      include: {
+        item: true,
+      },
+
+      orderBy: {
+        obtainedAt: "desc",
+      },
+    });
+  }
+
+  //////////////////////////////////////////////////
+  // GRANT
+  //////////////////////////////////////////////////
+
+  static async grantItem(
+    data: GrantInventoryInput
+  ) {
+    const user =
+      await prisma.user.findUnique({
+        where: {
+          username:
+            data.username,
+        },
+      });
+
+    if (!user) {
+      throw new NotFoundError(
+        "Usuario no encontrado"
+      );
+    }
+
+    const item =
+      await prisma.cosmeticItem.findUnique({
+        where: {
+          id: data.itemId,
+        },
+      });
+
+    if (!item) {
+      throw new NotFoundError(
+        "Cosmético no encontrado"
+      );
+    }
+
+    return prisma.userInventory.upsert({
+      where: {
+        userId_itemId: {
+          userId: user.id,
+          itemId: item.id,
+        },
+      },
+
+      create: {
+        userId: user.id,
+
+        itemId: item.id,
+
+        quantity:
+          data.quantity ?? 1,
+      },
+
+      update: {
+        quantity: {
+          increment:
+            data.quantity ?? 1,
+        },
+      },
+    });
+  }
+
+  //////////////////////////////////////////////////
+  // REMOVE
+  //////////////////////////////////////////////////
+
+  static async removeItem(
+    data: RemoveInventoryInput
+  ) {
+    const user =
+      await prisma.user.findUnique({
+        where: {
+          username:
+            data.username,
+        },
+      });
+
+    if (!user) {
+      throw new NotFoundError(
+        "Usuario no encontrado"
+      );
+    }
+
+    await prisma.userInventory.delete({
+      where: {
+        userId_itemId: {
+          userId: user.id,
+          itemId: data.itemId,
+        },
+      },
+    });
+
+    return {
+      message:
+        "Cosmético removido",
+    };
+  }
+
+  //////////////////////////////////////////////////
+  // CHECK OWNERSHIP
+  //////////////////////////////////////////////////
+
+  static async checkOwnership(
+    userId: number,
+    itemId: number
+  ) {
+    const inventory =
+      await prisma.userInventory.findUnique({
+        where: {
+          userId_itemId: {
+            userId,
+            itemId,
+          },
+        },
+      });
+
+    return {
+      owned: !!inventory,
+
+      quantity:
+        inventory?.quantity ?? 0,
+    };
+  }
+}
+---
+inventory.types.ts
+export interface GrantInventoryInput {
+  username: string;
+
+  itemId: number;
+
+  quantity?: number;
+}
+
+export interface RemoveInventoryInput {
+  username: string;
+
+  itemId: number;
+}
+
+export interface CheckOwnershipResponse {
+  owned: boolean;
+
+  quantity: number;
 }
 ---
 modules/interactions/
@@ -2980,6 +5044,379 @@ export const createModSchema = z.object({
   tags: z.array(z.string()).max(20),
 });
 ---
+modules/socials/
+socials.controller.ts
+import { Response } from "express";
+import { SocialPlatform } from "@prisma/client";
+
+import { asyncHandler } from "../../utils/asyncHandler";
+import { AuthRequest } from "../../middleware/auth.middleware";
+import { SocialsService } from "./socials.service";
+
+//////////////////////////////////////////////////
+// GET MY SOCIALS
+//////////////////////////////////////////////////
+
+export const getMySocials =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+      const socials =
+        await SocialsService.getMySocials(
+          req.userId!
+        );
+
+      res.json(socials);
+    }
+  );
+
+//////////////////////////////////////////////////
+// GET USER SOCIALS
+//////////////////////////////////////////////////
+
+export const getUserSocials =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+      const username =
+        req.params.username;
+
+      if (
+        !username ||
+        Array.isArray(username)
+      ) {
+        return res.status(400).json({
+          error: "Username inválido",
+        });
+      }
+
+      const socials =
+        await SocialsService.getUserSocials(
+          username
+        );
+
+      res.json(socials);
+    }
+  );
+
+//////////////////////////////////////////////////
+// UPSERT SOCIAL
+//////////////////////////////////////////////////
+
+export const upsertSocial =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+      const social =
+        await SocialsService.upsertSocial(
+          req.userId!,
+          req.body
+        );
+
+      res.json(social);
+    }
+  );
+
+//////////////////////////////////////////////////
+// DELETE SOCIAL
+//////////////////////////////////////////////////
+
+export const deleteSocial =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+      const platform =
+        req.params
+          .platform as SocialPlatform;
+
+      const result =
+        await SocialsService.deleteSocial(
+          req.userId!,
+          platform
+        );
+
+      res.json(result);
+    }
+  );
+---
+socials.routes.ts
+import { Router } from "express";
+
+import {
+  getMySocials,
+  getUserSocials,
+  upsertSocial,
+  deleteSocial,
+} from "./socials.controller";
+
+import {
+  authMiddleware,
+} from "../../middleware/auth.middleware";
+
+const router = Router();
+
+//////////////////////////////////////////////////
+// CURRENT USER
+//////////////////////////////////////////////////
+
+router.get(
+  "/me",
+  authMiddleware,
+  getMySocials
+);
+
+router.put(
+  "/me",
+  authMiddleware,
+  upsertSocial
+);
+
+router.delete(
+  "/me/:platform",
+  authMiddleware,
+  deleteSocial
+);
+
+//////////////////////////////////////////////////
+// PUBLIC
+//////////////////////////////////////////////////
+
+router.get(
+  "/:username",
+  getUserSocials
+);
+
+export default router;
+---
+socials.service.ts
+import { SocialPlatform } from "@prisma/client";
+
+import { prisma } from "../../lib/prisma";
+
+import {
+  BadRequestError,
+  NotFoundError,
+} from "../../utils/errors";
+
+import { UpsertSocialInput }
+  from "./socials.types";
+
+const SOCIAL_PATTERNS:
+  Record<SocialPlatform, RegExp> = {
+  GITHUB:
+    /^https?:\/\/(www\.)?github\.com\/.+$/i,
+
+  DISCORD:
+    /^https?:\/\/(www\.)?(discord\.gg|discord\.com)\/.+$/i,
+
+  YOUTUBE:
+    /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\/.+$/i,
+
+  INSTAGRAM:
+    /^https?:\/\/(www\.)?instagram\.com\/.+$/i,
+
+  PATREON:
+    /^https?:\/\/(www\.)?patreon\.com\/.+$/i,
+
+  KOFI:
+    /^https?:\/\/(www\.)?ko-fi\.com\/.+$/i,
+
+  TWITCH:
+    /^https?:\/\/(www\.)?twitch\.tv\/.+$/i,
+
+  X:
+    /^https?:\/\/(www\.)?(x\.com|twitter\.com)\/.+$/i,
+
+  TIKTOK:
+    /^https?:\/\/(www\.)?tiktok\.com\/.+$/i,
+
+  WEBSITE:
+    /^https?:\/\/.+$/i,
+};
+
+export class SocialsService {
+  //////////////////////////////////////////////////
+  // GET MY SOCIALS
+  //////////////////////////////////////////////////
+
+  static async getMySocials(
+    userId: number
+  ) {
+    const profile =
+      await prisma.userProfile.findUnique({
+        where: {
+          userId,
+        },
+
+        include: {
+          socials: true,
+        },
+      });
+
+    if (!profile) {
+      throw new NotFoundError(
+        "Perfil no encontrado"
+      );
+    }
+
+    return profile.socials;
+  }
+
+  //////////////////////////////////////////////////
+  // GET USER SOCIALS
+  //////////////////////////////////////////////////
+
+  static async getUserSocials(
+    username: string
+  ) {
+    const user =
+      await prisma.user.findUnique({
+        where: {
+          username,
+        },
+
+        include: {
+          profile: {
+            include: {
+              socials: true,
+            },
+          },
+        },
+      });
+
+    if (!user) {
+      throw new NotFoundError(
+        "Usuario no encontrado"
+      );
+    }
+
+    return (
+      user.profile?.socials ??
+      []
+    );
+  }
+
+  //////////////////////////////////////////////////
+  // UPSERT SOCIAL
+  //////////////////////////////////////////////////
+
+  static async upsertSocial(
+    userId: number,
+    data: UpsertSocialInput
+  ) {
+    const profile =
+      await prisma.userProfile.findUnique({
+        where: {
+          userId,
+        },
+      });
+
+    if (!profile) {
+      throw new NotFoundError(
+        "Perfil no encontrado"
+      );
+    }
+
+    const pattern =
+      SOCIAL_PATTERNS[
+        data.platform
+      ];
+
+    if (
+      !pattern ||
+      !pattern.test(data.url)
+    ) {
+      throw new BadRequestError(
+        "URL inválida para esa plataforma"
+      );
+    }
+
+    return prisma.profileSocial.upsert({
+      where: {
+        profileId_platform: {
+          profileId: profile.id,
+          platform:
+            data.platform,
+        },
+      },
+
+      create: {
+        profileId:
+          profile.id,
+
+        platform:
+          data.platform,
+
+        url:
+          data.url,
+      },
+
+      update: {
+        url:
+          data.url,
+      },
+    });
+  }
+
+  //////////////////////////////////////////////////
+  // DELETE SOCIAL
+  //////////////////////////////////////////////////
+
+  static async deleteSocial(
+    userId: number,
+    platform: SocialPlatform
+  ) {
+    const profile =
+      await prisma.userProfile.findUnique({
+        where: {
+          userId,
+        },
+      });
+
+    if (!profile) {
+      throw new NotFoundError(
+        "Perfil no encontrado"
+      );
+    }
+
+    await prisma.profileSocial.delete({
+      where: {
+        profileId_platform: {
+          profileId:
+            profile.id,
+
+          platform,
+        },
+      },
+    });
+
+    return {
+      message:
+        "Red social eliminada",
+    };
+  }
+}
+---
+socials.types.ts
+import { SocialPlatform } from "@prisma/client";
+
+//////////////////////////////////////////////////
+// CREATE / UPDATE SOCIAL
+//////////////////////////////////////////////////
+
+export interface UpsertSocialInput {
+  platform: SocialPlatform;
+  url: string;
+}
+---
 modules/uploads
 multipart.controller.ts
 import { Request, Response } from "express";
@@ -3190,45 +5627,41 @@ export const updateProfile =
 export const getPublicProfile =
   asyncHandler(
     async (
-      req: any,
-      res: Response
-    ) => {
-      const profile =
-        await UsersService.getPublicProfile(
-          req.params.username
-        );
-
-      res.json(profile);
-    }
-  );
-
-export const updateAvatar =
-  asyncHandler(
-    async (
       req: AuthRequest,
       res: Response
     ) => {
-      const user =
-      await UsersService.updateAvatar(
-        req.userId!,
-        req.body.avatar
-      );
+      const username =
+        req.params.username;
 
-      res.json(user);
+      if (
+        !username ||
+        Array.isArray(username)
+      ) {
+        return res.status(400).json({
+          error: "Username inválido",
+        });
+      }
+
+      const profile =
+        await UsersService.getPublicProfile(
+          username,
+          req.userId
+        );
+
+      res.json(profile);
     }
   );
 ---
 users.routes.ts
 import { Router } from "express";
 
-import { authMiddleware }
-  from "../../middleware/auth.middleware";
+import { authMiddleware } from "../../middleware/auth.middleware";
+import { optionalAuthMiddleware } from "../../middleware/optionalAuth.middleware";
 
 import {
   getCurrentProfile,
   updateProfile,
   getPublicProfile,
-  updateAvatar,
 } from "./users.controller";
 
 const router = Router();
@@ -3259,17 +5692,8 @@ router.patch(
 
 router.get(
   "/:username",
+  optionalAuthMiddleware,
   getPublicProfile
-);
-
-//////////////////////////////////////////////////
-// EDIT PROFILE
-//////////////////////////////////////////////////
-
-router.patch(
-  "/avatar",
-  authMiddleware,
-  updateAvatar
 );
 
 export default router;
@@ -3303,8 +5727,25 @@ export class UsersService {
           username: true,
           email: true,
 
-          avatar: true,
-          bio: true,
+        profile: {
+          select: {
+            displayName: true,
+
+            avatarUrl: true,
+            bannerUrl: true,
+
+            bio: true,
+
+            accentColor: true,
+
+            socials: true,
+            equippedCosmetics: {
+              include: {
+                cosmetic: true,
+              },
+            }
+          },
+        },
 
           role: true,
 
@@ -3424,42 +5865,62 @@ export class UsersService {
       );
     }
 
-    //////////////////////////////////////////////////
-    // UPDATE
-    //////////////////////////////////////////////////
-
-    const updatedUser =
+    if (username) {
       await prisma.user.update({
         where: {
           id: userId,
         },
 
         data: {
-          username:
-            username ??
-            undefined,
+          username,
+        },
+      });
+    }
 
-          bio:
-            bio ??
-            undefined,
+    //////////////////////////////////////////////////
+    // UPDATE
+    //////////////////////////////////////////////////
+
+    const updatedUser =
+      await prisma.userProfile.upsert({
+        where: {
+          userId,
         },
 
-        select: {
-          id: true,
-          username: true,
-          email: true,
+        create: {
+          userId,
 
-          avatar: true,
-          bio: true,
+          displayName:
+            data.displayName,
 
-          role: true,
+          bio:
+            data.bio,
 
-          isVerified: true,
+          avatarUrl:
+            data.avatarUrl,
 
-          createdAt: true,
-          updatedAt: true,
+          bannerUrl:
+            data.bannerUrl,
 
-          lastLoginAt: true,
+          accentColor:
+            data.accentColor,
+        },
+
+        update: {
+          displayName:
+            data.displayName,
+
+          bio:
+            data.bio,
+
+          avatarUrl:
+            data.avatarUrl,
+
+          bannerUrl:
+            data.bannerUrl,
+
+          accentColor:
+            data.accentColor,
         },
       });
 
@@ -3471,7 +5932,8 @@ export class UsersService {
   //////////////////////////////////////////////////
 
   static async getPublicProfile(
-    username: string
+    username: string,
+    viewerId?: number
   ) {
     const user =
       await prisma.user.findUnique({
@@ -3484,9 +5946,26 @@ export class UsersService {
 
           username: true,
 
-          avatar: true,
+        profile: {
+          select: {
+            displayName: true,
 
-          bio: true,
+            avatarUrl: true,
+
+            bannerUrl: true,
+
+            bio: true,
+
+            accentColor: true,
+
+            socials: true,
+            equippedCosmetics: {
+              include: {
+                cosmetic: true,
+              },
+            }
+          },
+        },
 
           createdAt: true,
 
@@ -3507,19 +5986,57 @@ export class UsersService {
       );
     }
 
+    let isFollowing = false;
+
+    if (
+      viewerId &&
+      viewerId !== user.id
+    ) {
+      const follow =
+        await prisma.follow.findUnique({
+          where: {
+            followerId_followingId: {
+              followerId: viewerId,
+              followingId: user.id,
+            },
+          },
+        });
+
+      isFollowing = !!follow;
+    }
+
     return {
       id: user.id,
 
-      username:
-        user.username,
+      username: user.username,
 
-      avatar:
-        user.avatar,
+      profile: {
+        displayName:
+          user.profile?.displayName ?? null,
 
-      bio: user.bio,
+        avatarUrl:
+          user.profile?.avatarUrl ?? null,
+
+        bannerUrl:
+          user.profile?.bannerUrl ?? null,
+
+        bio:
+          user.profile?.bio ?? null,
+
+        accentColor:
+          user.profile?.accentColor ?? null,
+
+        socials:
+          user.profile?.socials ?? [],
+
+        equippedCosmetics:
+          user.profile?.equippedCosmetics ?? [],
+      },
 
       createdAt:
         user.createdAt,
+
+      isFollowing,
 
       stats: {
         mods:
@@ -3536,62 +6053,6 @@ export class UsersService {
       },
     };
   }
-  
-  //////////////////////////////////////////////////
-  // UPDATE AVATAR
-  //////////////////////////////////////////////////
-
-  static async updateAvatar(
-    userId: number,
-    avatar: string
-  ) {
-    if (!avatar?.trim()) {
-      throw new BadRequestError(
-        "Avatar requerido"
-      );
-    }
-
-    const user =
-      await prisma.user.findUnique({
-        where: {
-          id: userId,
-        },
-      });
-
-    if (!user) {
-      throw new NotFoundError(
-        "Usuario no encontrado"
-      );
-    }
-
-    return prisma.user.update({
-      where: {
-        id: userId,
-      },
-
-      data: {
-        avatar,
-      },
-
-      select: {
-        id: true,
-        username: true,
-        email: true,
-
-        avatar: true,
-        bio: true,
-
-        role: true,
-
-        isVerified: true,
-
-        createdAt: true,
-        updatedAt: true,
-
-        lastLoginAt: true,
-      },
-    });
-  }
 }
 ---
 users.type.ts
@@ -3601,7 +6062,16 @@ users.type.ts
 
 export interface UpdateProfileInput {
   username?: string;
+
+  displayName?: string;
+
   bio?: string;
+
+  avatarUrl?: string;
+
+  bannerUrl?: string;
+
+  accentColor?: string;
 }
 ---
 routes/
@@ -5005,7 +7475,11 @@ export class ModService {
             select: {
               id: true,
               username: true,
-              avatar: true,
+              profile: {
+                select: {
+                  avatarUrl: true,
+                },
+              },
             },
           },
         },
@@ -5203,7 +7677,11 @@ sort=${sort}
               select: {
                 id: true,
                 username: true,
-                avatar: true,
+                profile: {
+                  select: {
+                    avatarUrl: true,
+                  },
+                },
               },
             },
           },
@@ -5280,7 +7758,11 @@ sort=${sort}
             select: {
               id: true,
               username: true,
-              avatar: true,
+              profile: {
+                select: {
+                  avatarUrl: true,
+                },
+              },
             },
           },
 

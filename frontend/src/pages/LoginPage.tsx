@@ -20,7 +20,12 @@ export default function LoginPage() {
 
     localStorage.setItem(
       "token",
-      data.token
+      data.accessToken
+    );
+
+    localStorage.setItem(
+      "refreshToken",
+      data.refreshToken
     );
 
     localStorage.setItem(

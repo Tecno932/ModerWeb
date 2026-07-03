@@ -18,6 +18,12 @@ import { errorHandler } from "./middleware/errorHandler.middleware";
 
 import interactionsRoutes from "./modules/interactions/interactions.routes";
 import commentRoutes from "./routes/comment";
+import followsRoutes from "./modules/follows/follows.routes";
+import socialsRoutes from "./modules/socials/socials.routes";
+
+import cosmeticsRoutes from "./modules/cosmetics/cosmetics.routes";
+import inventoryRoutes from "./modules/inventory/inventory.routes";
+import equippedRoutes from "./modules/equipped/equipped.routes";
 
 const app = express();
 
@@ -55,6 +61,17 @@ app.use("/mods", interactionsRoutes);
 
 // 💬 Comments
 app.use("/comments", commentRoutes);
+
+// Follows
+app.use("/follows", followsRoutes);
+
+// Socials
+app.use("/socials", socialsRoutes);
+
+// Inventory
+app.use("/cosmetics", cosmeticsRoutes);
+app.use("/inventory", inventoryRoutes);
+app.use("/equipped", equippedRoutes);
 
 // HEALTH
 app.get("/", (_, res) => {

@@ -164,10 +164,18 @@ import {
   Outlet,
 } from "react-router-dom";
 
-import { useAuth } from "@/context/AuthContext";
+import { useAuth }
+  from "@/features/auth/context/AuthContext";
 
 export default function ProtectedRoute() {
-  const { user } = useAuth();
+  const {
+    user,
+    loading,
+  } = useAuth();
+
+  if (loading) {
+    return <div>Cargando...</div>;
+  }
 
   if (!user) {
     return (
@@ -418,7 +426,11 @@ export const login = async (
   );
 
   if (!res.ok) {
+    const error =
+      await res.json();
+
     throw new Error(
+      error.error ||
       "Error en login"
     );
   }
@@ -463,40 +475,95 @@ export const register = async (
 //////////////////////////////////////////////////
 
 export const getMe =
-  async (token: string) => {
-    const res = await fetch(
-      `${API_URL}/auth/me`,
-      {
-        headers: {
-          Authorization:
-            `Bearer ${token}`,
-        },
-      }
+  async () => {
+    return apiFetch(
+      "/auth/me"
     );
-
-    if (!res.ok) {
-      throw new Error(
-        "No autorizado"
-      );
-    }
-
-    return res.json();
   };
+
+//////////////////////////////////////////////////
+// LOGOUT
+//////////////////////////////////////////////////
+
+export const logout = async (
+  refreshToken: string
+) => {
+  await fetch(
+    `${API_URL}/auth/logout`,
+    {
+      method: "POST",
+
+      headers: {
+        "Content-Type":
+          "application/json",
+      },
+
+      body: JSON.stringify({
+        refreshToken,
+      }),
+    }
+  );
+};
 ---
 hooks.ts
-import { useMutation } from "@tanstack/react-query";
-import { login, register } from "./api";
-
-export function useLogin() {
-  return useMutation({
-    mutationFn: login,
-  });
+export interface UserStats {
+  mods: number;
+  comments: number;
+  followers: number;
+  following: number;
 }
 
-export function useRegister() {
-  return useMutation({
-    mutationFn: register,
-  });
+export interface SocialLink {
+  id: number;
+
+  platform: string;
+
+  url: string;
+}
+
+export interface EquippedCosmetic {
+  id: number;
+
+  type: string;
+
+  cosmetic: {
+    id: number;
+
+    name: string;
+
+    imageUrl: string;
+
+    rarity: string;
+  };
+}
+
+export interface PublicProfile {
+  id: number;
+
+  username: string;
+
+  createdAt: string;
+
+  profile: {
+    displayName: string | null;
+
+    avatarUrl: string | null;
+
+    bannerUrl: string | null;
+
+    bio: string | null;
+
+    accentColor: string | null;
+
+    socials: SocialLink[];
+
+    equippedCosmetics:
+      EquippedCosmetic[];
+  };
+
+  isFollowing: boolean;
+
+  stats: UserStats;
 }
 ---
 types.tsx
@@ -504,26 +571,30 @@ export interface AuthUser {
   id: number;
 
   username: string;
-
   email: string;
-
-  avatar: string | null;
-
-  bio: string | null;
 
   role: string;
 
   isVerified: boolean;
 
   createdAt: string;
-
   updatedAt: string;
 
   lastLoginAt: string | null;
+
+  profile: {
+    displayName: string | null;
+
+    avatarUrl: string | null;
+    bannerUrl: string | null;
+
+    bio: string | null;
+
+    accentColor: string | null;
+  } | null;
 }
 ---
-feactures/auth/context/
-AuthContext.tsx
+feactures/auth/context/AuthContext.tsx
 import {
   createContext,
   useContext,
@@ -531,6 +602,7 @@ import {
 
 import { useMe } from "../hooks/useMe";
 import type { AuthUser } from "../types";
+import { logout as logoutApi } from "../api";
 
 //////////////////////////////////////////////////
 // TYPES
@@ -570,17 +642,37 @@ export function AuthProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const token =
-    localStorage.getItem("token");
-
   const {
     data: user,
     isLoading,
-  } = useMe(token);
+  } = useMe();
 
-  function logout() {
+  async function logout() {
+    try {
+      const refreshToken =
+        localStorage.getItem(
+          "refreshToken"
+        );
+
+      if (refreshToken) {
+        await logoutApi(
+          refreshToken
+        );
+      }
+    } catch (err) {
+      console.error(err);
+    }
+
     localStorage.removeItem(
       "token"
+    );
+
+    localStorage.removeItem(
+      "refreshToken"
+    );
+
+    localStorage.removeItem(
+      "user"
     );
 
     window.location.href =
@@ -615,22 +707,23 @@ export function useAuth() {
   );
 }
 ---
-feactures/auth/hooks/
-useMe.ts
+feactures/auth/hooks/useMe.ts
 import { useQuery }
   from "@tanstack/react-query";
 
 import { getMe }
   from "../api";
 
-export function useMe(
-  token: string | null
-) {
+export function useMe() {
+  const token =
+    localStorage.getItem(
+      "token"
+    );
+
   return useQuery({
     queryKey: ["me"],
 
-    queryFn: () =>
-      getMe(token!),
+    queryFn: getMe,
 
     enabled: !!token,
   });
@@ -3203,6 +3296,206 @@ DashboardSidebar.module.css
   }
 }
 ---
+feactures/equipped/api.ts
+import { API_URL }
+  from "@/shared/config/env";
+
+export async function getMyEquipped(
+  token: string
+) {
+  const res = await fetch(
+    `${API_URL}/equipped/me`,
+    {
+      headers: {
+        Authorization:
+          `Bearer ${token}`,
+      },
+    }
+  );
+
+  if (!res.ok) {
+    throw new Error(
+      "Error cargando equipados"
+    );
+  }
+
+  return res.json();
+}
+
+export async function equipCosmetic(
+  token: string,
+  cosmeticId: number
+) {
+  const res = await fetch(
+    `${API_URL}/equipped/equip`,
+    {
+      method: "POST",
+
+      headers: {
+        "Content-Type":
+          "application/json",
+
+        Authorization:
+          `Bearer ${token}`,
+      },
+
+      body: JSON.stringify({
+        cosmeticId,
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    throw new Error(
+      "Error equipando"
+    );
+  }
+
+  return res.json();
+}
+
+export async function unequipCosmetic(
+  token: string,
+  type: string
+) {
+  const res = await fetch(
+    `${API_URL}/equipped/unequip/${type}`,
+    {
+      method: "DELETE",
+
+      headers: {
+        Authorization:
+          `Bearer ${token}`,
+      },
+    }
+  );
+
+  if (!res.ok) {
+    throw new Error(
+      "Error desequipando"
+    );
+  }
+
+  return res.json();
+}
+---
+feactures/equipped/hooks/useEquipCosmetic.ts
+import {
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
+
+import {
+  equipCosmetic,
+} from "../api";
+
+export function useEquipCosmetic() {
+  const queryClient =
+    useQueryClient();
+
+  const token =
+    localStorage.getItem(
+      "token"
+    ) ?? "";
+
+  return useMutation({
+    mutationFn: (
+      cosmeticId: number
+    ) =>
+      equipCosmetic(
+        token,
+        cosmeticId
+      ),
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [
+          "equipped",
+        ],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: [
+          "profile",
+        ],
+      });
+    },
+  });
+}
+---
+useMyEquipped.ts
+import { useQuery }
+  from "@tanstack/react-query";
+
+import {
+  getMyEquipped,
+} from "../api";
+
+export function useMyEquipped() {
+  const token =
+    localStorage.getItem(
+      "token"
+    );
+
+  return useQuery({
+    queryKey: [
+      "equipped",
+      "me",
+    ],
+
+    queryFn: () =>
+      getMyEquipped(
+        token ?? ""
+      ),
+
+    enabled: !!token,
+  });
+}
+---
+useUnequipCosmetic.ts
+import {
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
+
+import {
+  unequipCosmetic,
+} from "../api";
+
+export function useUnequipCosmetic() {
+  const queryClient =
+    useQueryClient();
+
+  const token =
+    localStorage.getItem(
+      "token"
+    ) ?? "";
+
+  return useMutation({
+    mutationFn: (
+      type: string
+    ) =>
+      unequipCosmetic(
+        token,
+        type
+      ),
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [
+          "equipped",
+        ],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: [
+          "profile",
+        ],
+      });
+    },
+  });
+}
+---
 feactures/favorite/components/
 favoriteButton.tsx
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -3271,6 +3564,193 @@ export default function FavoriteButton({ modId }: any) {
     />
   </button>
   );
+}
+---
+feactures/follows/api.ts
+import { apiFetch }
+  from "@/shared/api/client";
+
+export async function followUser(
+  username: string
+) {
+  return apiFetch(
+    `/follows/${username}`,
+    {
+      method: "POST",
+    }
+  );
+}
+
+export async function unfollowUser(
+  username: string
+) {
+  return apiFetch(
+    `/follows/${username}`,
+    {
+      method: "DELETE",
+    }
+  );
+}
+---
+feactures/follows/components/FollowButton.tsx
+import { useFollow } from "../hooks/useFollow";
+import { useUnfollow } from "../hooks/useUnfollow";
+
+import styles from "./FollowButton.module.css";
+
+interface Props {
+  username: string;
+
+  isFollowing: boolean;
+}
+
+export default function FollowButton({
+  username,
+  isFollowing,
+}: Props) {
+  const follow =
+    useFollow();
+
+  const unfollow =
+    useUnfollow();
+
+  const loading =
+    follow.isPending ||
+    unfollow.isPending;
+
+  async function handleClick() {
+    if (loading) {
+      return;
+    }
+
+    if (isFollowing) {
+      await unfollow.mutateAsync(
+        username
+      );
+    } else {
+      await follow.mutateAsync(
+        username
+      );
+    }
+  }
+
+  return (
+    <button
+      className={`${styles.button} ${
+        isFollowing ? styles.following : styles.follow
+      }`}
+      onClick={handleClick}
+      disabled={loading}
+    >
+      {loading
+        ? "..."
+        : isFollowing
+          ? "Siguiendo"
+          : "Seguir"}
+    </button>
+  );
+}
+---
+FollowButton.module.css
+.button {
+  height: 28px;
+
+  padding: 0 16px;
+
+  border-radius: 999px;
+
+  border: none;
+
+  cursor: pointer;
+
+  font-size: .9rem;
+
+  font-weight: 600;
+
+  transition: .2s;
+}
+
+.follow {
+  background: #1d9bf0;
+  color: white;
+}
+
+.follow:hover {
+  background: #198cd8;
+}
+
+.following {
+  background: rgba(255,255,255,.08);
+  color: inherit;
+}
+
+.following:hover {
+  background: rgba(255,255,255,.12);
+}
+
+@media (max-width: 768px) {
+  .button {
+    height: 24px;
+    padding: 0 14px;
+    font-size: .9rem;
+    font-weight: 600;
+  }
+}
+---
+feactures/follows/hooks/useFollow.ts
+import {
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
+
+import { followUser }
+  from "../api";
+
+export function useFollow() {
+  const queryClient =
+    useQueryClient();
+
+  return useMutation({
+    mutationFn: followUser,
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["profile"],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["me"],
+      });
+    },
+  });
+}
+---
+useUnfollow.ts
+import {
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
+
+import { unfollowUser }
+  from "../api";
+
+export function useUnfollow() {
+  const queryClient =
+    useQueryClient();
+
+  return useMutation({
+    mutationFn: unfollowUser,
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["profile"],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["me"],
+      });
+    },
+  });
 }
 ---
 feactures/interactions/
@@ -3935,6 +4415,274 @@ favoriteButton.module.css
   opacity: 0.7;
 
   cursor: default;
+}
+---
+feactures/inventory/api.tsx
+import { API_URL }
+  from "@/shared/config/env";
+
+export async function getMyInventory(
+  token: string
+) {
+  const res = await fetch(
+    `${API_URL}/inventory/me`,
+    {
+      headers: {
+        Authorization:
+          `Bearer ${token}`,
+      },
+    }
+  );
+
+  if (!res.ok) {
+    throw new Error(
+      "Error cargando inventario"
+    );
+  }
+
+  return res.json();
+}
+---
+types.ts
+export interface CosmeticItem {
+  id: number;
+
+  name: string;
+
+  slug: string;
+
+  description: string | null;
+
+  imageUrl: string;
+
+  rarity: string;
+
+  type: string;
+
+  isActive: boolean;
+}
+
+export interface InventoryItem {
+  id: number;
+
+  quantity: number;
+
+  obtainedAt: string;
+
+  item: CosmeticItem;
+}
+---
+feactures/inventory/components/InventoryCard.tsx
+import styles
+  from "./InventoryCard.module.css";
+
+import type { InventoryItem, } from "../types";
+
+import {
+  useMyEquipped,
+} from "@/features/equipped/hooks/useMyEquipped";
+
+import {
+  useEquipCosmetic,
+} from "@/features/equipped/hooks/useEquipCosmetic";
+
+import {
+  useUnequipCosmetic,
+} from "@/features/equipped/hooks/useUnequipCosmetic";
+
+interface Props {
+  item: InventoryItem;
+}
+
+export default function InventoryCard({
+  item,
+}: Props) {
+  const {
+    data: equipped,
+  } = useMyEquipped();
+
+  const equip =
+    useEquipCosmetic();
+
+  const unequip =
+    useUnequipCosmetic();
+
+  const equippedItem =
+    equipped?.find(
+      (e: any) =>
+        e.type ===
+        item.item.type
+    );
+
+  const isEquipped =
+    equippedItem?.cosmeticId ===
+    item.item.id;
+
+  async function handleEquip() {
+    if (isEquipped) {
+      await unequip.mutateAsync(
+        item.item.type
+      );
+
+      return;
+    }
+
+    await equip.mutateAsync(
+      item.item.id
+    );
+  }
+
+  return (
+    <div
+      className={
+        styles.card
+      }
+    >
+      <img
+        src={
+          item.item.imageUrl
+        }
+        alt={
+          item.item.name
+        }
+      />
+
+      <h3>
+        {item.item.name}
+      </h3>
+
+      <span>
+        {item.item.type}
+      </span>
+
+      <span>
+        {item.item.rarity}
+      </span>
+
+      <span>
+        x{item.quantity}
+      </span>
+
+      <button
+        onClick={handleEquip}
+        disabled={
+          equip.isPending ||
+          unequip.isPending
+        }
+      >
+        {equip.isPending ||
+        unequip.isPending
+          ? "..."
+          : isEquipped
+          ? "Desequipar"
+          : "Equipar"}
+      </button>
+    </div>
+  );
+}
+---
+InventoryCard.module.css
+.card {
+  display: flex;
+  flex-direction: column;
+
+  gap: 0.5rem;
+
+  padding: 1rem;
+
+  border-radius: 12px;
+
+  background: var(--surface);
+
+  border: 1px solid var(--border);
+}
+
+.card img {
+  width: 100%;
+  height: 160px;
+
+  object-fit: cover;
+
+  border-radius: 8px;
+}
+---
+InventoryGrid.tsx
+import type { InventoryItem, } from "../types";
+
+import InventoryCard
+  from "./InventoryCard";
+
+import styles
+  from "./InventoryGrid.module.css";
+
+interface Props {
+  items: InventoryItem[];
+}
+
+export default function InventoryGrid({
+  items,
+}: Props) {
+  return (
+    <div
+      className={
+        styles.grid
+      }
+    >
+      {items.map(
+        (item) => (
+          <InventoryCard
+            key={item.id}
+            item={item}
+          />
+        )
+      )}
+    </div>
+  );
+}
+---
+InventoryGrid.module.css
+.grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      auto-fill,
+      minmax(
+        220px,
+        1fr
+      )
+    );
+
+  gap: 1rem;
+}
+---
+feactures/inventory/hooks/useMyInventory.ts
+import { useQuery }
+  from "@tanstack/react-query";
+
+import {
+  getMyInventory,
+} from "../api";
+
+export function useMyInventory() {
+  const token =
+    localStorage.getItem(
+      "token"
+    );
+
+  return useQuery({
+    queryKey: [
+      "inventory",
+      "me",
+    ],
+
+    queryFn: () =>
+      getMyInventory(
+        token ?? ""
+      ),
+
+    enabled: !!token,
+  });
 }
 ---
 feactures/like/
@@ -5964,6 +6712,378 @@ export function useDebounce<T>(
   }, [value, delay]);
 
   return debounced;
+}
+---
+feactures/socials/api.ts
+import { API_URL }
+  from "@/shared/config/env";
+
+//////////////////////////////////////////////////
+// GET MY SOCIALS
+//////////////////////////////////////////////////
+
+export async function getMySocials(
+  token: string
+) {
+  const res = await fetch(
+    `${API_URL}/socials/me`,
+    {
+      headers: {
+        Authorization:
+          `Bearer ${token}`,
+      },
+    }
+  );
+
+  if (!res.ok) {
+    throw new Error(
+      "Error cargando redes"
+    );
+  }
+
+  return res.json();
+}
+
+//////////////////////////////////////////////////
+// SAVE SOCIAL
+//////////////////////////////////////////////////
+
+export async function saveSocial(
+  token: string,
+  data: {
+    platform: string;
+    url: string;
+  }
+) {
+  const res = await fetch(
+    `${API_URL}/socials/me`,
+    {
+      method: "PUT",
+
+      headers: {
+        "Content-Type":
+          "application/json",
+
+        Authorization:
+          `Bearer ${token}`,
+      },
+
+      body:
+        JSON.stringify(data),
+    }
+  );
+
+  if (!res.ok) {
+    const error =
+      await res.json();
+
+    throw new Error(
+      error.error ??
+      "Error guardando red"
+    );
+  }
+
+  return res.json();
+}
+
+//////////////////////////////////////////////////
+// DELETE SOCIAL
+//////////////////////////////////////////////////
+
+export async function deleteSocial(
+  token: string,
+  platform: string
+) {
+  const res = await fetch(
+    `${API_URL}/socials/me/${platform}`,
+    {
+      method: "DELETE",
+
+      headers: {
+        Authorization:
+          `Bearer ${token}`,
+      },
+    }
+  );
+
+  if (!res.ok) {
+    throw new Error(
+      "Error eliminando red"
+    );
+  }
+
+  return res.json();
+}
+---
+types.ts
+export interface SocialLink {
+  id: number;
+
+  platform: string;
+
+  url: string;
+}
+
+export interface SaveSocialInput {
+  platform: string;
+
+  url: string;
+}
+---
+feactures/socials/components/socialsManager/socialsManager.tsx
+import { useState }
+  from "react";
+
+import {
+  useMySocials,
+} from "../../hooks/useMySocials";
+
+import {
+  useSaveSocial,
+} from "../../hooks/useSaveSocial";
+
+import {
+  useDeleteSocial,
+} from "../../hooks/useDeleteSocial";
+
+interface Props {
+  token: string;
+}
+
+const platforms = [
+    "GITHUB",
+    "DISCORD",
+    "YOUTUBE",
+    "INSTAGRAM",
+    "PATREON",
+    "KOFI",
+    "TWITCH",
+    "X",
+    "TIKTOK",
+    "WEBSITE",
+];
+
+export default function SocialsManager({
+  token,
+}: Props) {
+  const {
+    data = [],
+  } = useMySocials(
+    token
+  );
+
+  const saveSocial =
+    useSaveSocial(token);
+
+  const deleteSocial =
+    useDeleteSocial(token);
+
+  const [urls, setUrls] =
+    useState<
+      Record<string, string>
+    >({});
+
+  function getValue(
+    platform: string
+  ) {
+    return (
+      urls[platform] ??
+      data.find(
+        (s: any) =>
+          s.platform ===
+          platform
+      )?.url ??
+      ""
+    );
+  }
+
+  async function handleSave(
+    platform: string
+  ) {
+    const url =
+      getValue(platform);
+
+    if (!url.trim()) {
+      return;
+    }
+
+    await saveSocial.mutateAsync({
+      platform,
+      url,
+    });
+  }
+
+  async function handleDelete(
+    platform: string
+  ) {
+    await deleteSocial.mutateAsync(
+      platform
+    );
+  }
+
+  return (
+    <div>
+      <h2>
+        Redes Sociales
+      </h2>
+
+      {platforms.map(
+        (platform) => (
+          <div key={platform}>
+            <label>
+              {platform}
+            </label>
+
+            <input
+              value={getValue(
+                platform
+              )}
+              onChange={(e) =>
+                setUrls(
+                  (
+                    prev
+                  ) => ({
+                    ...prev,
+
+                    [platform]:
+                      e.target
+                        .value,
+                  })
+                )
+              }
+            />
+
+            <button
+              onClick={() =>
+                handleSave(
+                  platform
+                )
+              }
+            >
+              Guardar
+            </button>
+
+            <button
+              onClick={() =>
+                handleDelete(
+                  platform
+                )
+              }
+            >
+              Eliminar
+            </button>
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+---
+feactures/socials/hooks/useDeleteSocial.tsx
+import {
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
+
+import { deleteSocial }
+  from "../api";
+
+export function useDeleteSocial(
+  token: string
+) {
+  const queryClient =
+    useQueryClient();
+
+  return useMutation({
+    mutationFn: (
+      platform: string
+    ) =>
+      deleteSocial(
+        token,
+        platform
+      ),
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [
+          "my-socials",
+        ],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["me"],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["profile"],
+      });
+    },
+  });
+}
+---
+useSaveSocial.ts
+import {
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
+
+import { saveSocial }
+  from "../api";
+
+export function useSaveSocial(
+  token: string
+) {
+  const queryClient =
+    useQueryClient();
+
+  return useMutation({
+    mutationFn: (
+      data: {
+        platform: string;
+        url: string;
+      }
+    ) =>
+      saveSocial(
+        token,
+        data
+      ),
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [
+          "my-socials",
+        ],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["me"],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["profile"],
+      });
+    },
+  });
+}
+---
+useMySocialst.ts
+import { useQuery }
+  from "@tanstack/react-query";
+
+import { getMySocials }
+  from "../api";
+
+export function useMySocials(
+  token: string
+) {
+  return useQuery({
+    queryKey: ["my-socials"],
+
+    queryFn: () =>
+      getMySocials(token),
+
+    enabled: !!token,
+  });
 }
 ---
 feactures/upload-version/
@@ -8650,8 +9770,21 @@ import { API_URL }
 export async function getProfile(
   username: string
 ) {
+  const token =
+    localStorage.getItem(
+      "token"
+    );
+
   const res = await fetch(
-    `${API_URL}/users/${username}`
+    `${API_URL}/users/${username}`,
+    {
+      headers: token
+        ? {
+            Authorization:
+              `Bearer ${token}`,
+          }
+        : {},
+    }
   );
 
   if (!res.ok) {
@@ -8696,7 +9829,16 @@ export async function updateProfile(
   token: string,
   data: {
     username?: string;
+
+    displayName?: string;
+
     bio?: string;
+
+    avatarUrl?: string;
+
+    bannerUrl?: string;
+
+    accentColor?: string;
   }
 ) {
   const res = await fetch(
@@ -8747,131 +9889,593 @@ export interface PublicProfile {
 
   createdAt: string;
 
+  isFollowing: boolean;
+
+  profile: {
+    displayName: string | null;
+
+    avatarUrl: string | null;
+    bannerUrl: string | null;
+
+    bio: string | null;
+
+    accentColor: string | null;
+
+    socials: ProfileSocial[];
+
+    equippedCosmetics: any[];
+  };
+
   stats: UserStats;
+}
+
+export interface ProfileSocial {
+  id: number;
+
+  platform:
+    | "GITHUB"
+    | "DISCORD"
+    | "YOUTUBE"
+    | "INSTAGRAM"
+    | "PATREON"
+    | "KOFI"
+    | "TWITCH"
+    | "X"
+    | "TIKTOK"
+    | "WEBSITE";
+
+  url: string;
 }
 ---
 src/feactures/users/components/ProfileHeader.tsx
 import styles from "./ProfileHeader.module.css";
-
 interface Props {
-  username: string;
-  bio: string | null;
-  avatar: string | null;
-  createdAt: string;
+  username:    string;
+  displayName: string | null;
+  bio:         string | null;
+  avatarUrl:   string | null;
+  bannerUrl:   string | null;
+  createdAt:   string;
 
-  canEdit?: boolean;
-  onEdit?: () => void;
+  canEdit?:    boolean;
+  onEdit?: ()  => void;
+
+  stats?:      React.ReactNode;
+  socials?:    React.ReactNode;
+
+  actionButton?: React.ReactNode;
 }
 
 export default function ProfileHeader({
   username,
+  displayName,
   bio,
-  avatar,
-  createdAt,
+  avatarUrl,
+  bannerUrl,
   canEdit,
   onEdit,
+  stats,
+  socials,
+  actionButton,
 }: Props) {
-  const memberSince =
-    new Date(
-      createdAt
-    ).toLocaleDateString();
-
   return (
-    <div className={styles.header}>
-      <div className={styles.avatar}>
-        {avatar ? (
-          <img
-            src={avatar}
-            alt={username}
-          />
-        ) : (
-          username
-            .charAt(0)
-            .toUpperCase()
-        )}
+    <div className={styles.wrapper}>
+      <div className={styles.banner}>
+        {bannerUrl && <img src={bannerUrl} alt="Banner" />}
       </div>
 
-      <h1>{username}</h1>
+        <div className={styles.overlay}>
 
-      <p className={styles.bio}>
-        {bio ??
-          "No biography yet."}
-      </p>
+          {/* TOP: avatar + name */}
+          <div className={styles.top}>
+            <div className={styles.avatar}>
+              {avatarUrl ? (
+                <img src={avatarUrl} alt={username} />
+              ) : (
+                username.charAt(0).toUpperCase()
+              )}
+            </div>
 
-      <span
-        className={
-          styles.memberSince
-        }
-      >
-        Member since {memberSince}
-      </span>
-      
-      {canEdit && (
-        <button
-          className={
-            styles.editButton
-          }
-          onClick={onEdit}
-        >
-          Edit Profile
-        </button>
-      )}
+            <div className={styles.mainInfo}>
+              <div className={styles.nameRow}>
+                <p className={styles.name}>
+                  {displayName ?? username}
+                </p>
+
+                {actionButton}
+              </div>
+
+              {stats && (
+                <div className={styles.stats}>
+                  {stats}
+                </div>
+              )}
+
+              {socials && (
+                <div className={styles.socials}>
+                  {socials}
+                </div>
+              )}
+            </div>
+
+          {/* BIO */}
+          </div>
+          <div className={styles.bio}>
+            {bio ?? "Este usuario todavía no agregó una biografía."}
+          </div>
+
+          {canEdit && (
+            <button className={styles.editButton} onClick={onEdit}>
+              Editar perfil
+            </button>
+          )}
+
+        </div>
     </div>
   );
 }
 ---
 ProfileHeader.module.css
-.header {
+.wrapper {
+  width: 100%;
+}
+
+/* BANNER DESKTOP */
+.banner {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 1;
+  overflow: hidden;
+  background: linear-gradient(
+    to top,
+    rgba(250, 52, 52, 0.78),
+    rgba(51, 44, 251, 0.25),
+    transparent
+  );
+}
+
+.banner img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* overlay base */
+.overlay {
+  position:relative;
+  margin-top: -44px;
+  margin-left: 0;
   display: flex;
-
   flex-direction: column;
+  justify-content: space-between;
+  padding: 0 1rem 1.5rem;
+  z-index:5;
+    border-left: 1px solid rgba(255,255,255,0.06);
+    border-right: 1px solid rgba(255,255,255,0.06);
+}
 
-  align-items: center;
-
-  text-align: center;
-
+/* TOP ROW (IG style) */
+.top {
+  display: flex;
+  align-items: flex-start;
   gap: 1rem;
 }
 
-.avatar {
-  width: 120px;
-  height: 120px;
-
-  border-radius: 50%;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  font-size: 3rem;
-  font-weight: bold;
-
-  background: #202020;
+.avatar{
+  width:120px;
+  height:120px;
+  border-radius:50%;
+  overflow:hidden;
+  border:5px solid var(--background);
+  background:#222;
+  border: 3px solid #0f0f0f;
 }
 
 .avatar img {
   width: 100%;
   height: 100%;
-
   object-fit: cover;
-
-  border-radius: inherit;
 }
 
+.mainInfo{
+    display:flex;
+    flex-direction:column;
+    justify-content:flex-start;
+    gap:.55rem;
+    min-height:120px;
+
+    min-width:0;   /* <-- IMPORTANTE */
+    flex:1;
+}
+
+/* nombre limpio */
+.name {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.nameRow{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:.75rem;
+    flex-wrap:nowrap;
+}
+
+.nameInput{
+    flex:1;
+    min-width:0;
+
+    max-width:220px;
+
+    padding:0 0 .35rem;
+
+    border:none;
+    border-bottom:1px solid rgba(255,255,255,.12);
+
+    background:transparent;
+
+    color:inherit;
+
+    font-size:1.35rem;
+    font-weight:500;
+}
+
+.nameInput:hover{
+    border-bottom-color:rgba(255,255,255,.22);
+}
+
+.nameInput:focus{
+    outline:none;
+    border-bottom-color:var(--primary);
+}
+
+
+
+
+
+/* NOMBRE */
+.usernameRow{
+    display:flex;
+    align-items:center;
+    gap:.2rem;
+    margin-top:.2rem;
+}
+
+.usernameRow span{
+    opacity:.55;
+    font-size:.95rem;
+}
+
+.usernameInput{
+    width:fit-content;
+    min-width:140px;
+    max-width:220px;
+    padding:0 0 .25rem;
+    border:none;
+    border-bottom:1px solid rgba(255,255,255,.12);
+    background:transparent;
+    color:inherit;
+    font-size:.92rem;
+    opacity:.85;
+}
+
+.usernameInput:focus{
+    outline:none;
+    border-bottom-color:var(--primary);
+}
+
+
+
+
+/* BIOGRAFIA */
+.bioInput{
+    display:block;
+    width:100%;
+    max-width:540px;
+    min-height:70px;
+    max-height:180px;
+    overflow-y:auto;
+    overflow-x:hidden;
+    resize:none;
+    padding:0 0 .45rem;
+    margin-top:1rem;
+    border:none;
+    border-bottom:1px solid rgba(255,255,255,.12);
+    background:transparent;
+    color:inherit;
+    font:inherit;
+    line-height:1.5;
+    white-space:pre-wrap;
+    overflow-wrap:anywhere;
+    word-break:break-word;
+}
+
+.bioInput:focus{
+    outline:none;
+    border-bottom-color:var(--primary);
+}
+
+
+
+
+/* CONTADOR */
+.counter{
+    width:fit-content;
+    margin-top:.15rem;
+    margin-left:auto;
+    font-size:.72rem;
+    opacity:.45;
+}
+
+/* username secundario */
+.handle {
+  margin-top: 0.15rem;
+  font-size: 0.85rem;
+  opacity: 0.65;
+}
+
+/* STATS (IMPORTANTE: no cards) */
+.stats {
+  display: flex;
+  margin-top: -12px;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* SOCIALS debajo stats */
+.socials {
+  display: flex;
+  margin-top: -14px;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* BIO */
 .bio {
-  max-width: 600px;
-  opacity: 0.8;
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+  opacity: 0.9;
+  max-width: 650px;
+  line-height: 1.4;
 }
 
-.memberSince {
-  opacity: 0.6;
-  font-size: 0.9rem;
+/* EDIT */
+.editButton{
+  height: 26px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+
+  gap: .45rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.08);
+
+  background: rgba(255,255,255,.05);
+  color: inherit;
+  cursor: pointer;
+
+  font-size: .9rem;
+  font-weight: 600;
+  transition: .2s;
+}
+
+/* 🔥 MOBILE REAL IG STYLE */
+@media (max-width: 768px) {
+  .wrapper {
+    margin-top: -90px;
+  }
+
+  .banner {
+      width: 100vw;
+      margin-left: calc(50% - 50vw);
+  }
+
+  .overlay{
+    position: relative;
+    width:100vw;
+    margin-left:calc(50% - 50vw);
+    margin-top:-44px;
+    padding:0 1rem 1.5rem;
+    box-sizing:border-box;
+  }
+
+  /* avatar + name horizontal limpio */
+  .top {
+    display: flex;
+    flex-direction: row;
+    gap: 0.75rem;
+  }
+
+  .avatar {
+    width:92px;
+    height:92px;
+  }
+
+  .name {
+    font-size: 1.2rem;
+  }
+
+  .mainInfo {
+    padding-top:18px;
+    min-height: auto;
+    gap: 0.1rem;
+  }
+
+    .nameRow{
+        gap:.5rem;
+    }
+
+  .nameInput{
+      width:120px;
+      max-width:120px;
+      font-size:1.15rem;
+  }
+
+    .editButton{
+      margin-top:0;
+      flex-shrink:0;
+      padding:.4rem .8rem;
+    }
+
+  .usernameInput{
+      max-width:150px;
+      font-size:.86rem;
+  }
+
+  .handle {
+    margin-bottom: .15rem;
+  }
+
+  .stats {
+    gap: .45rem;
+    margin-top: -10px;
+  }
+
+  .bio {
+    margin-top: 0.75rem;
+    font-size: 0.88rem;
+    opacity: 0.85;
+  }
+
+  .bioInput{
+      min-width:100%;
+      max-width:100%;
+      font-size:.9rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .overlay {
+    border-left: 1px solid rgba(255,255,255,0.06);
+    border-right: 1px solid rgba(255,255,255,0.06);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+}
+---
+ProfileSocials.tsx
+import styles
+  from "./ProfileCosmetics.module.css";
+
+interface Props {
+  cosmetics: any[];
+}
+
+export default function ProfileCosmetics({
+  cosmetics,
+}: Props) {
+  if (
+    cosmetics.length === 0
+  ) {
+    return null;
+  }
+
+  return (
+    <div
+      className={
+        styles.container
+      }
+    >
+      <h2>
+        Cosméticos Equipados
+      </h2>
+
+      <div
+        className={
+          styles.grid
+        }
+      >
+        {cosmetics.map(
+          (item) => (
+            <div
+              key={item.id}
+              className={
+                styles.card
+              }
+            >
+              <img
+                src={
+                  item.cosmetic
+                    .imageUrl
+                }
+                alt={
+                  item.cosmetic
+                    .name
+                }
+              />
+
+              <h3>
+                {
+                  item.cosmetic
+                    .name
+                }
+              </h3>
+
+              <span>
+                {
+                  item.type
+                }
+              </span>
+            </div>
+          )
+        )}
+      </div>
+    </div>
+  );
+}
+---
+ProfileSocials.module.css
+.links {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+
+  margin-top: 0.75rem;
+}
+
+/* cada icono = solo clickable glyph */
+.link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 30px;
+  height: 30px;
+
+  border-radius: 6px;
+
+  text-decoration: none;
+
+  font-size: 1rem;
+
+  opacity: 0.7;
+
+  transition: 0.15s ease;
+}
+
+.link:hover {
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+/* mobile más compacto */
+@media (max-width: 768px) {
+  .links {
+    gap: 0.6rem;
+  }
+
+  .link {
+    width: 28px;
+    height: 28px;
+    font-size: 0.95rem;
+  }
 }
 ---
 ProfileStats.tsx
 interface Props {
   mods: number;
-  comments: number;
   followers: number;
   following: number;
 }
@@ -8880,7 +10484,6 @@ import styles from "./ProfileStats.module.css";
 
 export default function ProfileStats({
   mods,
-  comments,
   followers,
   following,
 }: Props) {
@@ -8892,18 +10495,13 @@ export default function ProfileStats({
       </div>
 
       <div>
-        <strong>{comments}</strong>
-        <span>Comments</span>
-      </div>
-
-      <div>
         <strong>{followers}</strong>
-        <span>Followers</span>
+        <span>Seguidores</span>
       </div>
 
       <div>
         <strong>{following}</strong>
-        <span>Following</span>
+        <span>Seguidos</span>
       </div>
     </div>
   );
@@ -8911,42 +10509,339 @@ export default function ProfileStats({
 ---
 ProfileStats.module.css
 .stats {
-  display: grid;
+  display: flex;
+  gap: 1.25rem;
+  align-items: center;
+  flex-wrap: wrap;
 
-  grid-template-columns:
-    repeat(4, 1fr);
-
-  gap: 1rem;
-
-  margin-top: 2rem;
+  margin-top: 0.75rem;
 }
 
+/* cada item = solo texto */
 .stats div {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
 
-  align-items: center;
+  gap: 0.15rem;
+  padding: 0;
+  margin: 0;
+}
 
-  padding: 1rem;
+/* número */
+.stats strong {
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1;
+  color: inherit;
+}
+
+/* label */
+.stats span {
+  font-size: 0.75rem;
+  opacity: 0.6;
+  line-height: 1;
+}
+
+/* MOBILE: aún más compacto */
+@media (max-width: 768px) {
+  .stats {
+    gap: 1rem;
+    justify-content: flex-start;
+  }
+
+  .stats strong {
+    font-size: 0.9rem;
+  }
+
+  .stats span {
+    font-size: 0.7rem;
+  }
+}
+---
+src/feactures/users/components/EditProfileForm/EditProfileForm.tsx
+import styles from "../userheader/ProfileHeader.module.css";
+
+interface FormData {
+  username: string;
+  displayName: string;
+  bio: string;
+  avatarUrl: string;
+  bannerUrl: string;
+  accentColor: string;
+}
+
+interface Props {
+  form: FormData;
+  setForm: React.Dispatch<React.SetStateAction<FormData>>;
+
+  loading?: boolean;
+  stats?: React.ReactNode;
+  socials?: React.ReactNode;
+
+  onSubmit: (data: FormData) => Promise<void>;
+}
+
+export default function EditProfileHeader({
+  form,
+  setForm,
+  loading,
+  stats,
+  socials,
+  onSubmit,
+}: Props) {
+
+function updateField(
+  field: keyof FormData,
+  value: string
+) {
+  console.log(field, value);
+
+  setForm((prev) => ({
+    ...prev,
+    [field]: value,
+  }));
+}
+
+  async function handleSubmit(
+    e: React.FormEvent
+  ) {
+    e.preventDefault();
+
+    await onSubmit(form);
+  }
+
+  return (
+    <form
+      className={styles.wrapper}
+      onSubmit={handleSubmit}
+    >
+      {/* Banner */}
+      <div className={styles.banner}>
+        {form.bannerUrl && (
+          <img
+            src={form.bannerUrl}
+            alt="Banner"
+          />
+        )}
+      </div>
+
+      <div className={styles.overlay}>
+        <div className={styles.top}>
+          {/* Avatar */}
+
+          <div className={styles.avatar}>
+            {form.avatarUrl ? (
+              <img
+                src={form.avatarUrl}
+                alt={form.username}
+              />
+            ) : (
+              form.username
+                .charAt(0)
+                .toUpperCase()
+            )}
+          </div>
+
+          {/* Información */}
+
+          <div className={styles.mainInfo}>
+            <div className={styles.nameRow}>
+              <input
+                autoComplete="off"
+                className={styles.nameInput}
+                value={form.displayName}
+                placeholder="Nombre"
+                maxLength={40}
+                onChange={(e) =>
+                  updateField(
+                    "displayName",
+                    e.target.value
+                  )
+                }
+              />
+
+              <button
+                type="submit"
+                className={styles.editButton}
+                disabled={loading}
+              >
+                {loading
+                  ? "Guardando..."
+                  : "Guardar"}
+              </button>
+            </div>
+
+            <div className={styles.counter}>
+              {form.displayName.length}/40
+            </div>
+
+            <div className={styles.usernameRow}>
+              <input
+                autoComplete="off"
+                className={styles.usernameInput}
+                value={form.username}
+                placeholder="username"
+                maxLength={24}
+                onChange={(e) =>
+                  updateField(
+                    "username",
+                    e.target.value
+                  )
+                }
+              />
+            </div>
+
+            <div className={styles.counter}>
+              {form.username.length}/24
+            </div>
+
+            {stats && (
+              <div className={styles.stats}>
+                {stats}
+              </div>
+            )}
+
+            {socials && (
+              <div className={styles.socials}>
+                {socials}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <textarea
+          autoComplete="off"
+          className={styles.bioInput}
+          rows={4}
+          maxLength={220}
+          placeholder="Contale algo a la comunidad..."
+          value={form.bio}
+          onChange={(e) =>
+            updateField(
+              "bio",
+              e.target.value
+            )
+          }
+        />
+
+        <div className={styles.counter}>
+          {form.bio.length}/220
+        </div>
+      </div>
+    </form>
+  );
+}
+---
+src/feactures/users/components/ProfileCosmetics/ProfileCosmetics.tsx
+import styles
+  from "./ProfileCosmetics.module.css";
+
+interface Props {
+  cosmetics: any[];
+}
+
+export default function ProfileCosmetics({
+  cosmetics,
+}: Props) {
+  if (
+    cosmetics.length === 0
+  ) {
+    return null;
+  }
+
+  return (
+    <div
+      className={
+        styles.container
+      }
+    >
+      <h2>
+        Cosméticos Equipados
+      </h2>
+
+      <div
+        className={
+          styles.grid
+        }
+      >
+        {cosmetics.map(
+          (item) => (
+            <div
+              key={item.id}
+              className={
+                styles.card
+              }
+            >
+              <img
+                src={
+                  item.cosmetic
+                    .imageUrl
+                }
+                alt={
+                  item.cosmetic
+                    .name
+                }
+              />
+
+              <h3>
+                {
+                  item.cosmetic
+                    .name
+                }
+              </h3>
+
+              <span>
+                {
+                  item.type
+                }
+              </span>
+            </div>
+          )
+        )}
+      </div>
+    </div>
+  );
+}
+---
+ProfileCosmetics.moduel.css
+.container {
+  margin-top: 2rem;
+}
+
+.grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      auto-fill,
+      minmax(
+        180px,
+        1fr
+      )
+    );
+
+  gap: 1rem;
+}
+
+.card {
+  border: 1px solid #333;
 
   border-radius: 12px;
 
-  background: var(--surface);
+  padding: 1rem;
+
+  text-align: center;
 }
 
-.stats strong {
-  font-size: 1.5rem;
-}
+.card img {
+  width: 100%;
 
-.stats span {
-  opacity: 0.7;
-}
+  height: 120px;
 
-@media (max-width: 768px) {
-  .stats {
-    grid-template-columns:
-      repeat(2, 1fr);
-  }
+  object-fit: cover;
+
+  border-radius: 8px;
 }
 ---
 src/feactures/users/hooks/useProfile.ts
@@ -8991,7 +10886,16 @@ export function useUpdateProfile(
     mutationFn: (
       data: {
         username?: string;
+
+        displayName?: string;
+
         bio?: string;
+
+        avatarUrl?: string;
+
+        bannerUrl?: string;
+
+        accentColor?: string;
       }
     ) =>
       updateProfile(
@@ -9333,7 +11237,12 @@ export default function LoginPage() {
 
     localStorage.setItem(
       "token",
-      data.token
+      data.accessToken
+    );
+
+    localStorage.setItem(
+      "refreshToken",
+      data.refreshToken
     );
 
     localStorage.setItem(
@@ -9416,135 +11325,113 @@ export default function RegisterPage() {
 }
 ---
 pages/EditProfilePage/EditProfilePage.tsx
+import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 
-import { useNavigate } from "react-router-dom";
+import Container from "@/shared/ui/container/Container";
 
-import { useAuth }
-  from "@/features/auth/context/AuthContext";
+import { useAuth } from "@/features/auth/context/AuthContext";
+import { useUpdateProfile } from "@/features/users/hooks/useUpdateProfile";
+import { useMyInventory } from "@/features/inventory/hooks/useMyInventory";
 
-import { useUpdateProfile }
-  from "@/features/users/hooks/useUpdateProfile";
+import EditProfileHeader from "@/features/users/components/EditProfileForm/EditProfileForm";
+import SocialsManager from "@/features/socials/components/SocialsManager/SocialsManager";
+
+import InventoryGrid from "@/features/inventory/components/InventoryGrid";
+
+import styles from "./EditProfilePage.module.css";
 
 export default function EditProfilePage() {
-  const navigate =
-    useNavigate();
+  const navigate = useNavigate();
 
-  const {
-    user,
-    loading,
-  } = useAuth();
+  const { user, loading } = useAuth();
+  const token = localStorage.getItem("token");
 
-  const token =
-    localStorage.getItem(
-      "token"
-    );
+  const updateProfile = useUpdateProfile(token ?? "");
+  const inventory = useMyInventory();
 
-  const updateProfile =
-    useUpdateProfile(
-      token ?? ""
-    );
-
-  const [username, setUsername] =
-    useState("");
-
-  const [bio, setBio] =
-    useState("");
-
-  //////////////////////////////////////////////////
-  // LOAD USER
-  //////////////////////////////////////////////////
+  const [form, setForm] = useState({
+    username: "",
+    displayName: "",
+    bio: "",
+    avatarUrl: "",
+    bannerUrl: "",
+    accentColor: "",
+  });
 
   useEffect(() => {
     if (!user) return;
 
-    setUsername(
-      user.username
-    );
-
-    setBio(
-      user.bio ?? ""
-    );
+    setForm({
+      username: user.username,
+      displayName: user.profile?.displayName ?? "",
+      bio: user.profile?.bio ?? "",
+      avatarUrl: user.profile?.avatarUrl ?? "",
+      bannerUrl: user.profile?.bannerUrl ?? "",
+      accentColor: user.profile?.accentColor ?? "",
+    });
   }, [user]);
 
-  //////////////////////////////////////////////////
-  // SUBMIT
-  //////////////////////////////////////////////////
-
-  async function handleSubmit(
-    e: React.FormEvent
-  ) {
-    e.preventDefault();
-
-    try {
-      await updateProfile.mutateAsync({
-        username,
-        bio,
-      });
-
-      navigate(
-        `/users/${username}`
-      );
-    } catch (error) {
-      console.error(error);
-    }
-  }
-
-  //////////////////////////////////////////////////
-  // LOADING
-  //////////////////////////////////////////////////
-
   if (loading) {
-    return (
-      <div>
-        Cargando...
-      </div>
-    );
+    return <Container>Cargando...</Container>;
   }
 
-  //////////////////////////////////////////////////
-  // RENDER
-  //////////////////////////////////////////////////
+  if (!user) {
+    return <Container>No autorizado</Container>;
+  }
+
+  async function handleSubmit(data: {
+    username: string;
+    displayName: string;
+    bio: string;
+    avatarUrl: string;
+    bannerUrl: string;
+    accentColor: string;
+  }) {
+    await updateProfile.mutateAsync(data);
+    navigate(`/users/${data.username}`);
+  }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-    >
-      <h1>
-        Edit Profile
-      </h1>
+    <Container>
+      <div className={styles.layout}>
 
-      <input
-        value={username}
-        onChange={(e) =>
-          setUsername(
-            e.target.value
-          )
-        }
-        placeholder="Username"
-      />
+        {/* SIDEBAR = EDICIÓN */}
+        <aside className={styles.sidebar}>
 
-      <textarea
-        value={bio}
-        onChange={(e) =>
-          setBio(
-            e.target.value
-          )
-        }
-        placeholder="Biography"
-      />
+<EditProfileHeader
+    form={form}
+    setForm={setForm}
+    loading={updateProfile.isPending}
+    onSubmit={handleSubmit}
+/>
 
-      <button
-        disabled={
-          updateProfile.isPending
-        }
-        type="submit"
-      >
-        {updateProfile.isPending
-          ? "Saving..."
-          : "Save Changes"}
-      </button>
-    </form>
+          <SocialsManager token={token ?? ""} />
+
+        </aside>
+
+        {/* CONTENT = INVENTARIO */}
+        <main className={styles.content}>
+
+          <div className={styles.section}>
+            <h2>Cosméticos</h2>
+            <p className={styles.description}>
+              Equipá marcos, fondos, insignias y otros elementos visuales de tu perfil.
+            </p>
+          </div>
+
+          {inventory.isLoading ? (
+            <p>Cargando inventario...</p>
+          ) : inventory.error ? (
+            <p>Error cargando el inventario.</p>
+          ) : (
+            <InventoryGrid items={inventory.data ?? []} />
+          )}
+
+        </main>
+
+      </div>
+    </Container>
   );
 }
 ---
@@ -9664,71 +11551,133 @@ HomePage.module.css
   }
 }
 ---
+pages/ProfilePage/InventoryPage/InventoryPage.tsx
+import Container
+  from "@/shared/ui/container/Container";
+
+import {
+  useMyInventory,
+} from "@/features/inventory/hooks/useMyInventory";
+
+import InventoryGrid
+  from "@/features/inventory/components/InventoryGrid";
+
+export default function InventoryPage() {
+  const {
+    data,
+    isLoading,
+    error,
+  } =
+    useMyInventory();
+
+  if (isLoading) {
+    return (
+      <Container>
+        Cargando...
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container>
+        Error cargando inventario
+      </Container>
+    );
+  }
+
+  return (
+    <Container>
+      <h1>
+        Mi Inventario
+      </h1>
+
+      <InventoryGrid
+        items={
+          data ?? []
+        }
+      />
+    </Container>
+  );
+}
+---
 pages/ProfilePage/ProfilePage.tsx
 import { useParams, useNavigate } from "react-router-dom";
+import { Pencil } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
 
 import { useProfile } from "@/features/users/hooks/useProfile";
 import Container from "@/shared/ui/container/Container";
 
-import ProfileHeader from "@/features/users/components/ProfileHeader";
+import ProfileHeader from "@/features/users/components/userheader/ProfileHeader";
 import ProfileStats from "@/features/users/components/ProfileStats";
+import ProfileSocials from "@/features/users/components/ProfileSocials";
+import FollowButton from "@/features/follows/components/FollowButton";
+
+import styles from "./ProfilePage.module.css";
 
 export default function ProfilePage() {
-  const { username } =
-    useParams();
+  const { username } = useParams();
+  const navigate = useNavigate();
+  const authUser = useAuth();
 
-  const {
-    data,
-    isLoading,
-    error,
-  } = useProfile(
-    username ?? ""
-  );
+  const { data, isLoading, error } = useProfile(username ?? "");
 
-  const navigate =
-    useNavigate();
+  if (isLoading) return <div>Cargando...</div>;
+  if (error || !data) return <div>Usuario no encontrado</div>;
 
-  const authUser =
-    useAuth();
-
-  if (isLoading) {
-    return <div>Cargando...</div>;
-  }
-
-  if (error || !data) {
-    return <div>Usuario no encontrado</div>;
-  }
-
-  const isOwner =
-    authUser.user?.id ===
-    data.id;
+  const isOwner = authUser.user?.id === data.id;
 
   return (
     <Container>
-      <ProfileHeader
-        username={data.username}
-        avatar={data.avatar}
-        bio={data.bio}
-        createdAt={data.createdAt}
-        canEdit={isOwner}
-        onEdit={() =>
-          navigate("/profile/edit")
-        }
-      />
+      <div className={styles.profileLayout}>
+        <aside className={styles.sidebar}>
+        <ProfileHeader
+          username={data.username}
+          displayName={data.profile?.displayName ?? null}
+          avatarUrl={data.profile?.avatarUrl ?? null}
+          bannerUrl={data.profile?.bannerUrl ?? null}
+          bio={data.profile?.bio ?? null}
+          createdAt={data.createdAt}
+          stats={
+            <ProfileStats
+              mods={data.stats.mods}
+              followers={data.stats.followers}
+              following={data.stats.following}
+            />
+          }
+          socials={
+            <ProfileSocials
+              socials={data.profile?.socials ?? []}
+            />
+          }
+          actionButton={
+            isOwner ? (
+              <button
+                className={styles.profileButton}
+                onClick={() => navigate("/profile/edit")}
+              >
+              <Pencil size={15} />
+                
+              </button>
+            ) : authUser.isAuthenticated ? (
+              <FollowButton
+                username={data.username}
+                isFollowing={data.isFollowing}
+              />
+            ) : null
+          }
+        />
+        </aside>
 
-      <ProfileStats
-        mods={data.stats.mods}
-        comments={
-          data.stats.comments
-        }
-        followers={
-          data.stats.followers
-        }
-        following={
-          data.stats.following
-        }
-      />
+        <main className={styles.content}>
+        <div className={styles.tabs}>
+          <button className={styles.tab}>Mods</button>
+          <button className={styles.tab}>Inventario</button>
+          <button className={styles.tab}>Comentarios</button>
+        </div>
+        </main>
+      </div>
     </Container>
   );
 }
@@ -13690,6 +15639,11 @@ export const router =
               element: <EditProfilePage />,
             },
 
+            {
+              path: "/profile/inventory",
+              element: <InventoryPage />,
+            }
+
             //////////////////////////////////////////////////
             // PROJECTS PAGE
             //////////////////////////////////////////////////
@@ -13773,9 +15727,9 @@ export const router =
     },
   ]);
 ---
-shared/api/
-client.ts
+shared/api/client.ts
 import { normalizeError } from "./error";
+import { refreshAccessToken, } from "@/features/auth/api";
 
 const API_URL =
   import.meta.env.VITE_API_URL ||
@@ -13829,17 +15783,75 @@ export async function apiFetch<T = any>(
   ////////////////////////////////////////////////////
 
   if (res.status === 401) {
+    const refreshToken =
+      localStorage.getItem(
+        "refreshToken"
+      );
+
+    if (refreshToken) {
+      try {
+        const result =
+          await refreshAccessToken(
+            refreshToken
+          );
+
+        localStorage.setItem(
+          "token",
+          result.accessToken
+        );
+
+        //////////////////////////////////////////////////
+        // REPEAT REQUEST
+        //////////////////////////////////////////////////
+
+        const retry =
+          await fetch(
+            `${API_URL}${endpoint}`,
+            {
+              ...options,
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+
+                Authorization:
+                  `Bearer ${result.accessToken}`,
+
+                ...options.headers,
+              },
+            }
+          );
+
+        const retryData =
+          await retry.json();
+
+        if (!retry.ok) {
+          throw new Error();
+        }
+
+        return retryData;
+      } catch {
+        console.log(
+          "Refresh expirado"
+        );
+      }
+    }
+
+    //////////////////////////////////////////////////
+    // LOGOUT
+    //////////////////////////////////////////////////
+
     localStorage.removeItem(
       "token"
     );
 
     localStorage.removeItem(
-      "user"
+      "refreshToken"
     );
 
-    //////////////////////////////////////////////////
-    // REDIRECT
-    //////////////////////////////////////////////////
+    localStorage.removeItem(
+      "user"
+    );
 
     if (
       window.location.pathname !==

@@ -1,0 +1,338 @@
+.wrapper {
+  width: 100%;
+}
+
+/* BANNER DESKTOP */
+.banner {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 1;
+  overflow: hidden;
+  background: linear-gradient(
+    to top,
+    rgba(250, 52, 52, 0.78),
+    rgba(51, 44, 251, 0.25),
+    transparent
+  );
+}
+
+.banner img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* overlay base */
+.overlay {
+  position:relative;
+  margin-top: -44px;
+  margin-left: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 0 1rem 1.5rem;
+  z-index:5;
+    border-left: 1px solid rgba(255,255,255,0.06);
+    border-right: 1px solid rgba(255,255,255,0.06);
+}
+
+/* TOP ROW (IG style) */
+.top {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.avatar{
+  width:120px;
+  height:120px;
+  border-radius:50%;
+  overflow:hidden;
+  border:5px solid var(--background);
+  background:#222;
+  border: 3px solid #0f0f0f;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mainInfo{
+    display:flex;
+    flex-direction:column;
+    justify-content:flex-start;
+    gap:.55rem;
+    min-height:120px;
+
+    min-width:0;   /* <-- IMPORTANTE */
+    flex:1;
+}
+
+/* nombre limpio */
+.name {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.nameRow{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:.75rem;
+    flex-wrap:nowrap;
+}
+
+.nameInput{
+    flex:1;
+    min-width:0;
+
+    max-width:220px;
+
+    padding:0 0 .35rem;
+
+    border:none;
+    border-bottom:1px solid rgba(255,255,255,.12);
+
+    background:transparent;
+
+    color:inherit;
+
+    font-size:1.35rem;
+    font-weight:500;
+}
+
+.nameInput:hover{
+    border-bottom-color:rgba(255,255,255,.22);
+}
+
+.nameInput:focus{
+    outline:none;
+    border-bottom-color:var(--primary);
+}
+
+
+
+
+
+/* NOMBRE */
+.usernameRow{
+    display:flex;
+    align-items:center;
+    gap:.2rem;
+    margin-top:.2rem;
+}
+
+.usernameRow span{
+    opacity:.55;
+    font-size:.95rem;
+}
+
+.usernameInput{
+    width:fit-content;
+    min-width:140px;
+    max-width:220px;
+    padding:0 0 .25rem;
+    border:none;
+    border-bottom:1px solid rgba(255,255,255,.12);
+    background:transparent;
+    color:inherit;
+    font-size:.92rem;
+    opacity:.85;
+}
+
+.usernameInput:focus{
+    outline:none;
+    border-bottom-color:var(--primary);
+}
+
+
+
+
+/* BIOGRAFIA */
+.bioInput{
+    display:block;
+    width:100%;
+    max-width:540px;
+    min-height:70px;
+    max-height:180px;
+    overflow-y:auto;
+    overflow-x:hidden;
+    resize:none;
+    padding:0 0 .45rem;
+    margin-top:1rem;
+    border:none;
+    border-bottom:1px solid rgba(255,255,255,.12);
+    background:transparent;
+    color:inherit;
+    font:inherit;
+    line-height:1.5;
+    white-space:pre-wrap;
+    overflow-wrap:anywhere;
+    word-break:break-word;
+}
+
+.bioInput:focus{
+    outline:none;
+    border-bottom-color:var(--primary);
+}
+
+
+
+
+/* CONTADOR */
+.counter{
+    width:fit-content;
+    margin-top:.15rem;
+    margin-left:auto;
+    font-size:.72rem;
+    opacity:.45;
+}
+
+/* username secundario */
+.handle {
+  margin-top: 0.15rem;
+  font-size: 0.85rem;
+  opacity: 0.65;
+}
+
+/* STATS (IMPORTANTE: no cards) */
+.stats {
+  display: flex;
+  margin-top: -12px;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* SOCIALS debajo stats */
+.socials {
+  display: flex;
+  margin-top: -14px;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* BIO */
+.bio {
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+  opacity: 0.9;
+  max-width: 650px;
+  line-height: 1.4;
+}
+
+/* EDIT */
+.editButton{
+  height: 26px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+
+  gap: .45rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.08);
+
+  background: rgba(255,255,255,.05);
+  color: inherit;
+  cursor: pointer;
+
+  font-size: .9rem;
+  font-weight: 600;
+  transition: .2s;
+}
+
+/* 🔥 MOBILE REAL IG STYLE */
+@media (max-width: 768px) {
+  .wrapper {
+    margin-top: -90px;
+  }
+
+  .banner {
+      width: 100vw;
+      margin-left: calc(50% - 50vw);
+  }
+
+  .overlay{
+    position: relative;
+    width:100vw;
+    margin-left:calc(50% - 50vw);
+    margin-top:-44px;
+    padding:0 1rem 1.5rem;
+    box-sizing:border-box;
+  }
+
+  /* avatar + name horizontal limpio */
+  .top {
+    display: flex;
+    flex-direction: row;
+    gap: 0.75rem;
+  }
+
+  .avatar {
+    width:92px;
+    height:92px;
+  }
+
+  .name {
+    font-size: 1.2rem;
+  }
+
+  .mainInfo {
+    padding-top:18px;
+    min-height: auto;
+    gap: 0.1rem;
+  }
+
+    .nameRow{
+        gap:.5rem;
+    }
+
+  .nameInput{
+      width:120px;
+      max-width:120px;
+      font-size:1.15rem;
+  }
+
+    .editButton{
+      margin-top:0;
+      flex-shrink:0;
+      padding:.4rem .8rem;
+    }
+
+  .usernameInput{
+      max-width:150px;
+      font-size:.86rem;
+  }
+
+  .handle {
+    margin-bottom: .15rem;
+  }
+
+  .stats {
+    gap: .45rem;
+    margin-top: -10px;
+  }
+
+  .bio {
+    margin-top: 0.75rem;
+    font-size: 0.88rem;
+    opacity: 0.85;
+  }
+
+  .bioInput{
+      min-width:100%;
+      max-width:100%;
+      font-size:.9rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .overlay {
+    border-left: 1px solid rgba(255,255,255,0.06);
+    border-right: 1px solid rgba(255,255,255,0.06);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+}

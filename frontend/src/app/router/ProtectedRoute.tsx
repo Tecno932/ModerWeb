@@ -3,10 +3,18 @@ import {
   Outlet,
 } from "react-router-dom";
 
-import { useAuth } from "@/features/auth/context/AuthContext";
+import { useAuth }
+  from "@/features/auth/context/AuthContext";
 
 export default function ProtectedRoute() {
-  const { user } = useAuth();
+  const {
+    user,
+    loading,
+  } = useAuth();
+
+  if (loading) {
+    return <div>Cargando...</div>;
+  }
 
   if (!user) {
     return (

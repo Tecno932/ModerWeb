@@ -11,11 +11,9 @@ export interface LoginInput {
 
 export interface AuthUser {
   id: number;
+
   username: string;
   email: string;
-
-  avatar: string | null;
-  bio: string | null;
 
   role: string;
 
@@ -25,4 +23,19 @@ export interface AuthUser {
   updatedAt: Date;
 
   lastLoginAt: Date | null;
+
+  profile: {
+    displayName: string | null;
+
+    avatarUrl: string | null;
+    bannerUrl: string | null;
+
+    bio: string | null;
+
+    accentColor: string | null;
+  } | null;
+}
+
+export interface RefreshInput {
+  refreshToken: string;
 }

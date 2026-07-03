@@ -50,30 +50,27 @@ export const updateProfile =
 export const getPublicProfile =
   asyncHandler(
     async (
-      req: any,
-      res: Response
-    ) => {
-      const profile =
-        await UsersService.getPublicProfile(
-          req.params.username
-        );
-
-      res.json(profile);
-    }
-  );
-
-export const updateAvatar =
-  asyncHandler(
-    async (
       req: AuthRequest,
       res: Response
     ) => {
-      const user =
-      await UsersService.updateAvatar(
-        req.userId!,
-        req.body.avatar
-      );
+      const username =
+        req.params.username;
 
-      res.json(user);
+      if (
+        !username ||
+        Array.isArray(username)
+      ) {
+        return res.status(400).json({
+          error: "Username inválido",
+        });
+      }
+
+      const profile =
+        await UsersService.getPublicProfile(
+          username,
+          req.userId
+        );
+
+      res.json(profile);
     }
   );

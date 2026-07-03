@@ -16,5 +16,40 @@ export interface PublicProfile {
 
   createdAt: string;
 
+  isFollowing: boolean;
+
+  profile: {
+    displayName: string | null;
+
+    avatarUrl: string | null;
+    bannerUrl: string | null;
+
+    bio: string | null;
+
+    accentColor: string | null;
+
+    socials: ProfileSocial[];
+
+    equippedCosmetics: any[];
+  };
+
   stats: UserStats;
+}
+
+export interface ProfileSocial {
+  id: number;
+
+  platform:
+    | "GITHUB"
+    | "DISCORD"
+    | "YOUTUBE"
+    | "INSTAGRAM"
+    | "PATREON"
+    | "KOFI"
+    | "TWITCH"
+    | "X"
+    | "TIKTOK"
+    | "WEBSITE";
+
+  url: string;
 }
