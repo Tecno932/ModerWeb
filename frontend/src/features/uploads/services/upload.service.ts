@@ -36,6 +36,7 @@ export function uploadVersionFile({
         body: JSON.stringify({
           filename: file.name,
           type: file.type,
+          folder: "mods",
         }),
       }
     );

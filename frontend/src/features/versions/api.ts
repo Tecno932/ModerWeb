@@ -142,6 +142,7 @@ export async function uploadFileR2(data: {
       body: JSON.stringify({
         filename: data.file.name,
         type: data.file.type,
+        folder: "mods",
       }),
     }
   );

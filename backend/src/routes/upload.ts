@@ -3,8 +3,7 @@ import { Router } from "express";
 import { authMiddleware }
   from "../middleware/auth.middleware";
 
-import { getPresignedUrl }
-  from "../controllers/upload.controller";
+import { getPresignedUrl, } from "../modules/uploads/upload.controller";
 
 import {
   startMultipartUpload,

@@ -7798,7 +7798,82 @@ export default function UploadVersionForm({
   );
 }
 ---
-feactures/uploads/components
+feactures/uploads/api/uploadImage.ts
+const API_URL =
+  import.meta.env.VITE_API_URL;
+
+const R2_PUBLIC_URL =
+  import.meta.env.VITE_R2_PUBLIC_URL;
+
+export async function uploadImage(
+  file: File,
+  folder: "avatars" | "banners"
+) {
+  const token =
+    localStorage.getItem("token");
+
+  ////////////////////////////////////////////////////
+  // PRESIGNED
+  ////////////////////////////////////////////////////
+
+  const presignedRes =
+    await fetch(
+      `${API_URL}/uploads/presigned`,
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type":
+            "application/json",
+
+          Authorization:
+            `Bearer ${token}`,
+        },
+
+        body: JSON.stringify({
+          filename: file.name,
+          type: file.type,
+          folder,
+        }),
+      }
+    );
+
+  if (!presignedRes.ok) {
+    throw new Error(
+      "Error obteniendo upload url"
+    );
+  }
+
+  const {
+    url,
+    key,
+  } =
+    await presignedRes.json();
+
+  ////////////////////////////////////////////////////
+  // UPLOAD
+  ////////////////////////////////////////////////////
+
+  const upload =
+    await fetch(url, {
+      method: "PUT",
+      body: file,
+    });
+
+  if (!upload.ok) {
+    throw new Error(
+      "Error subiendo imagen"
+    );
+  }
+
+  ////////////////////////////////////////////////////
+  // RETURN PUBLIC URL
+  ////////////////////////////////////////////////////
+
+  return `${R2_PUBLIC_URL}/${key}?v=${Date.now()}`;
+}
+---
+feactures/uploads/components/
 uploaditem.tsx
 import type {
   UploadItem as UploadItemType,
@@ -9076,6 +9151,7 @@ export function uploadVersionFile({
         body: JSON.stringify({
           filename: file.name,
           type: file.type,
+          folder: "mods",
         }),
       }
     );
@@ -10560,176 +10636,156 @@ ProfileStats.module.css
 }
 ---
 src/feactures/users/components/EditProfileForm/EditProfileForm.tsx
-import styles from "../userheader/ProfileHeader.module.css";
+import { useRef, useState } from "react";
 
-interface FormData {
-  username: string;
-  displayName: string;
-  bio: string;
-  avatarUrl: string;
-  bannerUrl: string;
-  accentColor: string;
-}
+import { uploadImage } from "@/features/uploads/api/uploadImage";
+import ImageCropper from "../ImageCropper/ImageCropper";
+import Spinner from "@/shared/ui/Spinner/Spinner";
 
-interface Props {
-  form: FormData;
-  setForm: React.Dispatch<React.SetStateAction<FormData>>;
+import styles from "./ImageUploader.module.css";
 
-  loading?: boolean;
-  stats?: React.ReactNode;
-  socials?: React.ReactNode;
+type Props = {
+  folder: "avatars" | "banners";
+  accept?: string;
+  className?: string;
+  onChange: (url: string) => void;
+  children?: React.ReactNode;
+};
 
-  onSubmit: (data: FormData) => Promise<void>;
-}
-
-export default function EditProfileHeader({
-  form,
-  setForm,
-  loading,
-  stats,
-  socials,
-  onSubmit,
+export default function ImageUploader({
+  folder,
+  accept = ".png,.jpg,.jpeg,.webp",
+  className,
+  onChange,
+  children,
 }: Props) {
 
-function updateField(
-  field: keyof FormData,
-  value: string
-) {
-  console.log(field, value);
+  const [selectedImage, setSelectedImage] = useState("");
+  const [cropOpen, setCropOpen] = useState(false);
 
-  setForm((prev) => ({
-    ...prev,
-    [field]: value,
-  }));
-}
+  const [selectedFile, setSelectedFile] =
+    useState<File | null>(null);
 
-  async function handleSubmit(
-    e: React.FormEvent
+  const inputRef =
+    useRef<HTMLInputElement>(null);
+
+  const [uploading, setUploading] =
+    useState(false);
+
+  function handleChange(
+    e: React.ChangeEvent<HTMLInputElement>
   ) {
-    e.preventDefault();
 
-    await onSubmit(form);
+    const file = e.target.files?.[0];
+
+    if (!file) return;
+
+    setSelectedFile(file);
+
+    setSelectedImage(
+      URL.createObjectURL(file)
+    );
+
+    setCropOpen(true);
+
+    e.target.value = "";
+  }
+
+  async function handleCropComplete(
+    croppedBlob: Blob
+  ) {
+
+    if (!selectedFile) return;
+
+    try {
+
+      // cerrar inmediatamente
+      setCropOpen(false);
+
+      setUploading(true);
+
+      const croppedFile = new File(
+        [croppedBlob],
+        selectedFile.name,
+        {
+          type: "image/webp",
+        }
+      );
+
+      const url =
+        await uploadImage(
+          croppedFile,
+          folder
+        );
+
+      onChange(url);
+
+    }
+    finally {
+
+      URL.revokeObjectURL(selectedImage);
+
+      setSelectedImage("");
+
+      setSelectedFile(null);
+
+      setUploading(false);
+
+    }
+
   }
 
   return (
-    <form
-      className={styles.wrapper}
-      onSubmit={handleSubmit}
+  <>
+    <div
+      className={`${styles.root} ${className ?? ""}`}
+      onClick={() => {
+        if (!uploading) {
+          inputRef.current?.click();
+        }
+      }}
     >
-      {/* Banner */}
-      <div className={styles.banner}>
-        {form.bannerUrl && (
-          <img
-            src={form.bannerUrl}
-            alt="Banner"
-          />
-        )}
-      </div>
 
-      <div className={styles.overlay}>
-        <div className={styles.top}>
-          {/* Avatar */}
+      <input
+        ref={inputRef}
+        className={styles.input}
+        type="file"
+        accept={accept}
+        onChange={handleChange}
+      />
 
-          <div className={styles.avatar}>
-            {form.avatarUrl ? (
-              <img
-                src={form.avatarUrl}
-                alt={form.username}
-              />
-            ) : (
-              form.username
-                .charAt(0)
-                .toUpperCase()
-            )}
-          </div>
+      {children}
 
-          {/* Información */}
-
-          <div className={styles.mainInfo}>
-            <div className={styles.nameRow}>
-              <input
-                autoComplete="off"
-                className={styles.nameInput}
-                value={form.displayName}
-                placeholder="Nombre"
-                maxLength={40}
-                onChange={(e) =>
-                  updateField(
-                    "displayName",
-                    e.target.value
-                  )
-                }
-              />
-
-              <button
-                type="submit"
-                className={styles.editButton}
-                disabled={loading}
-              >
-                {loading
-                  ? "Guardando..."
-                  : "Guardar"}
-              </button>
-            </div>
-
-            <div className={styles.counter}>
-              {form.displayName.length}/40
-            </div>
-
-            <div className={styles.usernameRow}>
-              <input
-                autoComplete="off"
-                className={styles.usernameInput}
-                value={form.username}
-                placeholder="username"
-                maxLength={24}
-                onChange={(e) =>
-                  updateField(
-                    "username",
-                    e.target.value
-                  )
-                }
-              />
-            </div>
-
-            <div className={styles.counter}>
-              {form.username.length}/24
-            </div>
-
-            {stats && (
-              <div className={styles.stats}>
-                {stats}
-              </div>
-            )}
-
-            {socials && (
-              <div className={styles.socials}>
-                {socials}
-              </div>
-            )}
-          </div>
+      {uploading && (
+        <div className={styles.overlay}>
+          <Spinner />
+          <span className={styles.text}>
+            ...
+          </span>
         </div>
+      )}
 
-        <textarea
-          autoComplete="off"
-          className={styles.bioInput}
-          rows={4}
-          maxLength={220}
-          placeholder="Contale algo a la comunidad..."
-          value={form.bio}
-          onChange={(e) =>
-            updateField(
-              "bio",
-              e.target.value
-            )
-          }
-        />
+    </div>
+    
+    <ImageCropper
+      open={cropOpen}
+      image={selectedImage}
+      aspect={
+        folder === "avatars"
+          ? 1
+          : 3 / 1
+      }
+      onCancel={() => {
+        URL.revokeObjectURL(selectedImage);
 
-        <div className={styles.counter}>
-          {form.bio.length}/220
-        </div>
-      </div>
-    </form>
+        setCropOpen(false);
+        setSelectedImage("");
+        setSelectedFile(null);
+      }}
+
+      onSave={handleCropComplete}
+    />
+  </>
   );
 }
 ---
@@ -11069,6 +11125,7 @@ export async function uploadFileR2(data: {
       body: JSON.stringify({
         filename: data.file.name,
         type: data.file.type,
+        folder: "mods",
       }),
     }
   );
@@ -15887,6 +15944,457 @@ export function normalizeError(err: any) {
   return { message: "Error desconocido" };
 }
 ---
+shared/components/ImageUploader/
+ImageUploader.tsx
+
+---
+ImageUploader.module.css
+.root {
+  position: relative;
+  overflow: hidden;
+
+  cursor: pointer;
+
+  transition: filter .2s ease;
+}
+
+.root:hover {
+  filter: brightness(.94);
+}
+
+.input {
+  display: none;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+
+  gap: .75rem;
+
+  background: rgba(0,0,0,.55);
+
+  color: white;
+
+  z-index: 5;
+
+  backdrop-filter: blur(2px);
+}
+
+.text {
+  font-size: .9rem;
+  font-weight: 600;
+
+  user-select: none;
+}
+---
+shared/components/ImageCropper/cropImage.ts
+import type { Area } from "react-easy-crop";
+
+function createImage(
+  url: string
+): Promise<HTMLImageElement> {
+
+  return new Promise(
+    (resolve, reject) => {
+
+      const image = new Image();
+
+      image.crossOrigin = "anonymous";
+
+      image.onload = () =>
+        resolve(image);
+
+      image.onerror = reject;
+
+      image.src = url;
+
+    }
+  );
+
+}
+
+export async function cropImage(
+  imageSrc: string,
+  crop: Area,
+  fileName: string = "image.webp"
+): Promise<File> {
+
+  const image =
+    await createImage(imageSrc);
+
+  const canvas =
+    document.createElement("canvas");
+
+  const ctx =
+    canvas.getContext("2d");
+
+  if (!ctx) {
+    throw new Error(
+      "No se pudo crear el canvas."
+    );
+  }
+
+  canvas.width =
+    crop.width;
+
+  canvas.height =
+    crop.height;
+
+  ctx.drawImage(
+    image,
+
+    crop.x,
+    crop.y,
+
+    crop.width,
+    crop.height,
+
+    0,
+    0,
+
+    crop.width,
+    crop.height
+  );
+
+  const blob =
+    await new Promise<Blob>(
+      (resolve, reject) => {
+
+        canvas.toBlob(
+          (blob) => {
+
+            if (!blob) {
+              reject(
+                new Error(
+                  "No se pudo generar la imagen."
+                )
+              );
+              return;
+            }
+
+            resolve(blob);
+
+          },
+          "image/webp",
+          0.92
+        );
+
+      }
+    );
+
+  return new File(
+    [blob],
+    fileName,
+    {
+      type: "image/webp",
+    }
+  );
+
+}
+---
+ImageCropper.tsx
+import { useCallback, useState, } from "react";
+import Cropper, { type Area, } from "react-easy-crop";
+import cropImage from "@/shared/utils/cropImage";
+
+import styles from "./ImageCropper.module.css";
+
+interface Props {
+  image: string;
+
+  open: boolean;
+
+  aspect: number;
+
+  cropShape?: "rect" | "round";
+
+  onCancel: () => void;
+
+  onSave: (
+    croppedBlob: Blob
+  ) => void | Promise<void>;
+}
+
+export default function ImageCropper({
+  image,
+  open,
+  aspect,
+  cropShape = "rect",
+  onCancel,
+  onSave,
+}: Props) {
+
+  const [crop, setCrop] =
+    useState({
+      x: 0,
+      y: 0,
+    });
+    
+
+  const [zoom, setZoom] =
+    useState(1);
+
+  const [croppedAreaPixels, setCroppedAreaPixels] =
+    useState<Area>();
+
+  const handleCropComplete =
+    useCallback(
+      (
+        _: Area,
+        croppedPixels: Area
+      ) => {
+        setCroppedAreaPixels(
+          croppedPixels
+        );
+      },
+      []
+    );
+
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div className={styles.backdrop}>
+      <div className={styles.modal}>
+        <div className={styles.cropperContainer}>
+
+        <Cropper
+            style={{containerStyle:{padding:"20px"}}}
+            image={image}
+            crop={crop}
+            zoom={zoom}
+            aspect={aspect}
+            cropShape={cropShape}
+            keyboardStep={4}
+
+            restrictPosition={true}
+            initialCroppedAreaPercentages={undefined}
+
+            zoomWithScroll
+
+            minZoom={1}
+            maxZoom={4}
+            zoomSpeed={0.2}
+
+            objectFit="contain"
+
+            showGrid={false}
+
+            onCropChange={setCrop}
+            onZoomChange={setZoom}
+            onCropComplete={handleCropComplete}
+        />
+
+        </div>
+
+        <div className={styles.controls}>
+
+          <label
+            className={styles.zoomLabel}
+          >
+            Zoom
+
+            <input
+              className={styles.slider}
+              type="range"
+              min={1}
+              max={3}
+              step={0.05}
+              value={zoom}
+              onChange={(e) =>
+                setZoom(
+                  Number(
+                    e.target.value
+                  )
+                )
+              }
+            />
+
+          </label>
+
+          <div className={styles.buttons}>
+
+            <button
+              type="button"
+              className={styles.cancel}
+              onClick={onCancel}
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="button"
+              className={styles.save}
+              onClick={async () => {
+
+                if (!croppedAreaPixels) {
+                  return;
+                }
+
+                const blob =
+                  await cropImage(
+                    image,
+                    croppedAreaPixels
+                  );
+
+                await onSave(blob);
+
+              }}
+            >
+              Guardar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+}
+---
+ImageCropper.module.css
+.backdrop{
+    position:fixed;
+    inset:0;
+
+    display:flex;
+    justify-content:center;
+    align-items:center;
+
+    padding:1rem;
+
+    background:rgba(0,0,0,.72);
+    backdrop-filter:blur(8px);
+
+    z-index:9999;
+
+    animation:fadeIn .18s ease;
+    padding:32px;
+}
+
+.modal{
+    width:min(900px,100%);
+    height:min(700px,100%);
+
+    display:flex;
+    flex-direction:column;
+    border-radius:18px;
+
+    overflow:hidden;
+
+    background:#181818;
+    border:1px solid rgba(255,255,255,.08);
+    box-shadow: 0 20px 60px rgba(0,0,0,.45);
+}
+
+.cropperContainer{
+    position:relative;
+    flex:1;
+    border-radius:14px;
+    overflow:hidden;
+    background:#101010;
+}
+
+.controls{
+    display:flex;
+    flex-direction:column;
+    gap:1rem;
+    padding:1.25rem;
+    background:#171717;
+}
+
+.zoomLabel{
+    display:flex;
+    flex-direction:column;
+    gap:.65rem;
+    font-size:.92rem;
+    font-weight:600;
+}
+
+.slider{
+    width:100%;
+    cursor:pointer;
+}
+
+.buttons{
+    display:flex;
+    justify-content:flex-end;
+    gap:.75rem;
+}
+
+.cancel,
+.save{
+    border:none;
+    border-radius:10px;
+    padding:.7rem 1.25rem;
+    font-size:.92rem;
+    font-weight:600;
+    cursor:pointer;
+    transition:.18s;
+}
+
+.cancel{
+    background:#2a2a2a;
+    color:white;
+}
+
+.cancel:hover{
+    background:#353535;
+}
+
+.save{
+    background:var(--primary);
+    color:rgb(0, 0, 0);
+}
+
+.save:hover{
+    filter:brightness(1.08);
+}
+
+@keyframes fadeIn{
+
+    from{
+        opacity:0;
+    }
+    to{
+        opacity:1;
+    }
+
+}
+
+@media (max-width:768px){
+
+    .backdrop{
+        padding:0;
+    }
+
+    .modal{
+        width:100%;
+        height:100%;
+        border-radius:0;
+    }
+
+    .controls{
+        padding:1rem;
+    }
+
+    .buttons{
+        width:100%;
+    }
+
+    .cancel,
+    .save{
+        flex:1;
+    }
+
+}
+---
 shared/components/
 ToastProvider.tsx
 import { createContext, useContext, useState } from "react";
@@ -16975,6 +17483,46 @@ Input.module.css
   color: #707070;
 }
 ---
+shared/ui/Spinner/
+Spinner.tsx
+import styles from "./Spinner.module.css";
+
+interface Props {
+  size?: number;
+}
+
+export default function Spinner({
+  size = 34,
+}: Props) {
+  return (
+    <span
+      className={styles.spinner}
+      style={{
+        width: size,
+        height: size,
+      }}
+    />
+  );
+}
+---
+Spinner.module.css
+.spinner {
+  display: inline-block;
+
+  border-radius: 50%;
+
+  border: 3px solid rgba(255,255,255,.22);
+  border-top-color: white;
+
+  animation: spin .75s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+---
 shared/ui/textarea/
 Textarea.tsx
 import type {
@@ -17222,6 +17770,103 @@ Section.module.css
   .title {
     font-size: 20px;
   }
+}
+---
+shader/utils/cropImage.ts
+import type { Area } from "react-easy-crop";
+
+function createImage(
+  url: string
+): Promise<HTMLImageElement> {
+
+  return new Promise(
+    (resolve, reject) => {
+
+      const image = new Image();
+
+      image.crossOrigin = "anonymous";
+
+      image.onload = () =>
+        resolve(image);
+
+      image.onerror = reject;
+
+      image.src = url;
+
+    }
+  );
+
+}
+
+export default async function cropImage(
+  imageSrc: string,
+  crop: Area
+): Promise<Blob> {
+
+  const image =
+    await createImage(imageSrc);
+
+  const canvas =
+    document.createElement("canvas");
+
+  canvas.width =
+    crop.width;
+
+  canvas.height =
+    crop.height;
+
+  const ctx =
+    canvas.getContext("2d");
+
+  if (!ctx) {
+    throw new Error(
+      "No se pudo crear el canvas."
+    );
+  }
+
+  ctx.drawImage(
+    image,
+
+    crop.x,
+    crop.y,
+    crop.width,
+    crop.height,
+
+    0,
+    0,
+    crop.width,
+    crop.height
+  );
+
+  return new Promise(
+    (resolve, reject) => {
+
+      canvas.toBlob(
+
+        (blob) => {
+
+          if (!blob) {
+
+            reject(
+              new Error(
+                "No se pudo generar el Blob."
+              )
+            );
+
+            return;
+          }
+
+          resolve(blob);
+
+        },
+
+        "image/webp",
+        0.95
+      );
+
+    }
+  );
+
 }
 ---
 style/

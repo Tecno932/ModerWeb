@@ -1,3 +1,5 @@
+import ImageUploader from "@/shared/components/ImageUploader/ImageUploader";
+
 import styles from "../userheader/ProfileHeader.module.css";
 
 interface FormData {
@@ -29,17 +31,17 @@ export default function EditProfileHeader({
   onSubmit,
 }: Props) {
 
-function updateField(
-  field: keyof FormData,
-  value: string
-) {
-  console.log(field, value);
+  function updateField(
+    field: keyof FormData,
+    value: string
+  ) {
+    console.log(field, value);
 
-  setForm((prev) => ({
-    ...prev,
-    [field]: value,
-  }));
-}
+    setForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  }
 
   async function handleSubmit(
     e: React.FormEvent
@@ -55,31 +57,35 @@ function updateField(
       onSubmit={handleSubmit}
     >
       {/* Banner */}
-      <div className={styles.banner}>
+      <ImageUploader
+        folder="banners"
+        className={styles.banner}
+        onChange={(url) => updateField("bannerUrl", url)}
+      >
         {form.bannerUrl && (
           <img
             src={form.bannerUrl}
             alt="Banner"
+            draggable={false}
           />
         )}
-      </div>
+      </ImageUploader>
 
       <div className={styles.overlay}>
         <div className={styles.top}>
           {/* Avatar */}
 
-          <div className={styles.avatar}>
-            {form.avatarUrl ? (
-              <img
-                src={form.avatarUrl}
-                alt={form.username}
-              />
-            ) : (
-              form.username
-                .charAt(0)
-                .toUpperCase()
-            )}
-          </div>
+          <ImageUploader
+            folder="avatars"
+            className={styles.avatar}
+            onChange={(url) => updateField("avatarUrl", url)}
+          >
+            <img
+              src={form.avatarUrl || "/default-avatar.png"}
+              alt={form.username}
+              draggable={false}
+            />
+          </ImageUploader>
 
           {/* Información */}
 

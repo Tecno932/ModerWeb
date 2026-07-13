@@ -5417,8 +5417,7 @@ export interface UpsertSocialInput {
   url: string;
 }
 ---
-modules/uploads
-multipart.controller.ts
+modules/uploadsmultipart.controller.ts
 import { Request, Response } from "express";
 
 import {
@@ -5573,6 +5572,188 @@ export async function completeMultipartUpload(
     });
   }
 }
+---
+upload.constants.ts
+//////////////////////////////////////////////////
+// MIME TYPES
+//////////////////////////////////////////////////
+
+export const IMAGE_MIME_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+] as const;
+
+export const MOD_FILE_MIME_TYPES = [
+  "application/java-archive",
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/octet-stream",
+] as const;
+
+//////////////////////////////////////////////////
+// SIZE LIMITS
+//////////////////////////////////////////////////
+
+export const MAX_AVATAR_SIZE =
+  5 * 1024 * 1024;
+
+export const MAX_BANNER_SIZE =
+  10 * 1024 * 1024;
+
+export const MAX_MOD_FILE_SIZE =
+  2 * 1024 * 1024 * 1024; // 2GB
+---
+upload.controller.ts
+import { Response } from "express";
+
+import { UploadService }
+  from "./upload.service";
+
+export async function getPresignedUrl(
+  req: any,
+  res: Response
+) {
+  const {
+    filename,
+    type,
+    folder,
+  } = req.body;
+
+  if (!filename || !type) {
+    return res.status(400).json({
+      error: "Missing data",
+    });
+  }
+
+  const result =
+    await UploadService.createPresignedUpload(
+      filename,
+      type,
+      folder,
+      req.userId
+    );
+
+  res.json(result);
+}
+---
+upload.service.ts
+import crypto from "crypto";
+import path from "path";
+
+import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { UploadFolder } from "./upload.types";
+
+import { s3 } from "../../lib/s3";
+
+import {
+  IMAGE_MIME_TYPES,
+  MOD_FILE_MIME_TYPES,
+} from "./upload.constants";
+
+export class UploadService {
+  static async createPresignedUpload(
+    filename: string,
+    type: string,
+    folder: UploadFolder,
+    userId: number
+  ) {
+    switch (folder) {
+
+      case "avatars":
+      case "banners":
+
+        if (
+          !IMAGE_MIME_TYPES.includes(type as any)
+        ) {
+          throw new Error(
+            "Tipo de imagen no permitido"
+          );
+        }
+
+        break;
+
+      case "mods":
+
+        if (
+          !MOD_FILE_MIME_TYPES.includes(type as any)
+        ) {
+          throw new Error(
+            "Tipo de archivo no permitido"
+          );
+        }
+
+        break;
+
+      default:
+        throw new Error(
+          "Carpeta inválida"
+        );
+    }
+
+    const ext = path.extname(filename);
+
+    let key: string;
+
+    switch (folder) {
+
+      case "avatars":
+        key =
+          `avatars/${userId}/avatar${ext}`;
+        break;
+
+      case "banners":
+        key =
+          `banners/${userId}/banner${ext}`;
+        break;
+
+      case "mods":
+        key =
+          `mods/${crypto.randomUUID()}${ext}`;
+        break;
+
+      default:
+        throw new Error(
+          "Carpeta inválida"
+        );
+    }
+
+    const command =
+      new PutObjectCommand({
+        Bucket: process.env.R2_BUCKET!,
+        Key: key,
+        ContentType: type,
+      });
+
+    const url =
+      await getSignedUrl(
+        s3,
+        command,
+        {
+          expiresIn: 60 * 5,
+        }
+      );
+
+    return {
+      url,
+      key,
+    };
+  }
+}
+---
+upload.types.ts
+export interface PresignedUploadInput {
+  filename: string;
+  type: string;
+  folder: "mods" | "avatars" | "banners";
+}
+
+export type UploadFolder =
+  | "avatars"
+  | "banners"
+  | "mods";
 ---
 modules/users/users.controller.ts
 import { Response } from "express";
@@ -6452,48 +6633,7 @@ import { Router } from "express";
 import { authMiddleware }
   from "../middleware/auth.middleware";
 
-import { getPresignedUrl }
-  from "../controllers/upload.controller";
-
-import {
-  startMultipartUpload,
-  getMultipartPartUrl,
-  completeMultipartUpload,
-} from "../modules/uploads/multipart.controller";
-
-const router = Router();
-
-router.post(
-  "/presigned",
-  authMiddleware,
-  getPresignedUrl
-);
-
-router.post(
-  "/start",
-  authMiddleware,
-  startMultipartUpload
-);
-
-router.post(
-  "/part-url",
-  authMiddleware,
-  getMultipartPartUrl
-);
-
-router.post(
-  "/complete",
-  authMiddleware,
-  completeMultipartUpload
-);
-
-export default router;import { Router } from "express";
-
-import { authMiddleware }
-  from "../middleware/auth.middleware";
-
-import { getPresignedUrl }
-  from "../controllers/upload.controller";
+import { getPresignedUrl, } from "../modules/uploads/upload.controller";
 
 import {
   startMultipartUpload,
