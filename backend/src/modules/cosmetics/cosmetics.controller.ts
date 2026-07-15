@@ -57,7 +57,7 @@ export const getCosmetic =
 
 export const createCosmetic =
   asyncHandler(
-    async (req: any, res: Response) => {
+    async (req: Request, res: Response) => {
       const cosmetic =
         await CosmeticsService.create(
           req.body
@@ -75,7 +75,7 @@ export const createCosmetic =
 
 export const updateCosmetic =
   asyncHandler(
-    async (req: any, res: Response) => {
+    async (req: Request, res: Response) => {
       const cosmetic =
         await CosmeticsService.update(
           Number(req.params.id),
@@ -92,7 +92,7 @@ export const updateCosmetic =
 
 export const activateCosmetic =
   asyncHandler(
-    async (req: any, res: Response) => {
+    async (req: Request, res: Response) => {
       const cosmetic =
         await CosmeticsService.activate(
           Number(req.params.id)
@@ -108,7 +108,7 @@ export const activateCosmetic =
 
 export const deactivateCosmetic =
   asyncHandler(
-    async (req: any, res: Response) => {
+    async (req: Request, res: Response) => {
       const cosmetic =
         await CosmeticsService.deactivate(
           Number(req.params.id)
@@ -124,7 +124,7 @@ export const deactivateCosmetic =
 
 export const deleteCosmetic =
   asyncHandler(
-    async (req: any, res: Response) => {
+    async (req: Request, res: Response) => {
       const result =
         await CosmeticsService.delete(
           Number(req.params.id)

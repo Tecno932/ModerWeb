@@ -1,5 +1,6 @@
-import { prisma } from "../../lib/prisma";
 import bcrypt from "bcryptjs";
+
+import { prisma } from "../../lib/prisma";
 
 import {
   BadRequestError,
@@ -12,10 +13,23 @@ import {
   generateRefreshToken,
 } from "./auth.tokens";
 
-import {
-  RegisterInput,
+import type {
   LoginInput,
+  RegisterInput,
 } from "./auth.types";
+
+import {
+  validateLogin,
+  validateRegister,
+} from "./auth.validation";
+
+import {
+  authUserSelect,
+} from "./auth.select";
+
+import {
+  toSafeUser,
+} from "./auth.mapper";
 
 //////////////////////////////////////////////////
 // REGISTER
@@ -24,59 +38,13 @@ import {
 export async function registerUser(
   data: RegisterInput
 ) {
+  validateRegister(data);
+
   const {
     username,
     email,
     password,
   } = data;
-
-  if (!username || !email || !password) {
-    throw new BadRequestError(
-      "Faltan campos obligatorios"
-    );
-  }
-
-  if (username.length < 3) {
-    throw new BadRequestError(
-      "El usuario debe tener al menos 3 caracteres"
-    );
-  }
-
-  if (username.length > 32) {
-    throw new BadRequestError(
-      "El usuario no puede superar los 32 caracteres"
-    );
-  }
-
-  const usernameRegex =
-    /^[a-zA-Z0-9_-]+$/;
-
-  if (!usernameRegex.test(username)) {
-    throw new BadRequestError(
-      "Username inválido"
-    );
-  }
-
-  const emailRegex =
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-  if (!emailRegex.test(email)) {
-    throw new BadRequestError(
-      "Email inválido"
-    );
-  }
-
-  if (password.length < 8) {
-    throw new BadRequestError(
-      "La contraseña es muy corta"
-    );
-  }
-
-  if (password.length > 128) {
-    throw new BadRequestError(
-      "La contraseña es demasiado larga"
-    );
-  }
 
   const existingUser =
     await prisma.user.findFirst({
@@ -120,10 +88,7 @@ export async function registerUser(
       }
     );
 
-  const { password: _, ...safeUser } =
-    user;
-
-  return safeUser;
+  return toSafeUser(user);
 }
 
 //////////////////////////////////////////////////
@@ -133,16 +98,12 @@ export async function registerUser(
 export async function loginUser(
   data: LoginInput
 ) {
+  validateLogin(data);
+
   const {
     email,
     password,
   } = data;
-
-  if (!email || !password) {
-    throw new BadRequestError(
-      "Faltan campos"
-    );
-  }
 
   const user =
     await prisma.user.findUnique({
@@ -183,41 +144,11 @@ export async function loginUser(
       where: {
         id: user.id,
       },
-
-      select: {
-        id: true,
-
-        username: true,
-        email: true,
-
-        role: true,
-
-        isVerified: true,
-
-        createdAt: true,
-        updatedAt: true,
-
-        lastLoginAt: true,
-
-        profile: {
-          select: {
-            displayName: true,
-
-            avatarUrl: true,
-            bannerUrl: true,
-
-            bio: true,
-
-            accentColor: true,
-          },
-        },
-      },
+      select: authUserSelect,
     });
 
   const accessToken =
-    generateAccessToken(
-      user.id
-    );
+    generateAccessToken(user.id);
 
   const refreshToken =
     generateRefreshToken();
@@ -226,24 +157,22 @@ export async function loginUser(
     data: {
       token: refreshToken,
       userId: user.id,
-
       expiresAt: new Date(
         Date.now() +
-        1000 * 60 * 60 * 24 * 30
+          1000 * 60 * 60 * 24 * 30
       ),
     },
-});
+  });
 
   return {
     user: safeUser,
-
     accessToken,
     refreshToken,
   };
 }
 
 //////////////////////////////////////////////////
-// GET CURRENT USER
+// CURRENT USER
 //////////////////////////////////////////////////
 
 export async function getCurrentUser(
@@ -254,35 +183,7 @@ export async function getCurrentUser(
       where: {
         id: userId,
       },
-
-      select: {
-        id: true,
-
-        username: true,
-        email: true,
-
-        role: true,
-
-        isVerified: true,
-
-        createdAt: true,
-        updatedAt: true,
-
-        lastLoginAt: true,
-
-        profile: {
-          select: {
-            displayName: true,
-
-            avatarUrl: true,
-            bannerUrl: true,
-
-            bio: true,
-
-            accentColor: true,
-          },
-        },
-      },
+      select: authUserSelect,
     });
 
   if (!user) {
@@ -295,7 +196,7 @@ export async function getCurrentUser(
 }
 
 //////////////////////////////////////////////////
-// TOKEN
+// REFRESH TOKEN
 //////////////////////////////////////////////////
 
 export async function refreshAccessToken(
@@ -311,10 +212,6 @@ export async function refreshAccessToken(
     await prisma.refreshToken.findUnique({
       where: {
         token: refreshToken,
-      },
-
-      include: {
-        user: true,
       },
     });
 
@@ -339,13 +236,11 @@ export async function refreshAccessToken(
     );
   }
 
-  const accessToken =
-    generateAccessToken(
-      storedToken.userId
-    );
-
   return {
-    accessToken,
+    accessToken:
+      generateAccessToken(
+        storedToken.userId
+      ),
   };
 }
 

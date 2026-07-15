@@ -1,33 +1,51 @@
 import crypto from "crypto";
 import path from "path";
 
-import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { UploadFolder } from "./upload.types";
+import {
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
+
+import {
+  getSignedUrl,
+} from "@aws-sdk/s3-request-presigner";
 
 import { s3 } from "../../lib/s3";
+
+import {
+  BadRequestError,
+} from "../../utils/errors";
 
 import {
   IMAGE_MIME_TYPES,
   MOD_FILE_MIME_TYPES,
 } from "./upload.constants";
 
+import {
+  UploadFolder,
+  ImageMimeType,
+  ModFileMimeType,
+} from "./upload.types";
+
 export class UploadService {
+
   static async createPresignedUpload(
     filename: string,
     type: string,
     folder: UploadFolder,
     userId: number
   ) {
+
     switch (folder) {
 
       case "avatars":
       case "banners":
 
         if (
-          !IMAGE_MIME_TYPES.includes(type as any)
+          !IMAGE_MIME_TYPES.includes(
+            type as ImageMimeType
+          )
         ) {
-          throw new Error(
+          throw new BadRequestError(
             "Tipo de imagen no permitido"
           );
         }
@@ -37,9 +55,11 @@ export class UploadService {
       case "mods":
 
         if (
-          !MOD_FILE_MIME_TYPES.includes(type as any)
+          !MOD_FILE_MIME_TYPES.includes(
+            type as ModFileMimeType
+          )
         ) {
-          throw new Error(
+          throw new BadRequestError(
             "Tipo de archivo no permitido"
           );
         }
@@ -47,42 +67,38 @@ export class UploadService {
         break;
 
       default:
-        throw new Error(
+        throw new BadRequestError(
           "Carpeta inválida"
         );
     }
 
-    const ext = path.extname(filename);
+    const ext =
+      path.extname(filename);
 
-    let key: string;
+    const key = (() => {
 
-    switch (folder) {
+      switch (folder) {
 
-      case "avatars":
-        key =
-          `avatars/${userId}/avatar${ext}`;
-        break;
+        case "avatars":
+          return `avatars/${userId}/avatar${ext}`;
 
-      case "banners":
-        key =
-          `banners/${userId}/banner${ext}`;
-        break;
+        case "banners":
+          return `banners/${userId}/banner${ext}`;
 
-      case "mods":
-        key =
-          `mods/${crypto.randomUUID()}${ext}`;
-        break;
+        case "mods":
+          return `mods/${crypto.randomUUID()}${ext}`;
 
-      default:
-        throw new Error(
-          "Carpeta inválida"
-        );
-    }
+      }
+
+    })();
 
     const command =
       new PutObjectCommand({
-        Bucket: process.env.R2_BUCKET!,
+        Bucket:
+          process.env.R2_BUCKET!,
+
         Key: key,
+
         ContentType: type,
       });
 
@@ -100,4 +116,5 @@ export class UploadService {
       key,
     };
   }
+
 }

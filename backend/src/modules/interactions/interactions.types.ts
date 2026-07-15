@@ -5,3 +5,8 @@ export interface ModInteractionsResponse {
   likesCount: number;
   favoritesCount: number;
 }
+
+export interface ToggleInteractionInput {
+  modId: number;
+  userId: number;
+}

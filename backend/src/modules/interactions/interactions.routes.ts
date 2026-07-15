@@ -2,7 +2,11 @@ import { Router } from "express";
 
 import { authMiddleware } from "../../middleware/auth.middleware";
 
-import { InteractionsController } from "./interactions.controller";
+import {
+  getInteractions,
+  toggleLike,
+  toggleFavorite,
+} from "./interactions.controller";
 
 const router = Router();
 
@@ -13,7 +17,7 @@ const router = Router();
 router.get(
   "/:id/interactions",
   authMiddleware,
-  InteractionsController.getInteractions
+  getInteractions
 );
 
 //////////////////////////////////////////////////////
@@ -23,7 +27,7 @@ router.get(
 router.post(
   "/:id/like",
   authMiddleware,
-  InteractionsController.toggleLike
+  toggleLike
 );
 
 //////////////////////////////////////////////////////
@@ -33,7 +37,7 @@ router.post(
 router.post(
   "/:id/favorite",
   authMiddleware,
-  InteractionsController.toggleFavorite
+  toggleFavorite
 );
 
 export default router;

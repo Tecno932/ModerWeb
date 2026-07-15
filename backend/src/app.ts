@@ -5,19 +5,25 @@ import { initRedis } from "./lib/redis";
 import path from "path";
 import multer from "multer";
 
-import modRoutes from "./routes/mod";
-import uploadsRoutes from "./routes/upload";
-import versionRoutes from "./routes/version";
-import fileRoutes from "./routes/file";
-import downloadRoutes from "./routes/download";
+import {
+  NextFunction,
+  Request,
+  Response,
+} from "express";
+
+import modRoutes from "./modules/mod/mod.routes";
+import uploadsRoutes from "./modules/uploads/upload.routes";
+import versionRoutes from "./modules/versions/version.routes";
+import fileRoutes from "./modules/files/file.routes";
+import downloadRoutes from "./modules/downloads/download.routes";
 import { rateLimit } from "./middleware/rateLimit.middleware";
 import usersRoutes from "./modules/users/users.routes";
 
-import authRoutes from "./modules/auth/auth";
+import authRoutes from "./modules/auth/auth.routes";
 import { errorHandler } from "./middleware/errorHandler.middleware";
 
 import interactionsRoutes from "./modules/interactions/interactions.routes";
-import commentRoutes from "./routes/comment";
+import commentRoutes from "./modules/comments/comment.routes";
 import followsRoutes from "./modules/follows/follows.routes";
 import socialsRoutes from "./modules/socials/socials.routes";
 
@@ -79,15 +85,29 @@ app.get("/", (_, res) => {
 });
 
 // ERROR HANDLER
-app.use((err: any, req: any, res: any, next: any) => {
-  console.error(err);
+app.use(
+  (
+    err: Error,
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
 
-  if (err instanceof multer.MulterError) {
-    return res.status(400).json({ error: err.message });
+    console.error(err);
+
+    if (err instanceof multer.MulterError) {
+      return res.status(400).json({
+        error: err.message,
+      });
+    }
+
+    return res.status(500).json({
+      error:
+        err.message ||
+        "Error interno",
+    });
   }
-
-  res.status(500).json({ error: err.message || "Error interno" });
-});
+);
 
 //app.use(rateLimit({ window: 60, limit: 5 })); // global rate limit
 app.use(errorHandler);

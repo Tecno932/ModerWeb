@@ -65,6 +65,12 @@ enum ModStatus {
   ARCHIVED
 }
 
+enum ReleaseType {
+  RELEASE
+  BETA
+  ALPHA
+}
+
 enum Visibility {
   PUBLIC
   UNLISTED
@@ -385,7 +391,7 @@ model ModFile {
   sha1          String?
   sha512        String?
 
-  releaseType String // beta | release
+  releaseType ReleaseType // beta | release
 
   createdAt DateTime @default(now())
   isPrimary Boolean  @default(false)

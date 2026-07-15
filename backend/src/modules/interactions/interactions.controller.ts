@@ -1,61 +1,57 @@
-import { Request, Response } from "express";
+import { Response } from "express";
+
+import { asyncHandler } from "../../utils/asyncHandler";
+import { AuthRequest } from "../../middleware/auth.middleware";
+
 import { InteractionsService } from "./interactions.service";
 
-export class InteractionsController {
-  //////////////////////////////////////////////////////
-  // GET
-  //////////////////////////////////////////////////////
+export const getInteractions =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
 
-  static async getInteractions(
-    req: any,
-    res: Response
-  ) {
-    const modId = Number(req.params.id);
+      const data =
+        await InteractionsService.getInteractions(
+          Number(req.params.id),
+          req.userId!
+        );
 
-    const data =
-      await InteractionsService.getInteractions(
-        modId,
-        req.userId
-      );
+      res.json(data);
+    }
+  );
 
-    res.json(data);
-  }
+export const toggleLike =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
 
-  //////////////////////////////////////////////////////
-  // LIKE
-  //////////////////////////////////////////////////////
+      const data =
+        await InteractionsService.toggleLike({
+          modId: Number(req.params.id),
+          userId: req.userId!,
+        });
 
-  static async toggleLike(
-    req: any,
-    res: Response
-  ) {
-    const modId = Number(req.params.id);
+      res.json(data);
+    }
+  );
 
-    const data =
-      await InteractionsService.toggleLike(
-        modId,
-        req.userId
-      );
+export const toggleFavorite =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
 
-    res.json(data);
-  }
+      const data =
+        await InteractionsService.toggleFavorite({
+          modId: Number(req.params.id),
+          userId: req.userId!,
+        });
 
-  //////////////////////////////////////////////////////
-  // FAVORITE
-  //////////////////////////////////////////////////////
-
-  static async toggleFavorite(
-    req: any,
-    res: Response
-  ) {
-    const modId = Number(req.params.id);
-
-    const data =
-      await InteractionsService.toggleFavorite(
-        modId,
-        req.userId
-      );
-
-    res.json(data);
-  }
-}
+      res.json(data);
+    }
+  );

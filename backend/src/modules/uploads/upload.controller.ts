@@ -1,12 +1,15 @@
 import { Response } from "express";
+import { AuthRequest } from "../../middleware/auth.middleware";
+import { asyncHandler } from "../../utils/asyncHandler";
 
 import { UploadService }
   from "./upload.service";
 
-export async function getPresignedUrl(
-  req: any,
-  res: Response
-) {
+export const getPresignedUrl = asyncHandler(
+  async (
+    req: AuthRequest,
+    res: Response
+  ) => {
   const {
     filename,
     type,
@@ -24,8 +27,9 @@ export async function getPresignedUrl(
       filename,
       type,
       folder,
-      req.userId
+      req.userId!
     );
 
   res.json(result);
-}
+  }
+);

@@ -1,33 +1,3 @@
-.env
-# Environment variables declared in this file are NOT automatically loaded by Prisma.
-# Please add `import "dotenv/config";` to your `prisma.config.ts` file, or use the Prisma CLI with Bun
-# to load environment variables from .env files: https://pris.ly/prisma-config-env-vars.
-
-# Prisma supports the native connection string format for PostgreSQL, MySQL, SQLite, SQL Server, MongoDB and CockroachDB.
-# See the documentation for all the connection string options: https://pris.ly/d/connection-strings
-
-# The following `prisma+postgres` URL is similar to the URL produced by running a local Prisma Postgres
-# server with the `prisma dev` CLI command, when not choosing any non-default ports or settings. The API key, unlike the
-# one found in a remote Prisma Postgres URL, does not contain any sensitive information.
-
-DATABASE_URL="postgresql://nahuel:3438@localhost:5432/mods_platform"
-JWT_ACCESS_SECRET="aff9e37be78f9590add7a2db7be58be18da7400e28d7ad3d72629d803003ca6d578e845858394e0683603a0ad834b2cc15ba4358e4961e4d65df0596156b7368"
-JWT_REFRESH_SECRET="06453c48ef9f58b3250b1c65143c4e262892d4e768fbcc671fabb0c8dfb5eefe08cb3bc2a707e402504ea955af9348e65f4c139dd968f82939535ade38dee0a4"
-
-# 🔥 NUEVO (CDN READY)
-CDN_URL="http://192.168.0.110:3000"
-PORT=3000
-
-
-REDIS_HOST=127.0.0.1
-REDIS_PORT=6379
-
-R2_ENDPOINT=https://2990b63ccc7f6b421f58ac47980b2785.r2.cloudflarestorage.com
-R2_ACCESS_KEY_ID=d834ba570f2c0fda1a4e78598c69e2eb
-R2_SECRET_ACCESS_KEY=32cf321527131dd5ff1dd2b04e3a7c32c72f647988d7f68d2b5b46229b514ca2
-R2_PUBLIC_URL=https://pub-4c284f3a6f124cfeb3982bca32ce1159.r2.dev
-R2_BUCKET=mod-site
----
 prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
@@ -125,14 +95,16 @@ enum CosmeticRarity {
 }
 
 enum SocialPlatform {
-  INSTAGRAM
-  YOUTUBE
+  GITHUB
   DISCORD
-  X
-  WEBSITE
-  TIKTOK
+  YOUTUBE
+  INSTAGRAM
+  PATREON
+  KOFI
   TWITCH
-  BLUESKY
+  X
+  TIKTOK
+  WEBSITE
 }
 
 //////////////////////
@@ -260,7 +232,6 @@ model TeamInvite {
 
   team Team @relation(fields: [teamId], references: [id])
 }
-
 
 //////////////////////
 // User Role
@@ -542,6 +513,26 @@ model Follow {
 }
 
 //////////////////////
+// LIKN SOCIAL
+//////////////////////
+
+model ProfileSocial {
+  id Int @id @default(autoincrement())
+
+  profileId Int
+
+  platform SocialPlatform
+
+  url String
+
+  profile UserProfile @relation(fields: [profileId], references: [id])
+
+  @@unique([profileId, platform])
+
+  @@index([profileId])
+}
+
+//////////////////////
 // USER INVENTORY
 //////////////////////
 
@@ -564,26 +555,6 @@ model UserInventory {
 
   @@index([userId])
   @@index([itemId])
-}
-
-//////////////////////
-// LIKN SOCIAL
-//////////////////////
-
-model ProfileSocial {
-  id Int @id @default(autoincrement())
-
-  profileId Int
-
-  platform SocialPlatform
-
-  url String
-
-  profile UserProfile @relation(fields: [profileId], references: [id])
-
-  @@unique([profileId, platform])
-
-  @@index([profileId])
 }
 
 //////////////////////
@@ -639,9 +610,8 @@ model EquippedCosmetic {
   @@index([profileId])
   @@index([cosmeticId])
 }
-
 ---
-src/ (todo dentro de src)
+src/ (todo lo que sigue va dentro de esta carpeta)
 app.ts
 import "dotenv/config";
 import express from "express";
@@ -650,19 +620,25 @@ import { initRedis } from "./lib/redis";
 import path from "path";
 import multer from "multer";
 
-import modRoutes from "./routes/mod";
-import uploadsRoutes from "./routes/upload";
-import versionRoutes from "./routes/version";
-import fileRoutes from "./routes/file";
-import downloadRoutes from "./routes/download";
+import {
+  NextFunction,
+  Request,
+  Response,
+} from "express";
+
+import modRoutes from "./modules/mod/mod.routes";
+import uploadsRoutes from "./modules/uploads/upload.routes";
+import versionRoutes from "./modules/versions/version.routes";
+import fileRoutes from "./modules/files/file.routes";
+import downloadRoutes from "./modules/downloads/download.routes";
 import { rateLimit } from "./middleware/rateLimit.middleware";
 import usersRoutes from "./modules/users/users.routes";
 
-import authRoutes from "./modules/auth/auth";
+import authRoutes from "./modules/auth/auth.routes";
 import { errorHandler } from "./middleware/errorHandler.middleware";
 
 import interactionsRoutes from "./modules/interactions/interactions.routes";
-import commentRoutes from "./routes/comment";
+import commentRoutes from "./modules/comments/comment.routes";
 import followsRoutes from "./modules/follows/follows.routes";
 import socialsRoutes from "./modules/socials/socials.routes";
 
@@ -724,15 +700,29 @@ app.get("/", (_, res) => {
 });
 
 // ERROR HANDLER
-app.use((err: any, req: any, res: any, next: any) => {
-  console.error(err);
+app.use(
+  (
+    err: Error,
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
 
-  if (err instanceof multer.MulterError) {
-    return res.status(400).json({ error: err.message });
+    console.error(err);
+
+    if (err instanceof multer.MulterError) {
+      return res.status(400).json({
+        error: err.message,
+      });
+    }
+
+    return res.status(500).json({
+      error:
+        err.message ||
+        "Error interno",
+    });
   }
-
-  res.status(500).json({ error: err.message || "Error interno" });
-});
+);
 
 //app.use(rateLimit({ window: 60, limit: 5 })); // global rate limit
 app.use(errorHandler);
@@ -741,858 +731,7 @@ app.listen(3000, () => {
   console.log("API running on http://192.168.0.110:3000");
 });
 ---
-Controller/
-comment.controller.ts
-import { Response } from "express";
-
-import { asyncHandler } from "../utils/asyncHandler";
-
-import { AuthRequest } from "../middleware/auth.middleware";
-
-import { CommentService } from "../services/comment.service";
-
-export const getComments =
-  asyncHandler(
-    async (
-      req: any,
-      res: Response
-    ) => {
-      const comments =
-        await CommentService.getComments(
-          Number(req.params.modId)
-        );
-
-      res.json(comments);
-    }
-  );
-
-export const createComment =
-  asyncHandler(
-    async (
-      req: AuthRequest,
-      res: Response
-    ) => {
-      const comment =
-        await CommentService.createComment(
-          Number(req.params.modId),
-          req.userId!,
-          req.body.content
-        );
-
-      res
-        .status(201)
-        .json(comment);
-    }
-  );
-
-export const updateComment =
-  asyncHandler(
-    async (
-      req: AuthRequest,
-      res: Response
-    ) => {
-      const comment =
-        await CommentService.updateComment(
-          Number(req.params.id),
-          req.userId!,
-          req.body.content
-        );
-
-      res.json(comment);
-    }
-  );
-
-export const deleteComment =
-  asyncHandler(
-    async (
-      req: AuthRequest,
-      res: Response
-    ) => {
-      const result =
-        await CommentService.deleteComment(
-          Number(req.params.id),
-          req.userId!
-        );
-
-      res.json(result);
-    }
-  );
-
-export const createReply =
-  asyncHandler(
-    async (
-      req: AuthRequest,
-      res: Response
-    ) => {
-      const reply =
-        await CommentService.createReply(
-          Number(req.params.id),
-          req.userId!,
-          req.body.content
-        );
-
-      res.status(201).json(reply);
-    }
-  );
----
-download.controller.ts
-import { Request, Response } from "express";
-import { prisma } from "../lib/prisma";
-
-export async function download(req: Request, res: Response) {
-  try {
-    const versionId = Number(req.params.versionId);
-
-    if (!versionId) {
-      return res.status(400).json({ error: "versionId inválido" });
-    }
-
-    const version = await prisma.modVersion.findUnique({
-      where: { id: versionId },
-      include: {
-        files: true, // 🔥 IMPORTANTE: tiene que ser files, no downloads
-        mod: true,
-      },
-    });
-
-    if (!version || version.files.length === 0) {
-      return res.status(404).json({ error: "No hay archivo" });
-    }
-
-    // 🔥 agarramos el archivo principal
-    const file =
-      version.files.find((f) => f.isPrimary) || version.files[0];
-
-    // incrementar downloads archivo
-    await prisma.modFile.update({
-      where: { id: file.id },
-      data: {
-        downloads: {
-          increment: 1,
-        },
-      },
-    });
-
-    // incrementar downloads mod
-    await prisma.mod.update({
-      where: { id: version.modId },
-      data: {
-        downloads: {
-          increment: 1,
-        },
-      },
-    });
-
-    console.log(
-      "⬇ REDIRECT A:",
-      file.url
-    );
-
-    return res.redirect(file.url);
-  } catch (error: unknown) {
-    const message =
-      error instanceof Error ? error.message : "Error";
-
-    console.error("❌ DOWNLOAD ERROR:", message);
-
-    return res.status(500).json({ error: message });
-  }
-}
----
-favorite.controller.ts
-import { prisma } from "../lib/prisma.js";
-import { NotFoundError } from "../utils/errors.js";
-
-export class FavoriteController {
-  static async toggleFavorite(userId: number, modId: number) {
-    // Verificar que el mod existe antes de favoritear
-    const mod = await prisma.mod.findUnique({ where: { id: modId } });
-    if (!mod) throw new NotFoundError("Mod no encontrado");
-
-    const existing = await prisma.favorite.findUnique({
-      where: { userId_modId: { userId, modId } },
-    });
-
-    if (existing) {
-      await prisma.favorite.delete({
-        where: { userId_modId: { userId, modId } },
-      });
-      return { favorited: false };
-    }
-
-    await prisma.favorite.create({
-      data: { userId, modId },
-    });
-
-    return { favorited: true };
-  }
-
-  static async isFavorited(userId: number, modId: number) {
-    const fav = await prisma.favorite.findUnique({
-      where: { userId_modId: { userId, modId } },
-    });
-    return !!fav;
-  }
-
-  // Para el perfil de usuario (ya lo usás en user.service.ts)
-  static async getUserFavorites(userId: number) {
-    return prisma.favorite.findMany({
-      where: { userId },
-      include: {
-        mod: {
-          include: {
-            images: true,
-            _count: { select: { likes: true } },
-          },
-        },
-      },
-    });
-  }
-}
----
-invite.controller.ts
-import { InviteService } from "../services/invite.service";
-
-export async function createInvite(req: any, res: any) {
-  try {
-    const { teamId, email, role } = req.body;
-
-    const invite = await InviteService.createInvite(
-      teamId,
-      email,
-      role
-    );
-
-    res.json(invite);
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
-  }
-}
-
-export async function acceptInvite(req: any, res: any) {
-  try {
-    const { token } = req.params;
-
-    const result = await InviteService.acceptInvite(
-      token,
-      req.userId
-    );
-
-    res.json(result);
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
-  }
-}
-
-export async function rejectInvite(req: any, res: any) {
-  try {
-    const { token } = req.params;
-
-    const result = await InviteService.rejectInvite(token);
-
-    res.json(result);
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
-  }
-}
----
-like.controller.ts
-import { prisma } from "../lib/prisma";
-import { getRedis } from "../lib/redis";
-
-export class LikeController {
-  /**
-   * Toggle like (like / unlike)
-   */
-  static async toggleLike(userId: number, modId: number) {
-    try {
-      const result = await prisma.$transaction(async (tx) => {
-        const existingLike = await tx.modLike.findUnique({
-          where: {
-            userId_modId: { userId, modId },
-          },
-        });
-
-        if (existingLike) {
-          await tx.modLike.delete({
-            where: {
-              userId_modId: { userId, modId },
-            },
-          });
-
-          await tx.mod.update({
-            where: { id: modId },
-            data: {
-              likesCount: { decrement: 1 },
-            },
-          });
-
-          return { liked: false };
-        }
-
-        await tx.modLike.create({
-          data: { userId, modId },
-        });
-
-        await tx.mod.update({
-          where: { id: modId },
-          data: {
-            likesCount: { increment: 1 },
-          },
-        });
-
-        return { liked: true };
-      });
-
-      // 🔥 INVALIDAR CACHE
-      const redis = getRedis();
-
-      if (redis) {
-        await redis.del("mods:list");
-        await redis.del("mods:trending");
-      }
-
-      return result;
-    } catch (error) {
-      console.error("Error toggling like:", error);
-      throw new Error("Error toggling like");
-    }
-  }
-
-  /**
-   * Get likes count
-   */
-  static async getLikesCount(modId: number) {
-    try {
-      const count = await prisma.modLike.count({
-        where: { modId },
-      });
-
-      return count;
-    } catch (error) {
-      console.error("Error getting likes count:", error);
-      throw new Error("Error getting likes count");
-    }
-  }
-
-  /**
-   * Check if user liked a mod
-   */
-  static async isLiked(userId: number, modId: number) {
-    try {
-      const like = await prisma.modLike.findUnique({
-        where: {
-          userId_modId: {
-            userId,
-            modId,
-          },
-        },
-      });
-
-      return !!like;
-    } catch (error) {
-      console.error("Error checking like:", error);
-      throw new Error("Error checking like");
-    }
-  }
-}
----
-mod.controller.ts
-import { Response } from "express";
-
-import { ModService } from "../services/mod.service";
-
-import { asyncHandler } from "../utils/asyncHandler";
-
-import { AuthRequest } from "../middleware/auth.middleware";
-
-export const createMod =
-  asyncHandler(
-    async (
-      req: AuthRequest,
-      res: Response
-    ) => {
-      const mod =
-        await ModService.createMod(
-          req.body,
-          req.files,
-          req.userId!
-        );
-
-      res
-        .status(201)
-        .json(mod);
-    }
-  );
-
-export const getMods =
-  asyncHandler(
-    async (
-      req: any,
-      res: Response
-    ) => {
-      const mods =
-        await ModService.getMods(
-          req.query
-        );
-
-      res.json(mods);
-    }
-  );
-
-export const getModBySlug =
-  asyncHandler(
-    async (
-      req: any,
-      res: Response
-    ) => {
-      const mod =
-        await ModService.getModBySlug(
-          req.params.slug,
-          req.userId,
-          req.ip
-        );
-
-      res.json(mod);
-    }
-  );
-
-export async function updateMod(
-  req: any,
-  res: Response
-) {
-  try {
-    const mod =
-      await ModService.updateMod(
-        Number(req.params.id),
-        req.body,
-        req.userId
-      );
-
-    res.json(mod);
-  } catch (err: any) {
-    res
-      .status(403)
-      .json({
-        error: err.message,
-      });
-  }
-}
-
-export async function deleteMod(
-  req: any,
-  res: Response
-) {
-  try {
-    const result =
-      await ModService.deleteMod(
-        Number(req.params.id),
-        req.userId
-      );
-
-    res.json(result);
-  } catch (err: any) {
-    res
-      .status(403)
-      .json({
-        error: err.message,
-      });
-  }
-}
----
-modfull.controller.ts
-import { prisma } from "../lib/prisma";
-import { AuthRequest } from "../middleware/auth.middleware";
-import { generateSlug } from "../utils/slug";
-import {
-  BadRequestError,
-  NotFoundError,
-  UnauthorizedError,
-} from "../utils/errors";
-import { sanitizeText, sanitizeRichText } from "../utils/sanitize";
-
-export const createFullMod = async (req: AuthRequest) => {
-  console.log("BODY:", req.body);
-  console.log("FILES:", req.files);
-
-  const userId = req.userId;
-  if (!userId) throw new UnauthorizedError("No autorizado");
-
-  const {
-    title,
-    description,
-    content,
-    platform,
-    loader,
-    type,
-    tags,
-  } = req.body;
-
-  // 🔥 SANITIZAR DESPUÉS DE EXTRAER
-  const safeTitle = sanitizeText(title);
-  const safeDescription = sanitizeText(description);
-  const safeContent = sanitizeRichText(content);
-
-  const parsedTags =
-    typeof tags === "string"
-      ? JSON.parse(tags || "[]")
-      : tags || [];
-
-  const files = req.files as {
-    cover?: Express.Multer.File[];
-    gallery?: Express.Multer.File[];
-  };
-
-  const cover = files?.cover?.[0];
-  const gallery = files?.gallery || [];
-
-  if (!cover) throw new BadRequestError("Cover requerido");
-
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-  });
-
-  if (!user) throw new NotFoundError("Usuario no encontrado");
-
-  const slug = generateSlug(user.username, safeTitle);
-
-  const mod = await prisma.mod.create({
-    data: {
-      title: safeTitle,
-      slug,
-      description: safeDescription,
-      content: safeContent,
-      platform,
-      loader,
-      type,
-      authorId: userId,
-
-      tags: {
-        create:
-          parsedTags?.map((t: string) => ({
-            tag: {
-              connectOrCreate: {
-                where: { name: t },
-                create: { name: t },
-              },
-            },
-          })) || [],
-      },
-
-      images: {
-        create: [
-          {
-            url: `/uploads/mods/${cover.filename}`,
-            thumb: `/uploads/mods/${cover.filename}`,
-            isCover: true,
-          },
-          ...gallery.map((file) => ({
-            url: `/uploads/mods/${file.filename}`,
-            thumb: `/uploads/mods/${file.filename}`,
-            isCover: false,
-          })),
-        ],
-      },
-    },
-  });
-
-  return mod;
-};
----
-version.controllert.ts
-import { prisma } from "../lib/prisma";
-import { VersionService } from "../services/version.service";
-import { createVersionSchema } from "../validations/version.schema";
-
-export async function createVersion(req: any, res: any) {
-  try {
-    const parsed = createVersionSchema.parse(req.body);
-
-    const version = await VersionService.createVersion(
-      parsed,
-      req.userId,
-      Number(req.params.id)
-    );
-
-    res.json(version);
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
-  }
-}
-
-export async function getVersions(req: any, res: any) {
-  const versions = await VersionService.getVersions(
-    Number(req.params.id)
-  );
-  res.json(versions);
-}
-
-export async function deleteVersion(req: any, res: any) {
-  const id = Number(req.params.id);
-
-  const version = await prisma.modVersion.findUnique({
-    where: { id },
-    include: { mod: true },
-  });
-
-  if (!version) {
-    return res.status(404).json({ error: "No existe" });
-  }
-
-  if (version.mod.authorId !== req.userId) {
-    return res.status(403).json({ error: "No autorizado" });
-  }
-
-  await prisma.modVersion.delete({
-    where: { id },
-  });
-
-  res.json({ success: true });
-}
-
-export async function updateVersion(req: any, res: any) {
-  const id = Number(req.params.id);
-
-  const version = await prisma.modVersion.findUnique({
-    where: { id },
-    include: { mod: true },
-  });
-
-  if (!version) {
-    return res.status(404).json({ error: "No existe" });
-  }
-
-  if (version.mod.authorId !== req.userId) {
-    return res.status(403).json({ error: "No autorizado" });
-  }
-
-  const updated = await prisma.modVersion.update({
-    where: { id },
-    data: {
-      version: req.body.version,
-    },
-  });
-
-  res.json(updated);
-}
----
-file.controller.ts
-import { FileService } from "../services/file.service";
-
-export async function uploadFile(req: any, res: any) {
-  try {
-    const file = req.file;
-
-    const result = await FileService.uploadFile(
-      file,
-      Number(req.params.id),
-      req.userId
-    );
-
-    res.json(result);
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
-  }
-}
----
-versionfile.controller.ts
-import { prisma } from "../lib/prisma";
-import crypto from "crypto";
-import fs from "fs";
-import path from "path";
-import { AuthRequest } from "../middleware/auth.middleware";
-import { validateFileBuffer } from "../utils/fileValidation";
-import {
-  BadRequestError,
-  ForbiddenError,
-  NotFoundError,
-  UnauthorizedError,
-} from "../utils/errors";
-
-export async function uploadVersionFile(req: AuthRequest) {
-  console.log("📦 uploadVersionFile HIT");
-  console.log("params:", req.params);
-  console.log("file exists:", !!(req as any).file);
-
-  const userId = req.userId;
-  if (!userId) throw new UnauthorizedError("No autorizado");
-
-  const versionId = Number(req.params.id);
-  if (!versionId) throw new BadRequestError("versionId requerido");
-
-  console.log("👉 VERSION ID:", versionId);
-
-  const file = (req as any).file as Express.Multer.File | undefined;
-  if (!file) throw new BadRequestError("No file");
-
-  const version = await prisma.modVersion.findUnique({
-    where: { id: versionId },
-    include: { mod: true },
-  });
-
-  if (!version) throw new NotFoundError("Versión no existe");
-
-  if (version.mod.authorId !== userId) {
-    throw new ForbiddenError("No autorizado");
-  }
-
-  console.log("📁 Archivo recibido:", file.originalname);
-
-  // 🔥 leer archivo desde disco (porque usás diskStorage)
-  const fileBuffer = fs.readFileSync(file.path);
-
-  // 🔥 validar tipo real del archivo
-  await validateFileBuffer(fileBuffer);
-
-  // 🔥 hashes
-  const sha1 = crypto.createHash("sha1").update(fileBuffer).digest("hex");
-  const sha512 = crypto.createHash("sha512").update(fileBuffer).digest("hex");
-
-  // 🔥 nombre lindo (para UI)
-  const safeName = version.mod.title
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "-")
-    .replace(/-+/g, "-");
-
-  const ext = path.extname(file.originalname);
-  const displayName = `${safeName}-${version.version}${ext}`;
-
-  // 🔥 opcional PRO: solo un archivo primary por versión
-  await prisma.modFile.updateMany({
-    where: {
-      modVersionId: versionId,
-      isPrimary: true,
-    },
-    data: {
-      isPrimary: false,
-    },
-  });
-
-  // 🔥 guardar en DB
-  const newFile = await prisma.modFile.create({
-    data: {
-      modVersionId: versionId,
-      filename: file.filename, // nombre real en disco (random)
-      displayName: displayName, // nombre lindo
-      url: `/uploads/mods/${file.filename}`,
-      size: file.size,
-      type: file.mimetype,
-      releaseType: "release",
-      isPrimary: true,
-      sha1,
-      sha512,
-    },
-  });
-
-  console.log("✅ Archivo subido:", newFile.id);
-
-  return newFile;
-}
----
-controller/project/
-files.controller.ts
-import { prisma } from "../../lib/prisma";
-
-export async function getFiles(req: any, res: any) {
-  const modId = Number(req.params.id);
-
-  const files = await prisma.modFile.findMany({
-    where: {
-      modVersion: {
-        modId,
-      },
-    },
-  });
-
-  res.json(files);
-}
-
-export async function deleteFile(req: any, res: any) {
-  const fileId = Number(req.params.fileId);
-
-  const file = await prisma.modFile.findUnique({
-    where: { id: fileId },
-    include: {
-      modVersion: {
-        include: { mod: true },
-      },
-    },
-  });
-
-  if (!file) {
-    return res.status(404).json({ error: "No existe" });
-  }
-
-  if (file.modVersion.mod.authorId !== req.userId) {
-    return res.status(403).json({ error: "No autorizado" });
-  }
-
-  await prisma.modFile.delete({
-    where: { id: fileId },
-  });
-
-  res.json({ success: true });
-}
----
-gallery.controller.ts
-import { prisma } from "../../lib/prisma";
-
-export async function getGallery(req: any, res: any) {
-  const modId = Number(req.params.id);
-
-  const images = await prisma.modImage.findMany({
-    where: { modId },
-  });
-
-  res.json(images);
-}
-
-export async function deleteImage(req: any, res: any) {
-  const imageId = Number(req.params.imageId);
-
-  await prisma.modImage.delete({
-    where: { id: imageId },
-  });
-
-  res.json({ success: true });
-}
----
-project.controller.ts
-import { ModService } from "../../services/mod.service.js";
-
-export async function getProject(req: any, res: any) {
-  try {
-    const id = Number(req.params.id);
-
-    const mod = await ModService.getProjectById(
-      id,
-      req.userId
-    );
-
-    res.json(mod);
-  } catch (err: any) {
-    res.status(403).json({ error: err.message });
-  }
-}
-
-export async function updateProject(req: any, res: any) {
-  try {
-    const id = Number(req.params.id);
-
-    const mod = await ModService.updateMod(
-      id,
-      req.body,
-      req.userId
-    );
-
-    res.json(mod);
-  } catch (err: any) {
-    res.status(403).json({ error: err.message });
-  }
-}
----
-constants/
-permission.ts
+constants/permissions.ts
 export const Roles = {
   OWNER: "owner",
   ADMIN: "admin",
@@ -1650,7 +789,7 @@ export const RoleScopes: Record<string, string[]> = {
   ],
 };
 ---
-scopes.ts
+scope.ts
 export const Scopes = {
   MOD_READ: "mod:read",
   MOD_UPDATE: "mod:update",
@@ -1663,8 +802,7 @@ export const Scopes = {
 
 export type Scope = typeof Scopes[keyof typeof Scopes];
 ---
-lib/
-cache.ts
+lib/cache.ts
 import { getRedis } from "./redis";
 
 const TTL = 60;
@@ -1800,18 +938,7 @@ export const prisma =
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
 }
----
-s3.ts
-import { S3Client } from "@aws-sdk/client-s3";
 
-export const s3 = new S3Client({
-  region: "auto",
-  endpoint: process.env.R2_ENDPOINT,
-  credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-  },
-});
 ---
 redis.ts
 import Redis from "ioredis";
@@ -1851,124 +978,60 @@ export function getRedis() {
   return redis;
 }
 ---
-mapper/
-mod.mapper.ts
-export function mapMod(
-  mod: any,
-  userId?: number
-) {
+s3.ts
+import { S3Client } from "@aws-sdk/client-s3";
+
+export const s3 = new S3Client({
+  region: "auto",
+  endpoint: process.env.R2_ENDPOINT,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+  },
+});
+---
+mappers/
+---
+comment.mapper.ts
+export function mapCommentUser<
+  T extends {
+    user: {
+      profile?: {
+        avatarUrl: string | null;
+      } | null;
+    };
+  }
+>(comment: T) {
   return {
-    ////////////////////////////////////////////////////
-    // BASIC
-    ////////////////////////////////////////////////////
-
-    id: mod.id,
-    title: mod.title,
-    slug: mod.slug,
-
-    summary: mod.summary,
-
-    description: mod.description,
-    content: (() => {
-      try {
-        return mod.content
-          ? JSON.parse(mod.content)
-          : null;
-      } catch {
-        return null;
-      }
-    })(),
-
-    icon: mod.icon,
-
-    platform: mod.platform,
-    loader: mod.loader,
-    type: mod.type,
-
-    categories: mod.categories,
-
-    links: {
-      sourceUrl: mod.sourceUrl,
-      issuesUrl: mod.issuesUrl,
-      discordUrl: mod.discordUrl,
-      websiteUrl: mod.websiteUrl,
-      wikiUrl: mod.wikiUrl,
-      donationUrl: mod.donationUrl,
+    ...comment,
+    user: {
+      ...comment.user,
+      avatar:
+        comment.user.profile?.avatarUrl ??
+        null,
     },
-
-    createdAt: mod.createdAt,
-    updatedAt: mod.updatedAt,
-
-    ////////////////////////////////////////////////////
-    // AUTHOR
-    ////////////////////////////////////////////////////
-
-    author: mod.author,
-
-    ////////////////////////////////////////////////////
-    // STATS
-    ////////////////////////////////////////////////////
-
-    stats: {
-      views: mod.views,
-
-      likes:
-        mod.likesCount || 0,
-
-      favorites:
-        mod.favoritesCount || 0,
-
-      downloads:
-        mod.downloads,
-
-      comments:
-        mod._count?.comments || 0,
-    },
-
-    ////////////////////////////////////////////////////
-    // INTERACTIONS
-    ////////////////////////////////////////////////////
-
-    interactions: {
-      liked:
-        Array.isArray(mod.likes)
-          ? mod.likes.length > 0
-          : false,
-
-      favorited:
-        Array.isArray(
-          mod.favorites
-        )
-          ? mod.favorites.length >
-            0
-          : false,
-    },
-
-    ////////////////////////////////////////////////////
-    // MEDIA
-    ////////////////////////////////////////////////////
-
-    images: mod.images,
-
-    ////////////////////////////////////////////////////
-    // TAGS
-    ////////////////////////////////////////////////////
-
-    tags:
-      mod.tags?.map(
-        (t: any) => t.tag
-      ) || [],
-
-    ////////////////////////////////////////////////////
-    // VERSIONS
-    ////////////////////////////////////////////////////
-
-    versions:
-      mod.versions || [],
   };
 }
 ---
-middleware/
+middleware/antiAbuse.middleware.ts
+import { Request, Response, NextFunction } from "express";
+
+export function antiAbuse(req: Request, res: Response, next: NextFunction) {
+  const ua = req.headers["user-agent"] || "";
+
+  // bloquea bots básicos
+  if (!ua || ua.length < 10) {
+    return res.status(403).json({ error: "Blocked" });
+  }
+
+  // tamaño payload
+  if (JSON.stringify(req.body).length > 50_000) {
+    return res.status(413).json({ error: "Payload too large" });
+  }
+
+  next();
+}
+---
 auth.middleware.ts
 import {
   Request,
@@ -2026,7 +1089,44 @@ export function authMiddleware(
   }
 }
 ---
-optionalAuth.middleware.ts
+errorHandler.middleware.ts
+import { Request, Response, NextFunction } from "express";
+import { AppError } from "../utils/errors";
+
+export function errorHandler(
+  err: any,
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  console.error("🔥 ERROR:", err);
+
+  if (err instanceof AppError) {
+    return res.status(err.statusCode).json({
+      error: err.name,
+      message: err.message,
+      status: err.statusCode,
+    });
+  }
+
+  // errores de Zod
+  if (err.name === "ZodError") {
+    return res.status(400).json({
+      error: "ValidationError",
+      message: err.errors.map((e: any) => e.message),
+      status: 400,
+    });
+  }
+
+  // fallback
+  return res.status(500).json({
+    error: "InternalServerError",
+    message: "Algo salió mal",
+    status: 500,
+  });
+}
+---
+optionalAuht.middleware.ts
 import {
   Response,
   NextFunction,
@@ -2190,29 +1290,20 @@ export function roleMiddleware(
   };
 }
 ---
-antiAbuse.middleware.ts
-import { Request, Response, NextFunction } from "express";
+modules/auth/auth.constants.ts
+export const REFRESH_TOKEN_DAYS = 30;
 
-export function antiAbuse(req: Request, res: Response, next: NextFunction) {
-  const ua = req.headers["user-agent"] || "";
+export const PASSWORD_MIN_LENGTH = 8;
+export const PASSWORD_MAX_LENGTH = 128;
 
-  // bloquea bots básicos
-  if (!ua || ua.length < 10) {
-    return res.status(403).json({ error: "Blocked" });
-  }
-
-  // tamaño payload
-  if (JSON.stringify(req.body).length > 50_000) {
-    return res.status(413).json({ error: "Payload too large" });
-  }
-
-  next();
-}
+export const USERNAME_MIN_LENGTH = 3;
+export const USERNAME_MAX_LENGTH = 32;
 ---
-modules/auth/
 auth.controller.ts
 import { Request, Response } from "express";
+
 import { AuthRequest } from "../../middleware/auth.middleware";
+import { asyncHandler } from "../../utils/asyncHandler";
 
 import {
   loginUser,
@@ -2227,207 +1318,180 @@ import {
 // REGISTER
 //////////////////////////////////////////////////
 
-export async function register(
-  req: Request,
-  res: Response
-) {
-  try {
-    const {
-      username,
-      email,
-      password,
-    } = req.body;
+export const register =
+  asyncHandler(
+    async (
+      req: Request,
+      res: Response
+    ) => {
 
-    const user =
-      await registerUser({
+      const {
         username,
         email,
         password,
-      });
+      } = req.body;
 
-    res
-      .status(201)
-      .json(user);
-  } catch (error: unknown) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Error desconocido";
+      const user =
+        await registerUser({
+          username,
+          email,
+          password,
+        });
 
-    res.status(400).json({
-      error: message,
-    });
-  }
-}
+      res
+        .status(201)
+        .json(user);
+    }
+  );
 
 //////////////////////////////////////////////////
 // LOGIN
 //////////////////////////////////////////////////
 
-export async function login(
-  req: Request,
-  res: Response
-) {
-  try {
-    const {
-      email,
-      password,
-    } = req.body;
+export const login =
+  asyncHandler(
+    async (
+      req: Request,
+      res: Response
+    ) => {
 
-    const result =
-      await loginUser({
+      const {
         email,
         password,
-      });
+      } = req.body;
 
-    res.json(result);
-  } catch (error: unknown) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Error desconocido";
+      const result =
+        await loginUser({
+          email,
+          password,
+        });
 
-    res.status(400).json({
-      error: message,
-    });
-  }
-}
+      res.json(result);
+    }
+  );
 
 //////////////////////////////////////////////////
 // ME
 //////////////////////////////////////////////////
 
-export async function me(
-  req: AuthRequest,
-  res: Response
-) {
-  try {
-    const userId = req.userId;
+export const me =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
 
-    if (!userId) {
-      return res
-        .status(401)
-        .json({
-          error: "No autorizado",
-        });
+      const user =
+        await getCurrentUser(
+          req.userId!
+        );
+
+      res.json(user);
     }
-
-    const user =
-      await getCurrentUser(
-        userId
-      );
-
-    res.json(user);
-  } catch (error: unknown) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Error desconocido";
-
-    res.status(400).json({
-      error: message,
-    });
-  }
-}
+  );
 
 //////////////////////////////////////////////////
-// TOKEN
+// REFRESH
 //////////////////////////////////////////////////
 
-export async function refresh(
-  req: Request,
-  res: Response
-) {
-  try {
-    const {
-      refreshToken,
-    } = req.body;
+export const refresh =
+  asyncHandler(
+    async (
+      req: Request,
+      res: Response
+    ) => {
 
-    const result =
-      await refreshAccessToken(
-        refreshToken
-      );
+      const {
+        refreshToken,
+      } = req.body;
 
-    res.json(result);
-  } catch (error: unknown) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Error desconocido";
+      const result =
+        await refreshAccessToken(
+          refreshToken
+        );
 
-    res.status(401).json({
-      error: message,
-    });
-  }
-}
+      res.json(result);
+    }
+  );
 
 //////////////////////////////////////////////////
 // LOGOUT
 //////////////////////////////////////////////////
 
-export async function logout(
-  req: Request,
-  res: Response
-) {
-  try {
-    const {
-      refreshToken,
-    } = req.body;
+export const logout =
+  asyncHandler(
+    async (
+      req: Request,
+      res: Response
+    ) => {
 
-    const result =
-      await logoutUser(
-        refreshToken
-      );
+      const {
+        refreshToken,
+      } = req.body;
 
-    res.json(result);
-  } catch (error: unknown) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Error desconocido";
+      const result =
+        await logoutUser(
+          refreshToken
+        );
 
-    res.status(400).json({
-      error: message,
-    });
-  }
-}
+      res.json(result);
+    }
+  );
 
 //////////////////////////////////////////////////
 // LOGOUT ALL
 //////////////////////////////////////////////////
 
-export async function logoutAll(
-  req: AuthRequest,
-  res: Response
-) {
-  try {
-    if (!req.userId) {
-      return res.status(401).json({
-        error: "No autorizado",
-      });
+export const logoutAll =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+
+      const result =
+        await logoutAllSessions(
+          req.userId!
+        );
+
+      res.json(result);
     }
+  );
+---
+auth.select.ts
+export const authUserSelect = {
+  id: true,
 
-    const result =
-      await logoutAllSessions(
-        req.userId
-      );
+  username: true,
+  email: true,
 
-    res.json(result);
-  } catch (error: unknown) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Error desconocido";
+  role: true,
 
-    res.status(400).json({
-      error: message,
-    });
-  }
-}
+  isVerified: true,
+
+  createdAt: true,
+  updatedAt: true,
+
+  lastLoginAt: true,
+
+  profile: {
+    select: {
+      displayName: true,
+
+      avatarUrl: true,
+      bannerUrl: true,
+
+      bio: true,
+
+      accentColor: true,
+    },
+  },
+} as const;
 ---
 auth.service.ts
-import { prisma } from "../../lib/prisma";
 import bcrypt from "bcryptjs";
+
+import { prisma } from "../../lib/prisma";
 
 import {
   BadRequestError,
@@ -2440,10 +1504,23 @@ import {
   generateRefreshToken,
 } from "./auth.tokens";
 
-import {
-  RegisterInput,
+import type {
   LoginInput,
+  RegisterInput,
 } from "./auth.types";
+
+import {
+  validateLogin,
+  validateRegister,
+} from "./auth.validation";
+
+import {
+  authUserSelect,
+} from "./auth.select";
+
+import {
+  toSafeUser,
+} from "./auth.mapper";
 
 //////////////////////////////////////////////////
 // REGISTER
@@ -2452,59 +1529,13 @@ import {
 export async function registerUser(
   data: RegisterInput
 ) {
+  validateRegister(data);
+
   const {
     username,
     email,
     password,
   } = data;
-
-  if (!username || !email || !password) {
-    throw new BadRequestError(
-      "Faltan campos obligatorios"
-    );
-  }
-
-  if (username.length < 3) {
-    throw new BadRequestError(
-      "El usuario debe tener al menos 3 caracteres"
-    );
-  }
-
-  if (username.length > 32) {
-    throw new BadRequestError(
-      "El usuario no puede superar los 32 caracteres"
-    );
-  }
-
-  const usernameRegex =
-    /^[a-zA-Z0-9_-]+$/;
-
-  if (!usernameRegex.test(username)) {
-    throw new BadRequestError(
-      "Username inválido"
-    );
-  }
-
-  const emailRegex =
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-  if (!emailRegex.test(email)) {
-    throw new BadRequestError(
-      "Email inválido"
-    );
-  }
-
-  if (password.length < 8) {
-    throw new BadRequestError(
-      "La contraseña es muy corta"
-    );
-  }
-
-  if (password.length > 128) {
-    throw new BadRequestError(
-      "La contraseña es demasiado larga"
-    );
-  }
 
   const existingUser =
     await prisma.user.findFirst({
@@ -2548,10 +1579,7 @@ export async function registerUser(
       }
     );
 
-  const { password: _, ...safeUser } =
-    user;
-
-  return safeUser;
+  return toSafeUser(user);
 }
 
 //////////////////////////////////////////////////
@@ -2561,16 +1589,12 @@ export async function registerUser(
 export async function loginUser(
   data: LoginInput
 ) {
+  validateLogin(data);
+
   const {
     email,
     password,
   } = data;
-
-  if (!email || !password) {
-    throw new BadRequestError(
-      "Faltan campos"
-    );
-  }
 
   const user =
     await prisma.user.findUnique({
@@ -2611,41 +1635,11 @@ export async function loginUser(
       where: {
         id: user.id,
       },
-
-      select: {
-        id: true,
-
-        username: true,
-        email: true,
-
-        role: true,
-
-        isVerified: true,
-
-        createdAt: true,
-        updatedAt: true,
-
-        lastLoginAt: true,
-
-        profile: {
-          select: {
-            displayName: true,
-
-            avatarUrl: true,
-            bannerUrl: true,
-
-            bio: true,
-
-            accentColor: true,
-          },
-        },
-      },
+      select: authUserSelect,
     });
 
   const accessToken =
-    generateAccessToken(
-      user.id
-    );
+    generateAccessToken(user.id);
 
   const refreshToken =
     generateRefreshToken();
@@ -2654,24 +1648,22 @@ export async function loginUser(
     data: {
       token: refreshToken,
       userId: user.id,
-
       expiresAt: new Date(
         Date.now() +
-        1000 * 60 * 60 * 24 * 30
+          1000 * 60 * 60 * 24 * 30
       ),
     },
-});
+  });
 
   return {
     user: safeUser,
-
     accessToken,
     refreshToken,
   };
 }
 
 //////////////////////////////////////////////////
-// GET CURRENT USER
+// CURRENT USER
 //////////////////////////////////////////////////
 
 export async function getCurrentUser(
@@ -2682,35 +1674,7 @@ export async function getCurrentUser(
       where: {
         id: userId,
       },
-
-      select: {
-        id: true,
-
-        username: true,
-        email: true,
-
-        role: true,
-
-        isVerified: true,
-
-        createdAt: true,
-        updatedAt: true,
-
-        lastLoginAt: true,
-
-        profile: {
-          select: {
-            displayName: true,
-
-            avatarUrl: true,
-            bannerUrl: true,
-
-            bio: true,
-
-            accentColor: true,
-          },
-        },
-      },
+      select: authUserSelect,
     });
 
   if (!user) {
@@ -2723,7 +1687,7 @@ export async function getCurrentUser(
 }
 
 //////////////////////////////////////////////////
-// TOKEN
+// REFRESH TOKEN
 //////////////////////////////////////////////////
 
 export async function refreshAccessToken(
@@ -2739,10 +1703,6 @@ export async function refreshAccessToken(
     await prisma.refreshToken.findUnique({
       where: {
         token: refreshToken,
-      },
-
-      include: {
-        user: true,
       },
     });
 
@@ -2767,13 +1727,11 @@ export async function refreshAccessToken(
     );
   }
 
-  const accessToken =
-    generateAccessToken(
-      storedToken.userId
-    );
-
   return {
-    accessToken,
+    accessToken:
+      generateAccessToken(
+        storedToken.userId
+      ),
   };
 }
 
@@ -2848,7 +1806,18 @@ export function generateRefreshToken() {
     .toString("hex");
 }
 ---
-auth.ts
+auth.mapper.ts
+export function toSafeUser<
+  T extends {
+    password: string;
+  }
+>(user: T) {
+  const { password, ...safeUser } = user;
+
+  return safeUser;
+}
+---
+auth.routes.ts
 import { Router } from "express";
 
 import { authMiddleware, } from "../../middleware/auth.middleware";
@@ -2909,7 +1878,7 @@ router.post(
 
 export default router;
 ---
-auth.type.ts
+auth.types.ts
 export interface RegisterInput {
   username: string;
   email: string;
@@ -2950,6 +1919,598 @@ export interface AuthUser {
 
 export interface RefreshInput {
   refreshToken: string;
+}
+---
+auth.validation.ts
+import { BadRequestError } from "../../utils/errors";
+
+import type {
+  LoginInput,
+  RegisterInput,
+} from "./auth.types";
+
+import {
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  USERNAME_MAX_LENGTH,
+  USERNAME_MIN_LENGTH,
+} from "./auth.constants";
+
+const usernameRegex =
+  /^[a-zA-Z0-9_-]+$/;
+
+const emailRegex =
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function validateRegister(
+  data: RegisterInput
+) {
+  const {
+    username,
+    email,
+    password,
+  } = data;
+
+  if (
+    !username ||
+    !email ||
+    !password
+  ) {
+    throw new BadRequestError(
+      "Faltan campos obligatorios"
+    );
+  }
+
+  if (
+    username.length <
+    USERNAME_MIN_LENGTH
+  ) {
+    throw new BadRequestError(
+      `El usuario debe tener al menos ${USERNAME_MIN_LENGTH} caracteres`
+    );
+  }
+
+  if (
+    username.length >
+    USERNAME_MAX_LENGTH
+  ) {
+    throw new BadRequestError(
+      `El usuario no puede superar los ${USERNAME_MAX_LENGTH} caracteres`
+    );
+  }
+
+  if (
+    !usernameRegex.test(username)
+  ) {
+    throw new BadRequestError(
+      "Username inválido"
+    );
+  }
+
+  if (
+    !emailRegex.test(email)
+  ) {
+    throw new BadRequestError(
+      "Email inválido"
+    );
+  }
+
+  if (
+    password.length <
+    PASSWORD_MIN_LENGTH
+  ) {
+    throw new BadRequestError(
+      "La contraseña es muy corta"
+    );
+  }
+
+  if (
+    password.length >
+    PASSWORD_MAX_LENGTH
+  ) {
+    throw new BadRequestError(
+      "La contraseña es demasiado larga"
+    );
+  }
+}
+
+export function validateLogin(
+  data: LoginInput
+) {
+  const {
+    email,
+    password,
+  } = data;
+
+  if (
+    !email ||
+    !password
+  ) {
+    throw new BadRequestError(
+      "Faltan campos"
+    );
+  }
+}
+---
+modules/comments/comment.controller.ts
+import { Request, Response } from "express";
+import { asyncHandler } from "../../utils/asyncHandler";
+import { AuthRequest } from "../../middleware/auth.middleware";
+import { CommentService } from "./comment.service";
+
+export const getComments =
+  asyncHandler(
+    async (
+      req: Request,
+      res: Response
+    ) => {
+
+      const comments =
+        await CommentService.getComments(
+          Number(req.params.modId)
+        );
+
+      res.json(comments);
+    }
+  );
+
+export const createComment =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+      const comment =
+        await CommentService.createComment({
+          modId: Number(req.params.modId),
+          userId: req.userId!,
+          content: req.body.content,
+        });
+
+      res
+        .status(201)
+        .json(comment);
+    }
+  );
+
+export const updateComment =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+      const comment =
+        await CommentService.updateComment({
+          commentId: Number(req.params.commentId),
+          userId: req.userId!,
+          content: req.body.content,
+        });
+
+      res.json(comment);
+    }
+  );
+
+export const deleteComment =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+      const result =
+        await CommentService.deleteComment(
+          Number(req.params.id),
+          req.userId!
+        );
+
+      res.json(result);
+    }
+  );
+
+export const createReply =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+      const reply =
+        await CommentService.createReply({
+          parentId: Number(req.params.commentId),
+          userId: req.userId!,
+          content: req.body.content,
+        });
+
+      res.status(201).json(reply);
+    }
+  );
+---
+comment.service.ts
+import { prisma } from "../../lib/prisma";
+
+import {
+  BadRequestError,
+  ForbiddenError,
+  NotFoundError,
+} from "../../utils/errors";
+
+import { sanitizeText } from "../../utils/sanitize";
+
+import {
+  CreateCommentInput,
+  CreateReplyInput,
+  UpdateCommentInput,
+} from "./comment.types";
+
+import { commentUserSelect } from "./comment.select";
+import { mapCommentUser } from "../../mappers/comment.mapper";
+
+export class CommentService {
+  //////////////////////////////////////////////////
+  // GET COMMENTS
+  //////////////////////////////////////////////////
+
+  static async getComments(
+    modId: number
+  ) {
+    const comments =
+      await prisma.comment.findMany({
+        where: {
+          modId,
+          deleted: false,
+          parentId: null,
+        },
+
+        include: {
+          user: {
+            select: commentUserSelect,
+          },
+
+          replies: {
+            where: {
+              deleted: false,
+            },
+
+            include: {
+              user: {
+                select:
+                  commentUserSelect,
+              },
+            },
+
+            orderBy: {
+              createdAt: "asc",
+            },
+          },
+        },
+
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+
+    return comments.map((comment) => ({
+      ...mapCommentUser(comment),
+
+      replies:
+        comment.replies.map(
+          mapCommentUser
+        ),
+    }));
+  }
+
+  //////////////////////////////////////////////////
+  // CREATE COMMENT
+  //////////////////////////////////////////////////
+
+  static async createComment({
+    modId,
+    userId,
+    content,
+  }: CreateCommentInput) {
+    const safeContent =
+      sanitizeText(
+        content?.trim() || ""
+      );
+
+    if (!safeContent) {
+      throw new BadRequestError(
+        "Comentario vacío"
+      );
+    }
+
+    const mod =
+      await prisma.mod.findUnique({
+        where: {
+          id: modId,
+        },
+      });
+
+    if (!mod) {
+      throw new NotFoundError(
+        "Mod no encontrado"
+      );
+    }
+
+    const comment =
+      await prisma.comment.create({
+        data: {
+          modId,
+          userId,
+          content: safeContent,
+        },
+
+        include: {
+          user: {
+            select:
+              commentUserSelect,
+          },
+        },
+      });
+
+    return mapCommentUser(
+      comment
+    );
+  }
+
+  //////////////////////////////////////////////////
+  // UPDATE COMMENT
+  //////////////////////////////////////////////////
+
+  static async updateComment({
+    commentId,
+    userId,
+    content,
+  }: UpdateCommentInput) {
+    const comment =
+      await prisma.comment.findUnique({
+        where: {
+          id: commentId,
+        },
+      });
+
+    if (
+      !comment ||
+      comment.deleted
+    ) {
+      throw new NotFoundError(
+        "Comentario no encontrado"
+      );
+    }
+
+    if (
+      comment.userId !== userId
+    ) {
+      throw new ForbiddenError(
+        "No autorizado"
+      );
+    }
+
+    const safeContent =
+      sanitizeText(
+        content?.trim() || ""
+      );
+
+    if (!safeContent) {
+      throw new BadRequestError(
+        "Comentario vacío"
+      );
+    }
+
+    return prisma.comment.update({
+      where: {
+        id: commentId,
+      },
+
+      data: {
+        content: safeContent,
+      },
+    });
+  }
+
+  //////////////////////////////////////////////////
+  // DELETE COMMENT
+  //////////////////////////////////////////////////
+
+  static async deleteComment(
+    commentId: number,
+    userId: number
+  ) {
+    const comment =
+      await prisma.comment.findUnique({
+        where: {
+          id: commentId,
+        },
+      });
+
+    if (
+      !comment ||
+      comment.deleted
+    ) {
+      throw new NotFoundError(
+        "Comentario no encontrado"
+      );
+    }
+
+    if (
+      comment.userId !== userId
+    ) {
+      throw new ForbiddenError(
+        "No autorizado"
+      );
+    }
+
+    await prisma.comment.update({
+      where: {
+        id: commentId,
+      },
+
+      data: {
+        deleted: true,
+      },
+    });
+
+    return {
+      success: true,
+    };
+  }
+
+  //////////////////////////////////////////////////
+  // CREATE REPLY
+  //////////////////////////////////////////////////
+
+  static async createReply({
+    parentId,
+    userId,
+    content,
+  }: CreateReplyInput) {
+    const parent =
+      await prisma.comment.findUnique({
+        where: {
+          id: parentId,
+        },
+      });
+
+    if (!parent) {
+      throw new NotFoundError(
+        "Comentario no encontrado"
+      );
+    }
+
+    if (
+      parent.parentId !== null
+    ) {
+      throw new BadRequestError(
+        "Solo un nivel de respuestas permitido"
+      );
+    }
+
+    const safeContent =
+      sanitizeText(
+        content?.trim() || ""
+      );
+
+    if (!safeContent) {
+      throw new BadRequestError(
+        "Comentario vacío"
+      );
+    }
+
+    const reply =
+      await prisma.comment.create({
+        data: {
+          modId: parent.modId,
+          userId,
+          parentId,
+          content: safeContent,
+        },
+
+        include: {
+          user: {
+            select:
+              commentUserSelect,
+          },
+        },
+      });
+
+    return mapCommentUser(
+      reply
+    );
+  }
+}
+---
+comment.router.ts
+import { Router } from "express";
+
+import { authMiddleware } from "../../middleware/auth.middleware";
+
+import {
+  getComments,
+  createComment,
+  updateComment,
+  deleteComment,
+  createReply,
+} from "./comment.controller";
+
+const router = Router();
+
+//////////////////////////////////////////////////
+// GET COMMENTS
+//////////////////////////////////////////////////
+
+router.get(
+  "/mod/:modId",
+  getComments
+);
+
+//////////////////////////////////////////////////
+// CREATE COMMENT
+//////////////////////////////////////////////////
+
+router.post(
+  "/mod/:modId",
+  authMiddleware,
+  createComment
+);
+
+//////////////////////////////////////////////////
+// EDIT COMMENT
+//////////////////////////////////////////////////
+
+router.patch(
+  "/:id",
+  authMiddleware,
+  updateComment
+);
+
+//////////////////////////////////////////////////
+// DELATE COMMENT
+//////////////////////////////////////////////////
+
+router.delete(
+  "/:id",
+  authMiddleware,
+  deleteComment
+);
+
+//////////////////////////////////////////////////
+// 
+//////////////////////////////////////////////////
+
+router.post(
+  "/:id/replies",
+  authMiddleware,
+  createReply
+);
+
+export default router;
+---
+comment.select.ts
+export const commentUserSelect = {
+  id: true,
+  username: true,
+  profile: {
+    select: {
+      avatarUrl: true,
+    },
+  },
+} as const;
+---
+comment.types.ts
+export interface CreateCommentInput {
+  modId: number;
+  userId: number;
+  content: string;
+}
+
+export interface UpdateCommentInput {
+  commentId: number;
+  userId: number;
+  content: string;
+}
+
+export interface CreateReplyInput {
+  parentId: number;
+  userId: number;
+  content: string;
 }
 ---
 modules/cosmetics/
@@ -3013,7 +2574,7 @@ export const getCosmetic =
 
 export const createCosmetic =
   asyncHandler(
-    async (req: any, res: Response) => {
+    async (req: Request, res: Response) => {
       const cosmetic =
         await CosmeticsService.create(
           req.body
@@ -3031,7 +2592,7 @@ export const createCosmetic =
 
 export const updateCosmetic =
   asyncHandler(
-    async (req: any, res: Response) => {
+    async (req: Request, res: Response) => {
       const cosmetic =
         await CosmeticsService.update(
           Number(req.params.id),
@@ -3048,7 +2609,7 @@ export const updateCosmetic =
 
 export const activateCosmetic =
   asyncHandler(
-    async (req: any, res: Response) => {
+    async (req: Request, res: Response) => {
       const cosmetic =
         await CosmeticsService.activate(
           Number(req.params.id)
@@ -3064,7 +2625,7 @@ export const activateCosmetic =
 
 export const deactivateCosmetic =
   asyncHandler(
-    async (req: any, res: Response) => {
+    async (req: Request, res: Response) => {
       const cosmetic =
         await CosmeticsService.deactivate(
           Number(req.params.id)
@@ -3080,7 +2641,7 @@ export const deactivateCosmetic =
 
 export const deleteCosmetic =
   asyncHandler(
-    async (req: any, res: Response) => {
+    async (req: Request, res: Response) => {
       const result =
         await CosmeticsService.delete(
           Number(req.params.id)
@@ -3090,7 +2651,7 @@ export const deleteCosmetic =
     }
   );
 ---
-cosmetics.routes.ts
+cosmetics.router.ts
 import { Router } from "express";
 
 import {
@@ -3357,8 +2918,121 @@ export interface UpdateCosmeticInput {
   isActive?: boolean;
 }
 ---
-modules/equipped/
-equipped.controller.ts
+modules/downloads/download.controller.ts
+import { Request, Response } from "express";
+
+import { asyncHandler } from "../../utils/asyncHandler";
+
+import { DownloadService } from "./download.service";
+
+//////////////////////////////////////////////////
+// DOWNLOAD
+//////////////////////////////////////////////////
+
+export const download =
+  asyncHandler(
+    async (
+      req: Request,
+      res: Response
+    ) => {
+
+      const url =
+        await DownloadService.download(
+          Number(req.params.versionId)
+        );
+
+      res.redirect(url);
+    }
+  );
+---
+download.routes.ts
+import { Router } from "express";
+import { download } from "./download.controller";
+
+const router = Router();
+
+// 🔥 descarga por VERSION (como vos ya venías haciendo)
+router.get("/versions/:versionId/download", download);
+
+export default router;
+---
+download.service.ts
+import { prisma } from "../../lib/prisma";
+
+import {
+  BadRequestError,
+  NotFoundError,
+} from "../../utils/errors";
+
+export class DownloadService {
+
+  //////////////////////////////////////////////////
+  // DOWNLOAD
+  //////////////////////////////////////////////////
+
+  static async download(
+    versionId: number
+  ) {
+
+    if (!versionId) {
+      throw new BadRequestError(
+        "versionId inválido"
+      );
+    }
+
+    const version =
+      await prisma.modVersion.findUnique({
+        where: {
+          id: versionId,
+        },
+        include: {
+          files: true,
+          mod: true,
+        },
+      });
+
+    if (
+      !version ||
+      version.files.length === 0
+    ) {
+      throw new NotFoundError(
+        "No hay archivo"
+      );
+    }
+
+    const file =
+      version.files.find(
+        file => file.isPrimary
+      ) ??
+      version.files[0];
+
+    await prisma.modFile.update({
+      where: {
+        id: file.id,
+      },
+      data: {
+        downloads: {
+          increment: 1,
+        },
+      },
+    });
+
+    await prisma.mod.update({
+      where: {
+        id: version.modId,
+      },
+      data: {
+        downloads: {
+          increment: 1,
+        },
+      },
+    });
+
+    return file.url;
+  }
+}
+---
+modules/equipped/equipped.controller.ts
 import {
   Request,
   Response,
@@ -3455,7 +3129,7 @@ export const unequip =
     }
   );
 ---
-equipped.routes.ts
+equipped.router.ts
 import { Router }
   from "express";
 
@@ -3718,8 +3392,171 @@ export interface UnequipInput {
   type: CosmeticType;
 }
 ---
-modules/follower/
-followers.controller.ts
+modules/feactures/feactures.service.ts
+import { prisma } from "../../lib/prisma";
+
+export class FeatureService {
+  static async hasFeature(userId: number, key: string) {
+    const feature = await prisma.userFeature.findFirst({
+      where: {
+        userId,
+        feature: {
+          key,
+        },
+      },
+      include: { feature: true },
+    });
+
+    return !!feature;
+  }
+}
+---
+modules/files/file.controller.ts
+import { FileService } from "./file.service";
+import { Response } from "express";
+
+import { AuthRequest } from "../../middleware/auth.middleware";
+import { asyncHandler } from "../../utils/asyncHandler";
+
+export const uploadFile =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+
+      const result =
+        await FileService.uploadFile({
+          file: req.file!,
+          versionId: Number(req.params.id),
+          userId: req.userId!,
+        });
+
+      res.json(result);
+    }
+  );
+---
+file.service.ts
+import { prisma } from "../../lib/prisma";
+import { cacheInvalidate } from "../../lib/cache";
+
+import {
+  ForbiddenError,
+  NotFoundError,
+} from "../../utils/errors";
+
+import {
+  CreateFileInput,
+  ReleaseType,
+} from "./file.types";
+
+export class FileService {
+  static async uploadFile({
+    versionId,
+    userId,
+    file,
+  }: CreateFileInput) {
+    const version =
+      await prisma.modVersion.findUnique({
+        where: {
+          id: versionId,
+        },
+        include: {
+          mod: true,
+        },
+      });
+
+    if (!version) {
+      throw new NotFoundError(
+        "Versión no encontrada"
+      );
+    }
+
+    if (
+      version.mod.authorId !== userId
+    ) {
+      throw new ForbiddenError(
+        "No autorizado"
+      );
+    }
+
+    await prisma.modFile.updateMany({
+      where: {
+        modVersionId: versionId,
+        isPrimary: true,
+      },
+      data: {
+        isPrimary: false,
+      },
+    });
+
+    const newFile =
+      await prisma.modFile.create({
+        data: {
+          modVersionId: versionId,
+
+          filename: file.filename,
+
+          displayName:
+            file.originalname,
+
+          url:
+            `/uploads/files/${file.filename}`,
+
+          size: file.size,
+
+          type: file.mimetype,
+
+          releaseType:
+            ReleaseType.release,
+
+          isPrimary: true,
+        },
+      });
+
+    await cacheInvalidate("mods:*");
+
+    return newFile;
+  }
+}
+---
+file.types.ts
+import { ReleaseType } from "@prisma/client";
+
+export interface UploadFileInput {
+  filename: string;
+  originalname: string;
+  mimetype: string;
+  size: number;
+}
+
+export interface CreateFileInput {
+  versionId: number;
+  userId: number;
+  file: UploadFileInput;
+}
+
+export { ReleaseType };
+---
+file.ts
+import { Router } from "express";
+import { authMiddleware } from "../../middleware/auth.middleware";
+import { registerFile } from "../versions/files/versionfiles.service";
+
+const router = Router();
+
+router.post("/:id/files", authMiddleware, async (req, res) => {
+  try {
+    const file = await registerFile(req);
+    res.json(file);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+export default router;
+---
+modules/follows/follows.controller.ts
 import { Response } from "express";
 
 import { asyncHandler } from "../../utils/asyncHandler";
@@ -3857,7 +3694,7 @@ export const getFollowing =
     }
   );
 ---
-followers.router.ts
+follows.routes.ts
 import { Router } from "express";
 
 import {
@@ -3912,7 +3749,7 @@ router.get(
 
 export default router;
 ---
-followers.service.ts
+follows.service.ts
 import { prisma } from "../../lib/prisma";
 import {
   BadRequestError,
@@ -4077,13 +3914,409 @@ export class FollowsService {
   }
 }
 ---
-followers.type.ts
+follows.types.ts
 export interface FollowParams {
   username: string;
 }
 ---
-modules/inventory/
-inventory.controller.ts
+modules/interactions/interactions.controller.ts
+import { Response } from "express";
+
+import { asyncHandler } from "../../utils/asyncHandler";
+import { AuthRequest } from "../../middleware/auth.middleware";
+
+import { InteractionsService } from "./interactions.service";
+
+export const getInteractions =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+
+      const data =
+        await InteractionsService.getInteractions(
+          Number(req.params.id),
+          req.userId!
+        );
+
+      res.json(data);
+    }
+  );
+
+export const toggleLike =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+
+      const data =
+        await InteractionsService.toggleLike({
+          modId: Number(req.params.id),
+          userId: req.userId!,
+        });
+
+      res.json(data);
+    }
+  );
+
+export const toggleFavorite =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+
+      const data =
+        await InteractionsService.toggleFavorite({
+          modId: Number(req.params.id),
+          userId: req.userId!,
+        });
+
+      res.json(data);
+    }
+  );
+---
+interactions.routes.ts
+import { Router } from "express";
+
+import { authMiddleware } from "../../middleware/auth.middleware";
+
+import {
+  getInteractions,
+  toggleLike,
+  toggleFavorite,
+} from "./interactions.controller";
+
+const router = Router();
+
+//////////////////////////////////////////////////////
+// GET INTERACTIONS
+//////////////////////////////////////////////////////
+
+router.get(
+  "/:id/interactions",
+  authMiddleware,
+  getInteractions
+);
+
+//////////////////////////////////////////////////////
+// LIKE
+//////////////////////////////////////////////////////
+
+router.post(
+  "/:id/like",
+  authMiddleware,
+  toggleLike
+);
+
+//////////////////////////////////////////////////////
+// FAVORITE
+//////////////////////////////////////////////////////
+
+router.post(
+  "/:id/favorite",
+  authMiddleware,
+  toggleFavorite
+);
+
+export default router;
+---
+interactions.service.ts
+import { prisma } from "../../lib/prisma";
+
+import { NotFoundError } from "../../utils/errors";
+
+import type {
+  ToggleInteractionInput,
+} from "./interactions.types";
+
+export class InteractionsService {
+
+  //////////////////////////////////////////////////////
+  // GET INTERACTIONS
+  //////////////////////////////////////////////////////
+
+  static async getInteractions(
+    modId: number,
+    userId?: number
+  ) {
+
+    const mod =
+      await prisma.mod.findUnique({
+        where: {
+          id: modId,
+        },
+
+        select: {
+          likesCount: true,
+
+          favoritesCount: true,
+
+          likes: userId
+            ? {
+                where: { userId },
+                select: {
+                  userId: true,
+                },
+              }
+            : false,
+
+          favorites: userId
+            ? {
+                where: { userId },
+                select: {
+                  userId: true,
+                },
+              }
+            : false,
+        },
+      });
+
+    if (!mod) {
+      throw new NotFoundError(
+        "Mod no encontrado"
+      );
+    }
+
+    return {
+      liked:
+        Array.isArray(mod.likes) &&
+        mod.likes.length > 0,
+
+      favorited:
+        Array.isArray(mod.favorites) &&
+        mod.favorites.length > 0,
+
+      likesCount:
+        mod.likesCount,
+
+      favoritesCount:
+        mod.favoritesCount,
+    };
+  }
+
+  //////////////////////////////////////////////////////
+  // PRIVATE
+  //////////////////////////////////////////////////////
+
+  private static async updateCounts(
+    tx: any,
+    modId: number,
+    field: "likesCount" | "favoritesCount",
+    increment: boolean
+  ) {
+    return tx.mod.update({
+      where: {
+        id: modId,
+      },
+
+      data: {
+        [field]: {
+          [increment
+            ? "increment"
+            : "decrement"]: 1,
+        },
+      },
+
+      select: {
+        likesCount: true,
+        favoritesCount: true,
+      },
+    });
+  }
+
+  //////////////////////////////////////////////////////
+  // TOGGLE LIKE
+  //////////////////////////////////////////////////////
+
+  static async toggleLike({
+    modId,
+    userId,
+  }: ToggleInteractionInput) {
+
+    return prisma.$transaction(
+      async (tx) => {
+
+        const existing =
+          await tx.modLike.findUnique({
+            where: {
+              userId_modId: {
+                userId,
+                modId,
+              },
+            },
+          });
+
+        if (existing) {
+
+          await tx.modLike.delete({
+            where: {
+              userId_modId: {
+                userId,
+                modId,
+              },
+            },
+          });
+
+          const updated =
+            await this.updateCounts(
+              tx,
+              modId,
+              "likesCount",
+              false
+            );
+
+          return {
+            liked: false,
+
+            likesCount:
+              updated.likesCount,
+
+            favoritesCount:
+              updated.favoritesCount,
+          };
+        }
+
+        await tx.modLike.create({
+          data: {
+            userId,
+            modId,
+          },
+        });
+
+        const updated =
+          await this.updateCounts(
+            tx,
+            modId,
+            "likesCount",
+            true
+          );
+
+        return {
+          liked: true,
+
+          likesCount:
+            updated.likesCount,
+
+          favoritesCount:
+            updated.favoritesCount,
+        };
+      }
+    );
+  }
+
+  //////////////////////////////////////////////////////
+  // TOGGLE FAVORITE
+  //////////////////////////////////////////////////////
+
+  static async toggleFavorite({
+    modId,
+    userId,
+  }: ToggleInteractionInput) {
+
+    return prisma.$transaction(
+      async (tx) => {
+
+        const existing =
+          await tx.favorite.findUnique({
+            where: {
+              userId_modId: {
+                userId,
+                modId,
+              },
+            },
+          });
+
+        if (existing) {
+
+          await tx.favorite.delete({
+            where: {
+              userId_modId: {
+                userId,
+                modId,
+              },
+            },
+          });
+
+          const updated =
+            await this.updateCounts(
+              tx,
+              modId,
+              "favoritesCount",
+              false
+            );
+
+          return {
+            favorited: false,
+
+            likesCount:
+              updated.likesCount,
+
+            favoritesCount:
+              updated.favoritesCount,
+          };
+        }
+
+        await tx.favorite.create({
+          data: {
+            userId,
+            modId,
+          },
+        });
+
+        const updated =
+          await this.updateCounts(
+            tx,
+            modId,
+            "favoritesCount",
+            true
+          );
+
+        return {
+          favorited: true,
+
+          likesCount:
+            updated.likesCount,
+
+          favoritesCount:
+            updated.favoritesCount,
+          };
+      }
+    );
+  }
+}
+---
+interactions.types.ts
+export interface ModInteractionsResponse {
+  liked: boolean;
+  favorited: boolean;
+
+  likesCount: number;
+  favoritesCount: number;
+}
+
+export interface ToggleInteractionInput {
+  modId: number;
+  userId: number;
+}
+---
+interactions.types.ts
+export interface ModInteractionsResponse {
+  liked: boolean;
+  favorited: boolean;
+
+  likesCount: number;
+  favoritesCount: number;
+}
+
+export interface ToggleInteractionInput {
+  modId: number;
+  userId: number;
+}
+---
+modules/inventory/inventory.controller.ts
 import {
   Request,
   Response,
@@ -4514,345 +4747,1395 @@ export interface CheckOwnershipResponse {
   quantity: number;
 }
 ---
-modules/interactions/
-interactions.controller.ts
-import { Request, Response } from "express";
-import { InteractionsService } from "./interactions.service";
+modules/invites/invite.controller.ts
+import { Response } from "express";
 
-export class InteractionsController {
-  //////////////////////////////////////////////////////
-  // GET
-  //////////////////////////////////////////////////////
+import { InviteService } from "./invite.service";
 
-  static async getInteractions(
-    req: any,
-    res: Response
+import { asyncHandler } from "../../utils/asyncHandler";
+import { AuthRequest } from "../../middleware/auth.middleware";
+
+export const createInvite =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+
+      const { teamId, email, role } = req.body;
+
+      const invite =
+        await InviteService.createInvite(
+          teamId,
+          email,
+          role
+        );
+
+      res.json(invite);
+    }
+  );
+
+export const acceptInvite =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+
+      const token = String(req.params.token);
+
+      const result =
+        await InviteService.acceptInvite(
+          token,
+          req.userId!
+        );
+
+      res.json(result);
+    }
+  );
+
+export const rejectInvite =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+
+      const token = String(req.params.token);
+
+      const result =
+        await InviteService.rejectInvite(
+          token
+        );
+
+      res.json(result);
+    }
+  );
+---
+invite.service.ts
+import { prisma } from "../../lib/prisma";
+import crypto from "crypto";
+import {  BadRequestError, NotFoundError, UnauthorizedError,} from "../../utils/errors";
+
+export class InviteService {
+  static async createInvite(
+    teamId: number,
+    email: string,
+    role: string
   ) {
-    const modId = Number(req.params.id);
+    const token = crypto.randomBytes(32).toString("hex");
 
-    const data =
-      await InteractionsService.getInteractions(
-        modId,
-        req.userId
-      );
+    const invite = await prisma.teamInvite.create({
+      data: {
+        teamId,
+        email,
+        role,
+        token,
+        expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24), // 24h
+      },
+    });
 
-    res.json(data);
+    return invite;
   }
 
-  //////////////////////////////////////////////////////
-  // LIKE
-  //////////////////////////////////////////////////////
+  static async acceptInvite(token: string, userId: number) {
+    const invite = await prisma.teamInvite.findUnique({
+      where: { token },
+    });
 
-  static async toggleLike(
-    req: any,
-    res: Response
-  ) {
-    const modId = Number(req.params.id);
+    if (!invite) throw new NotFoundError("Invitación inválida");
 
-    const data =
-      await InteractionsService.toggleLike(
-        modId,
-        req.userId
-      );
+    if (invite.expiresAt < new Date()) {
+      throw new BadRequestError("Invitación expirada");
+    }
 
-    res.json(data);
+    await prisma.teamMember.create({
+      data: {
+        teamId: invite.teamId,
+        userId,
+        role: invite.role,
+      },
+    });
+
+    await prisma.teamInvite.delete({
+      where: { id: invite.id },
+    });
+
+    return { success: true };
   }
 
-  //////////////////////////////////////////////////////
-  // FAVORITE
-  //////////////////////////////////////////////////////
+  static async rejectInvite(token: string) {
+    await prisma.teamInvite.delete({
+      where: { token },
+    });
 
-  static async toggleFavorite(
-    req: any,
-    res: Response
-  ) {
-    const modId = Number(req.params.id);
-
-    const data =
-      await InteractionsService.toggleFavorite(
-        modId,
-        req.userId
-      );
-
-    res.json(data);
+    return { success: true };
   }
 }
 ---
-interactions.routes.ts
+invite.ts
+import { Router } from "express";
+import {
+  createInvite,
+  acceptInvite,
+  rejectInvite,
+} from "./invite.controller";
+import { authMiddleware } from "../../middleware/auth.middleware";
+
+const router = Router();
+
+router.post("/", authMiddleware, createInvite);
+router.post("/accept/:token", authMiddleware, acceptInvite);
+router.post("/reject/:token", authMiddleware, rejectInvite);
+
+export default router;
+---
+modules/mod/mod.controller.ts
+import { Request, Response } from "express";
+
+import { ModService } from "./mod.service";
+import { asyncHandler } from "../../utils/asyncHandler";
+import { AuthRequest } from "../../middleware/auth.middleware";
+
+export const createMod =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+      const mod =
+        await ModService.createMod(
+          req.body,
+          req.files,
+          req.userId!
+        );
+
+      res
+        .status(201)
+        .json(mod);
+    }
+  );
+
+export const getMods =
+  asyncHandler(
+    async (
+      req: Request,
+      res: Response
+    ) => {
+      const mods =
+        await ModService.getMods(
+          req.query
+        );
+
+      res.json(mods);
+    }
+  );
+
+export const getModBySlug =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+
+      const slug = String(req.params.slug);
+
+      const mod =
+        await ModService.getModBySlug(
+          slug,
+          req.userId,
+          req.ip
+        );
+
+      res.json(mod);
+    }
+  );
+
+export const updateMod =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+
+      const mod =
+        await ModService.updateMod(
+          Number(req.params.id),
+          req.body,
+          req.userId!
+        );
+
+      res.json(mod);
+    }
+  );
+
+export const deleteMod =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+
+      const result =
+        await ModService.deleteMod(
+          Number(req.params.id),
+          req.userId!
+        );
+
+      res.json(result);
+    }
+  );
+---
+mod.select.ts
+export const modAuthorSelect = {
+  id: true,
+  username: true,
+  profile: {
+    select: {
+      avatarUrl: true,
+    },
+  },
+} as const;
+
+export const modListInclude = {
+  images: true,
+
+  tags: {
+    include: {
+      tag: true,
+    },
+  },
+
+  author: {
+    select: modAuthorSelect,
+  },
+} as const;
+
+export const modDetailInclude = {
+  ...modListInclude,
+
+  versions: {
+    include: {
+      files: true,
+    },
+
+    orderBy: {
+      createdAt: "desc",
+    },
+  },
+
+  _count: {
+    select: {
+      comments: {
+        where: {
+          deleted: false,
+        },
+      },
+    },
+  },
+} as const;
+---
+mod.service.ts
+import { prisma } from "../../lib/prisma";
+
+import {
+  cacheGet,
+  cacheInvalidate,
+  cacheSet,
+} from "../../lib/cache";
+
+import { TeamService } from "../teams/team.service";
+
+import {
+  sanitizeRichText,
+  sanitizeText,
+} from "../../utils/sanitize";
+
+import {
+  ForbiddenError,
+  NotFoundError,
+  BadRequestError,
+} from "../../utils/errors";
+
+import { mapMod } from "./mod.mapper";
+
+import {
+  generateUniqueSlug,
+} from "./mod.slug";
+
+import {
+  parseArray,
+} from "./mod.parsers";
+
+import {
+  validateCreateMod,
+} from "./mod.validation";
+
+import {
+  modListInclude,
+  modDetailInclude,
+} from "./mod.select";
+
+import type {
+  CreateModInput,
+  UpdateModInput,
+} from "./mod.types";
+
+import {
+  Loader,
+  ModStatus,
+  Platform,
+  ProjectType,
+  Visibility,
+} from "@prisma/client";
+
+import { Scopes } from "../../constants/scopes";
+
+export class ModService {
+
+  //////////////////////////////////////////////////
+  // CREATE MOD
+  //////////////////////////////////////////////////
+
+  static async createMod(
+    data: CreateModInput,
+    files: any,
+    userId: number
+  ) {
+
+    validateCreateMod(data);
+
+    const user =
+      await prisma.user.findUnique({
+        where: {
+          id: userId,
+        },
+      });
+
+    if (!user) {
+      throw new NotFoundError(
+        "Usuario no encontrado"
+      );
+    }
+
+    const categories =
+      parseArray(data.categories);
+
+    const tags =
+      parseArray(data.tags);
+
+    const safeTitle =
+      sanitizeText(data.title);
+
+    const safeSummary =
+      sanitizeText(
+        data.summary ?? ""
+      );
+
+    const safeDescription =
+      sanitizeText(
+        data.description
+      );
+
+    const safeContent =
+      sanitizeRichText(
+        data.content ?? ""
+      );
+
+    const icon =
+      files?.icon?.[0];
+
+    const gallery =
+      files?.gallery ?? [];
+
+    const slug =
+      await generateUniqueSlug(
+        user.username,
+        safeTitle
+      );
+
+    const iconUrl =
+      icon
+        ? `/uploads/mods/${icon.filename}`
+        : null;
+
+    const mod =
+      await prisma.mod.create({
+
+        data: {
+
+          //////////////////////////////////////////////////
+          // BASIC
+          //////////////////////////////////////////////////
+
+          title: safeTitle,
+
+          slug,
+
+          summary:
+            safeSummary || null,
+
+          description:
+            safeDescription,
+
+          content:
+            safeContent || null,
+
+          license:
+            data.license ?? null,
+
+          //////////////////////////////////////////////////
+          // LINKS
+          //////////////////////////////////////////////////
+
+          sourceUrl:
+            data.sourceUrl ?? null,
+
+          issuesUrl:
+            data.issuesUrl ?? null,
+
+          discordUrl:
+            data.discordUrl ?? null,
+
+          websiteUrl:
+            data.websiteUrl ?? null,
+
+          wikiUrl:
+            data.wikiUrl ?? null,
+
+          donationUrl:
+            data.donationUrl ?? null,
+
+          //////////////////////////////////////////////////
+          // META
+          //////////////////////////////////////////////////
+
+          platform:
+            data.platform as Platform,
+
+          type:
+            data.type as ProjectType,
+
+          loader:
+            (data.loader as Loader) ??
+            null,
+
+          visibility:
+            (data.visibility as Visibility) ??
+            Visibility.PUBLIC,
+
+          status:
+            ModStatus.DRAFT,
+
+          categories,
+
+          //////////////////////////////////////////////////
+          // MEDIA
+          //////////////////////////////////////////////////
+
+          icon: iconUrl,
+
+          images: {
+            create: gallery.map(
+              (
+                file: Express.Multer.File
+              ) => ({
+                url:
+                  `/uploads/mods/${file.filename}`,
+
+                thumb:
+                  `/uploads/mods/${file.filename}`,
+
+                isCover: false,
+              })
+            ),
+          },
+
+          //////////////////////////////////////////////////
+          // TAGS
+          //////////////////////////////////////////////////
+
+          tags: {
+            create: tags.map(
+              (name) => ({
+                tag: {
+                  connectOrCreate: {
+
+                    where: {
+                      name,
+                    },
+
+                    create: {
+                      name,
+                    },
+
+                  },
+                },
+              })
+            ),
+          },
+
+          //////////////////////////////////////////////////
+          // AUTHOR
+          //////////////////////////////////////////////////
+
+          authorId:
+            userId,
+
+        },
+
+        include:
+          modListInclude,
+
+      });
+
+    await cacheInvalidate(
+      "mods:*"
+    );
+
+    return mapMod(mod);
+
+  }
+
+  //////////////////////////////////////////////////
+  // GET MODS
+  //////////////////////////////////////////////////
+
+  static async getMods(
+    query: any
+  ) {
+
+    const page =
+      Number(query.page) || 1;
+
+    const limit =
+      Number(query.limit) || 12;
+
+    const search =
+      query.query?.trim() ?? "";
+
+    const platform =
+      query.platform;
+
+    const loader =
+      query.loader;
+
+    const type =
+      query.type;
+
+    const category =
+      query.category;
+
+    const version =
+      query.version;
+
+    const sort =
+      query.sort ?? "newest";
+
+    if (page < 1) {
+      throw new BadRequestError(
+        "page inválida"
+      );
+    }
+
+    if (
+      limit < 1 ||
+      limit > 50
+    ) {
+      throw new BadRequestError(
+        "limit inválido"
+      );
+    }
+
+    const where: any = {
+      deletedAt: null,
+    };
+
+    if (search) {
+
+      where.OR = [
+
+        {
+          title: {
+            contains: search,
+            mode: "insensitive",
+          },
+        },
+
+        {
+          description: {
+            contains: search,
+            mode: "insensitive",
+          },
+        },
+
+        {
+          tags: {
+            some: {
+              tag: {
+                name: {
+                  contains: search,
+                  mode: "insensitive",
+                },
+              },
+            },
+          },
+        },
+
+      ];
+
+    }
+
+    if (platform) {
+      where.platform = platform;
+    }
+
+    if (loader) {
+      where.loader = loader;
+    }
+
+    if (type) {
+      where.type = type;
+    }
+
+    if (category) {
+
+      where.categories = {
+        has: category,
+      };
+
+    }
+
+    if (version) {
+
+      where.versions = {
+        some: {
+          minecraftVersion:
+            version,
+        },
+      };
+
+    }
+
+    if (query.authorId) {
+
+      where.authorId =
+        Number(query.authorId);
+
+    }
+
+    const orderBy =
+
+      sort === "popular"
+
+        ? {
+            likesCount: "desc" as const,
+          }
+
+        : sort === "downloads"
+
+        ? {
+            downloads: "desc" as const,
+          }
+
+        : {
+            createdAt: "desc" as const,
+          };
+
+    const cacheKey =
+
+      `mods:list:
+page=${page}:
+limit=${limit}:
+query=${search}:
+platform=${platform}:
+loader=${loader}:
+type=${type}:
+category=${category}:
+version=${version}:
+sort=${sort}`;
+
+    const cached =
+      await cacheGet(cacheKey);
+
+    if (cached) {
+      return cached;
+    }
+
+    const skip =
+      (page - 1) * limit;
+
+    const [
+      mods,
+      total,
+    ] =
+      await Promise.all([
+
+        prisma.mod.findMany({
+
+          where,
+
+          skip,
+
+          take: limit,
+
+          orderBy,
+
+          include:
+            modListInclude,
+
+        }),
+
+        prisma.mod.count({
+          where,
+        }),
+
+      ]);
+
+    const result = {
+
+      data:
+        mods.map(mapMod),
+
+      meta: {
+
+        total,
+
+        page,
+
+        limit,
+
+        totalPages:
+          Math.ceil(
+            total / limit
+          ),
+
+      },
+
+    };
+
+    await cacheSet(
+      cacheKey,
+      result
+    );
+
+    return result;
+
+  }
+
+  //////////////////////////////////////////////////
+  // GET MOD
+  //////////////////////////////////////////////////
+
+  static async getModBySlug(
+    slug: string,
+    userId?: number,
+    reqIp?: string
+  ) {
+
+    const mod =
+      await prisma.mod.findFirst({
+
+        where: {
+          slug,
+          deletedAt: null,
+        },
+
+        include:
+          modDetailInclude,
+
+      });
+
+    if (!mod) {
+      throw new NotFoundError(
+        "Mod no encontrado"
+      );
+    }
+
+    const viewKey =
+      `mod:view:${mod.id}:${userId ?? reqIp}`;
+
+    const viewed =
+      await cacheGet(viewKey);
+
+    if (!viewed) {
+
+      await prisma.mod.update({
+
+        where: {
+          id: mod.id,
+        },
+
+        data: {
+          views: {
+            increment: 1,
+          },
+        },
+
+      });
+
+      await cacheSet(
+        viewKey,
+        true,
+        60 * 30
+      );
+
+      mod.views++;
+
+    }
+
+    return mapMod(
+      mod,
+      userId
+    );
+
+  }
+
+  //////////////////////////////////////////////////
+  // UPDATE
+  //////////////////////////////////////////////////
+
+  static async updateMod(
+    id: number,
+    data: UpdateModInput,
+    userId: number
+  ) {
+
+    const mod =
+      await prisma.mod.findUnique({
+
+        where: {
+          id,
+        },
+
+      });
+
+    if (
+      !mod ||
+      mod.deletedAt
+    ) {
+      throw new NotFoundError(
+        "Mod no encontrado"
+      );
+    }
+
+    const allowed =
+      await TeamService.hasScope(
+        userId,
+        mod,
+        Scopes.MOD_UPDATE
+      );
+
+    if (!allowed) {
+      throw new ForbiddenError(
+        "No autorizado"
+      );
+    }
+
+    const updated =
+      await prisma.mod.update({
+
+        where: {
+          id,
+        },
+
+        data,
+
+      });
+
+    await cacheInvalidate(
+      "mods:*"
+    );
+
+    return updated;
+
+  }
+
+  //////////////////////////////////////////////////
+  // DELETE
+  //////////////////////////////////////////////////
+
+  static async deleteMod(
+    id: number,
+    userId: number
+  ) {
+
+    const mod =
+      await prisma.mod.findUnique({
+
+        where: {
+          id,
+        },
+
+      });
+
+    if (
+      !mod ||
+      mod.deletedAt
+    ) {
+      throw new NotFoundError(
+        "Mod no encontrado"
+      );
+    }
+
+    const allowed =
+      await TeamService.hasScope(
+        userId,
+        mod,
+        Scopes.MOD_DELETE
+      );
+
+    if (!allowed) {
+      throw new ForbiddenError(
+        "No autorizado"
+      );
+    }
+
+    await prisma.mod.update({
+
+      where: {
+        id,
+      },
+
+      data: {
+        deletedAt:
+          new Date(),
+      },
+
+    });
+
+    await cacheInvalidate(
+      "mods:*"
+    );
+
+    return {
+      success: true,
+    };
+
+  }
+
+}
+---
+mod.slug.ts
+import { prisma } from "../../lib/prisma";
+
+import { generateSlug } from "../../utils/slug";
+
+export async function generateUniqueSlug(
+  username: string,
+  title: string
+) {
+  let slug =
+    generateSlug(username, title);
+
+  let counter = 1;
+
+  while (
+    await prisma.mod.findUnique({
+      where: {
+        slug,
+      },
+    })
+  ) {
+    slug =
+      `${generateSlug(
+        username,
+        title
+      )}-${counter}`;
+
+    counter++;
+  }
+
+  return slug;
+}
+---
+mod.types.ts
+import type {
+  Loader,
+  Platform,
+  ProjectType,
+  Visibility,
+} from "@prisma/client";
+
+export interface CreateModInput {
+  title: string;
+  summary?: string;
+  description: string;
+  content?: string;
+  license?: string;
+
+  sourceUrl?: string;
+  issuesUrl?: string;
+  discordUrl?: string;
+  websiteUrl?: string;
+  wikiUrl?: string;
+  donationUrl?: string;
+
+  platform: Platform;
+  type: ProjectType;
+  loader?: Loader | null;
+  visibility?: Visibility;
+
+  categories?: string[] | string;
+  tags?: string[] | string;
+}
+
+export interface UpdateModInput {
+  title?: string;
+  summary?: string;
+  description?: string;
+  content?: string;
+  license?: string;
+
+  sourceUrl?: string;
+  issuesUrl?: string;
+  discordUrl?: string;
+  websiteUrl?: string;
+  wikiUrl?: string;
+  donationUrl?: string;
+
+  platform?: Platform;
+  type?: ProjectType;
+  loader?: Loader | null;
+  visibility?: Visibility;
+
+  categories?: string[];
+}
+---
+mod.validation.ts
+import { BadRequestError } from "../../utils/errors";
+
+import type {
+  CreateModInput,
+} from "./mod.types";
+
+export function validateCreateMod(
+  data: CreateModInput
+) {
+  if (!data.title?.trim()) {
+    throw new BadRequestError(
+      "Title requerido"
+    );
+  }
+
+  if (!data.description?.trim()) {
+    throw new BadRequestError(
+      "Description requerida"
+    );
+  }
+
+  if (!data.platform) {
+    throw new BadRequestError(
+      "Platform requerida"
+    );
+  }
+
+  if (!data.type) {
+    throw new BadRequestError(
+      "Type requerido"
+    );
+  }
+}
+---
+mod.mapper.ts
+export function mapMod(
+  mod: any,
+  userId?: number
+) {
+  return {
+    ////////////////////////////////////////////////////
+    // BASIC
+    ////////////////////////////////////////////////////
+
+    id: mod.id,
+    title: mod.title,
+    slug: mod.slug,
+
+    summary: mod.summary,
+
+    description: mod.description,
+    content: (() => {
+      try {
+        return mod.content
+          ? JSON.parse(mod.content)
+          : null;
+      } catch {
+        return null;
+      }
+    })(),
+
+    icon: mod.icon,
+
+    platform: mod.platform,
+    loader: mod.loader,
+    type: mod.type,
+
+    categories: mod.categories,
+
+    links: {
+      sourceUrl: mod.sourceUrl,
+      issuesUrl: mod.issuesUrl,
+      discordUrl: mod.discordUrl,
+      websiteUrl: mod.websiteUrl,
+      wikiUrl: mod.wikiUrl,
+      donationUrl: mod.donationUrl,
+    },
+
+    createdAt: mod.createdAt,
+    updatedAt: mod.updatedAt,
+
+    ////////////////////////////////////////////////////
+    // AUTHOR
+    ////////////////////////////////////////////////////
+
+    author: mod.author,
+
+    ////////////////////////////////////////////////////
+    // STATS
+    ////////////////////////////////////////////////////
+
+    stats: {
+      views: mod.views,
+
+      likes:
+        mod.likesCount || 0,
+
+      favorites:
+        mod.favoritesCount || 0,
+
+      downloads:
+        mod.downloads,
+
+      comments:
+        mod._count?.comments || 0,
+    },
+
+    ////////////////////////////////////////////////////
+    // INTERACTIONS
+    ////////////////////////////////////////////////////
+
+    interactions: {
+      liked:
+        Array.isArray(mod.likes)
+          ? mod.likes.length > 0
+          : false,
+
+      favorited:
+        Array.isArray(
+          mod.favorites
+        )
+          ? mod.favorites.length >
+            0
+          : false,
+    },
+
+    ////////////////////////////////////////////////////
+    // MEDIA
+    ////////////////////////////////////////////////////
+
+    images: mod.images,
+
+    ////////////////////////////////////////////////////
+    // TAGS
+    ////////////////////////////////////////////////////
+
+    tags:
+      mod.tags?.map(
+        (t: any) => t.tag
+      ) || [],
+
+    ////////////////////////////////////////////////////
+    // VERSIONS
+    ////////////////////////////////////////////////////
+
+    versions:
+      mod.versions || [],
+  };
+}
+---
+mod.parsed.ts
+export function parseArray(
+  value: unknown
+): string[] {
+  if (!value) {
+    return [];
+  }
+
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    return JSON.parse(value);
+  }
+
+  return [];
+}
+---
+mod.router.ts
 import { Router } from "express";
 
 import { authMiddleware } from "../../middleware/auth.middleware";
 
-import { InteractionsController } from "./interactions.controller";
+import { upload } from "../../lib/multer";
+
+import {
+  createMod,
+  getMods,
+  getModBySlug,
+  updateMod,
+  deleteMod,
+} from "./mod.controller";
 
 const router = Router();
 
-//////////////////////////////////////////////////////
-// GET INTERACTIONS
-//////////////////////////////////////////////////////
+//////////////////////////////////////////////////
+// CREATE
+//////////////////////////////////////////////////
+
+router.post(
+  "/",
+  authMiddleware,
+
+  upload.fields([
+    {
+      name: "icon",
+      maxCount: 1,
+    },
+
+    {
+      name: "gallery",
+      maxCount: 10,
+    },
+  ]),
+
+  createMod
+);
+
+//////////////////////////////////////////////////
+// GET ALL
+//////////////////////////////////////////////////
+
+router.get("/", getMods);
+
+//////////////////////////////////////////////////
+// GET ONE
+//////////////////////////////////////////////////
 
 router.get(
-  "/:id/interactions",
+  "/:slug",
   authMiddleware,
-  InteractionsController.getInteractions
+  getModBySlug
 );
 
-//////////////////////////////////////////////////////
-// LIKE
-//////////////////////////////////////////////////////
+//////////////////////////////////////////////////
+// UPDATE
+//////////////////////////////////////////////////
 
-router.post(
-  "/:id/like",
+router.patch(
+  "/:id",
   authMiddleware,
-  InteractionsController.toggleLike
+  updateMod
 );
 
-//////////////////////////////////////////////////////
-// FAVORITE
-//////////////////////////////////////////////////////
+//////////////////////////////////////////////////
+// DELETE
+//////////////////////////////////////////////////
 
-router.post(
-  "/:id/favorite",
+router.delete(
+  "/:id",
   authMiddleware,
-  InteractionsController.toggleFavorite
+  deleteMod
 );
 
 export default router;
 ---
-interactions.service.ts
-import { prisma } from "../../lib/prisma";
-import { NotFoundError } from "../../utils/errors";
+import { Response } from "express";
 
-export class InteractionsService {
-  //////////////////////////////////////////////////////
-  // GET INTERACTIONS
-  //////////////////////////////////////////////////////
+import { asyncHandler } from "../../utils/asyncHandler";
 
-  static async getInteractions(
-    modId: number,
-    userId?: number
-  ) {
-    const mod = await prisma.mod.findUnique({
-      where: { id: modId },
+import { AuthRequest } from "../../middleware/auth.middleware";
 
-      select: {
-        id: true,
+import { ModService } from "./mod.service";
 
-        likesCount: true,
-        favoritesCount: true,
+export const getProject =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
 
-        likes: userId
-          ? {
-              where: { userId },
-              select: { userId: true },
-            }
-          : false,
+      const mod =
+        await ModService.getProjectById(
+          Number(req.params.id),
+          req.userId
+        );
 
-        favorites: userId
-          ? {
-              where: { userId },
-              select: { userId: true },
-            }
-          : false,
-      },
-    });
-
-    if (!mod) {
-      throw new NotFoundError("Mod no encontrado");
+      res.json(mod);
     }
+  );
 
-    return {
-      liked: Array.isArray(mod.likes)
-        ? mod.likes.length > 0
-        : false,
+export const updateProject =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
 
-      favorited: Array.isArray(mod.favorites)
-        ? mod.favorites.length > 0
-        : false,
+      const mod =
+        await ModService.updateMod(
+          Number(req.params.id),
+          req.body,
+          req.userId!
+        );
 
-      likesCount: mod.likesCount,
-      favoritesCount: mod.favoritesCount,
-    };
-  }
+      res.json(mod);
+    }
+  );
+---
+project.routes.ts
+import { Router } from "express";
+import { authMiddleware } from "../../middleware/auth.middleware";
 
-  //////////////////////////////////////////////////////
-  // TOGGLE LIKE
-  //////////////////////////////////////////////////////
+import {
+  getProject,
+  updateProject,
+} from "./project.controller";
 
-  static async toggleLike(
-    modId: number,
-    userId: number
-  ) {
-    return prisma.$transaction(async (tx) => {
-      const existing =
-        await tx.modLike.findUnique({
-          where: {
-            userId_modId: {
-              userId,
-              modId,
-            },
-          },
-        });
+const router = Router();
 
-      if (existing) {
-        await tx.modLike.delete({
-          where: {
-            userId_modId: {
-              userId,
-              modId,
-            },
-          },
-        });
+// 🔥 dashboard
+router.get("/:id", authMiddleware, getProject);
 
-        const updated = await tx.mod.update({
-          where: { id: modId },
+// 🔥 editar básico
+router.patch("/:id", authMiddleware, updateProject);
 
-          data: {
-            likesCount: {
-              decrement: 1,
-            },
-          },
+export default router;
+---
+modules/mod/gallery/gallery.controller.ts
+import { prisma } from "../../../lib/prisma";
 
-          select: {
-            likesCount: true,
-            favoritesCount: true,
-          },
-        });
+export async function getGallery(req: any, res: any) {
+  const modId = Number(req.params.id);
 
-        return {
-          liked: false,
-          likesCount: updated.likesCount,
-          favoritesCount:
-            updated.favoritesCount,
-        };
-      }
+  const images = await prisma.modImage.findMany({
+    where: { modId },
+  });
 
-      await tx.modLike.create({
-        data: {
-          userId,
-          modId,
-        },
-      });
+  res.json(images);
+}
 
-      const updated = await tx.mod.update({
-        where: { id: modId },
+export async function deleteImage(req: any, res: any) {
+  const imageId = Number(req.params.imageId);
 
-        data: {
-          likesCount: {
-            increment: 1,
-          },
-        },
+  await prisma.modImage.delete({
+    where: { id: imageId },
+  });
 
-        select: {
-          likesCount: true,
-          favoritesCount: true,
-        },
-      });
-
-      return {
-        liked: true,
-        likesCount: updated.likesCount,
-        favoritesCount:
-          updated.favoritesCount,
-      };
-    });
-  }
-
-  //////////////////////////////////////////////////////
-  // TOGGLE FAVORITE
-  //////////////////////////////////////////////////////
-
-  static async toggleFavorite(
-    modId: number,
-    userId: number
-  ) {
-    return prisma.$transaction(async (tx) => {
-      const existing =
-        await tx.favorite.findUnique({
-          where: {
-            userId_modId: {
-              userId,
-              modId,
-            },
-          },
-        });
-
-      if (existing) {
-        await tx.favorite.delete({
-          where: {
-            userId_modId: {
-              userId,
-              modId,
-            },
-          },
-        });
-
-        const updated = await tx.mod.update({
-          where: { id: modId },
-
-          data: {
-            favoritesCount: {
-              decrement: 1,
-            },
-          },
-
-          select: {
-            likesCount: true,
-            favoritesCount: true,
-          },
-        });
-
-        return {
-          favorited: false,
-          likesCount: updated.likesCount,
-          favoritesCount:
-            updated.favoritesCount,
-        };
-      }
-
-      await tx.favorite.create({
-        data: {
-          userId,
-          modId,
-        },
-      });
-
-      const updated = await tx.mod.update({
-        where: { id: modId },
-
-        data: {
-          favoritesCount: {
-            increment: 1,
-          },
-        },
-
-        select: {
-          likesCount: true,
-          favoritesCount: true,
-        },
-      });
-
-      return {
-        favorited: true,
-        likesCount: updated.likesCount,
-        favoritesCount:
-          updated.favoritesCount,
-      };
-    });
-  }
+  res.json({ success: true });
 }
 ---
-interactions.types.ts
-export interface ModInteractionsResponse {
-  liked: boolean;
-  favorited: boolean;
-
-  likesCount: number;
-  favoritesCount: number;
-}
----
-modules/mods/dto/
-create-mod.dto.ts
+modules/mods/dto/create-mod.dto.ts
 import {
   Loader,
   Platform,
@@ -4891,8 +6174,8 @@ export interface CreateModDto {
   tags: string[];
 }
 ---
-modules/mods/uploads/
-mod-upload.config.ts
+modules/mods/uploads/mod-upload.config.ts
+import { Request } from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -4921,7 +6204,7 @@ const storage = multer.diskStorage({
 });
 
 function fileFilter(
-  _req: any,
+  _req: Request,
   file: Express.Multer.File,
   cb: multer.FileFilterCallback
 ) {
@@ -4967,8 +6250,7 @@ export const createModUploadMiddleware =
     },
   ]);
 ---
-modules/mods/utils/
-slug.ts
+modules/mods/utils/slug.ts
 export function slugify(
   value: string
 ) {
@@ -4979,8 +6261,7 @@ export function slugify(
     .replace(/\s+/g, "-");
 }
 ---
-modules/mods/validations/
-create-mod.schema.ts
+modules/mods/validation/create-mod.schema.ts
 import { z } from "zod";
 
 export const createModSchema = z.object({
@@ -5044,8 +6325,34 @@ export const createModSchema = z.object({
   tags: z.array(z.string()).max(20),
 });
 ---
-modules/socials/
-socials.controller.ts
+modules/permissions/permissions.service.ts
+import { prisma } from "../../lib/prisma";
+
+export class PermissionService {
+  static async getUserScopes(userId: number) {
+    const roles = await prisma.userRole.findMany({
+      where: { userId },
+      include: { role: true },
+    });
+
+    const scopes = new Set<string>();
+
+    for (const r of roles) {
+      for (const s of r.role.scopes) {
+        scopes.add(s);
+      }
+    }
+
+    return Array.from(scopes);
+  }
+
+  static async hasScope(userId: number, scope: string) {
+    const scopes = await this.getUserScopes(userId);
+    return scopes.includes(scope);
+  }
+}
+---
+modules/socials/socials.controller.ts
 import { Response } from "express";
 import { SocialPlatform } from "@prisma/client";
 
@@ -5417,17 +6724,56 @@ export interface UpsertSocialInput {
   url: string;
 }
 ---
-modules/uploadsmultipart.controller.ts
+modules/teams/team.service.ts
+import { prisma } from "../../lib/prisma";
+import { RoleScopes } from "../../constants/roles";
+
+export class TeamService {
+  static async getMembership(userId: number, teamId: number) {
+    return prisma.teamMember.findFirst({
+      where: { userId, teamId },
+    });
+  }
+
+  static async hasScope(
+    userId: number,
+    mod: any,
+    scope: string
+  ) {
+    // dueño directo (fallback)
+    if (mod.authorId === userId) return true;
+
+    if (!mod.teamId) return false;
+
+    const membership = await this.getMembership(userId, mod.teamId);
+
+    if (!membership) return false;
+
+    const roleScopes = RoleScopes[membership.role] || [];
+
+    // soporte para scopes personalizados (futuro)
+    if (membership.scopes && membership.scopes.length > 0) {
+      return membership.scopes.includes(scope);
+    }
+
+    return roleScopes.includes(scope);
+  }
+}
+---
+modules/uploads/multipart.controller.ts
 import { Request, Response } from "express";
 
 import {
+  CompleteMultipartUploadCommand,
   CreateMultipartUploadCommand,
   UploadPartCommand,
-  CompleteMultipartUploadCommand,
 } from "@aws-sdk/client-s3";
 
 import { getSignedUrl }
   from "@aws-sdk/s3-request-presigner";
+
+import { asyncHandler }
+  from "../../utils/asyncHandler";
 
 import { s3 }
   from "../../lib/s3";
@@ -5436,142 +6782,129 @@ import { s3 }
 // START MULTIPART
 ////////////////////////////////////////////////////////
 
-export async function startMultipartUpload(
-  req: Request,
-  res: Response
-) {
-  try {
-    const { filename, type } =
-      req.body;
+export const startMultipartUpload =
+  asyncHandler(
+    async (
+      req: Request,
+      res: Response
+    ) => {
 
-    const key =
-      `mods/${Date.now()}-${filename}`;
+      const {
+        filename,
+        type,
+      } = req.body;
 
-    const command =
-      new CreateMultipartUploadCommand({
-        Bucket:
-          process.env.R2_BUCKET!,
+      const key =
+        `mods/${Date.now()}-${filename}`;
 
-        Key: key,
+      const command =
+        new CreateMultipartUploadCommand({
+          Bucket:
+            process.env.R2_BUCKET!,
 
-        ContentType: type,
+          Key: key,
+
+          ContentType: type,
+        });
+
+      const response =
+        await s3.send(command);
+
+      res.json({
+        uploadId:
+          response.UploadId,
+
+        key,
       });
-
-    const response =
-      await s3.send(command);
-
-    return res.json({
-      uploadId:
-        response.UploadId,
-
-      key,
-    });
-  } catch (err) {
-    console.error(err);
-
-    return res.status(500).json({
-      error:
-        "Error starting multipart upload",
-    });
-  }
-}
+    }
+  );
 
 ////////////////////////////////////////////////////////
 // GET PART URL
 ////////////////////////////////////////////////////////
 
-export async function getMultipartPartUrl(
-  req: Request,
-  res: Response
-) {
-  try {
-    const {
-      uploadId,
-      key,
-      partNumber,
-    } = req.body;
+export const getMultipartPartUrl =
+  asyncHandler(
+    async (
+      req: Request,
+      res: Response
+    ) => {
 
-    const command =
-      new UploadPartCommand({
-        Bucket:
-          process.env.R2_BUCKET!,
+      const {
+        uploadId,
+        key,
+        partNumber,
+      } = req.body;
 
-        Key: key,
+      const command =
+        new UploadPartCommand({
+          Bucket:
+            process.env.R2_BUCKET!,
 
-        UploadId: uploadId,
+          Key: key,
 
-        PartNumber: partNumber,
+          UploadId: uploadId,
+
+          PartNumber: partNumber,
+        });
+
+      const url =
+        await getSignedUrl(
+          s3,
+          command,
+          {
+            expiresIn: 3600,
+          }
+        );
+
+      res.json({
+        url,
       });
-
-    const url =
-      await getSignedUrl(
-        s3,
-        command,
-        {
-          expiresIn: 3600,
-        }
-      );
-
-    return res.json({
-      url,
-    });
-  } catch (err) {
-    console.error(err);
-
-    return res.status(500).json({
-      error:
-        "Error generating part url",
-    });
-  }
-}
+    }
+  );
 
 ////////////////////////////////////////////////////////
 // COMPLETE MULTIPART
 ////////////////////////////////////////////////////////
 
-export async function completeMultipartUpload(
-  req: Request,
-  res: Response
-) {
-  try {
-    const {
-      uploadId,
-      key,
-      parts,
-    } = req.body;
+export const completeMultipartUpload =
+  asyncHandler(
+    async (
+      req: Request,
+      res: Response
+    ) => {
 
-    const command =
-      new CompleteMultipartUploadCommand({
-        Bucket:
-          process.env.R2_BUCKET!,
+      const {
+        uploadId,
+        key,
+        parts,
+      } = req.body;
 
-        Key: key,
+      const command =
+        new CompleteMultipartUploadCommand({
+          Bucket:
+            process.env.R2_BUCKET!,
 
-        UploadId: uploadId,
+          Key: key,
 
-        MultipartUpload: {
-          Parts: parts,
-        },
+          UploadId: uploadId,
+
+          MultipartUpload: {
+            Parts: parts,
+          },
+        });
+
+      const response =
+        await s3.send(command);
+
+      res.json({
+        success: true,
+
+        location:
+          response.Location,
       });
-
-    const response =
-      await s3.send(command);
-
-    return res.json({
-      success: true,
-
-      location:
-        response.Location,
-    });
-  } catch (err) {
-    console.error(err);
-
-    return res.status(500).json({
-      error:
-        "Error completing multipart upload",
-    });
-  }
-}
+    }
+  );
 ---
 upload.constants.ts
 //////////////////////////////////////////////////
@@ -5607,14 +6940,17 @@ export const MAX_MOD_FILE_SIZE =
 ---
 upload.controller.ts
 import { Response } from "express";
+import { AuthRequest } from "../../middleware/auth.middleware";
+import { asyncHandler } from "../../utils/asyncHandler";
 
 import { UploadService }
   from "./upload.service";
 
-export async function getPresignedUrl(
-  req: any,
-  res: Response
-) {
+export const getPresignedUrl = asyncHandler(
+  async (
+    req: AuthRequest,
+    res: Response
+  ) => {
   const {
     filename,
     type,
@@ -5632,43 +6968,62 @@ export async function getPresignedUrl(
       filename,
       type,
       folder,
-      req.userId
+      req.userId!
     );
 
   res.json(result);
-}
+  }
+);
 ---
 upload.service.ts
 import crypto from "crypto";
 import path from "path";
 
-import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { UploadFolder } from "./upload.types";
+import {
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
+
+import {
+  getSignedUrl,
+} from "@aws-sdk/s3-request-presigner";
 
 import { s3 } from "../../lib/s3";
+
+import {
+  BadRequestError,
+} from "../../utils/errors";
 
 import {
   IMAGE_MIME_TYPES,
   MOD_FILE_MIME_TYPES,
 } from "./upload.constants";
 
+import {
+  UploadFolder,
+  ImageMimeType,
+  ModFileMimeType,
+} from "./upload.types";
+
 export class UploadService {
+
   static async createPresignedUpload(
     filename: string,
     type: string,
     folder: UploadFolder,
     userId: number
   ) {
+
     switch (folder) {
 
       case "avatars":
       case "banners":
 
         if (
-          !IMAGE_MIME_TYPES.includes(type as any)
+          !IMAGE_MIME_TYPES.includes(
+            type as ImageMimeType
+          )
         ) {
-          throw new Error(
+          throw new BadRequestError(
             "Tipo de imagen no permitido"
           );
         }
@@ -5678,9 +7033,11 @@ export class UploadService {
       case "mods":
 
         if (
-          !MOD_FILE_MIME_TYPES.includes(type as any)
+          !MOD_FILE_MIME_TYPES.includes(
+            type as ModFileMimeType
+          )
         ) {
-          throw new Error(
+          throw new BadRequestError(
             "Tipo de archivo no permitido"
           );
         }
@@ -5688,42 +7045,38 @@ export class UploadService {
         break;
 
       default:
-        throw new Error(
+        throw new BadRequestError(
           "Carpeta inválida"
         );
     }
 
-    const ext = path.extname(filename);
+    const ext =
+      path.extname(filename);
 
-    let key: string;
+    const key = (() => {
 
-    switch (folder) {
+      switch (folder) {
 
-      case "avatars":
-        key =
-          `avatars/${userId}/avatar${ext}`;
-        break;
+        case "avatars":
+          return `avatars/${userId}/avatar${ext}`;
 
-      case "banners":
-        key =
-          `banners/${userId}/banner${ext}`;
-        break;
+        case "banners":
+          return `banners/${userId}/banner${ext}`;
 
-      case "mods":
-        key =
-          `mods/${crypto.randomUUID()}${ext}`;
-        break;
+        case "mods":
+          return `mods/${crypto.randomUUID()}${ext}`;
 
-      default:
-        throw new Error(
-          "Carpeta inválida"
-        );
-    }
+      }
+
+    })();
 
     const command =
       new PutObjectCommand({
-        Bucket: process.env.R2_BUCKET!,
+        Bucket:
+          process.env.R2_BUCKET!,
+
         Key: key,
+
         ContentType: type,
       });
 
@@ -5741,9 +7094,53 @@ export class UploadService {
       key,
     };
   }
+
 }
 ---
+upload.routes.ts
+import { Router } from "express";
+
+import { authMiddleware } from "../../middleware/auth.middleware";
+
+import { getPresignedUrl, } from "./upload.controller";
+
+import {
+  startMultipartUpload,
+  getMultipartPartUrl,
+  completeMultipartUpload,
+} from "../../modules/uploads/multipart.controller";
+
+const router = Router();
+
+router.post(
+  "/presigned",
+  authMiddleware,
+  getPresignedUrl
+);
+
+router.post(
+  "/start",
+  authMiddleware,
+  startMultipartUpload
+);
+
+router.post(
+  "/part-url",
+  authMiddleware,
+  getMultipartPartUrl
+);
+
+router.post(
+  "/complete",
+  authMiddleware,
+  completeMultipartUpload
+);
+
+export default router;
+---
 upload.types.ts
+import { Loader } from "@prisma/client";
+
 export interface PresignedUploadInput {
   filename: string;
   type: string;
@@ -5754,6 +7151,17 @@ export type UploadFolder =
   | "avatars"
   | "banners"
   | "mods";
+
+export type ImageMimeType =
+  | "image/png"
+  | "image/jpeg"
+  | "image/webp"
+  | "image/gif";
+
+export type ModFileMimeType =
+  | "application/java-archive"
+  | "application/zip"
+  | "application/x-zip-compressed";
 ---
 modules/users/users.controller.ts
 import { Response } from "express";
@@ -6236,7 +7644,7 @@ export class UsersService {
   }
 }
 ---
-users.type.ts
+users.types
 //////////////////////////////////////////////////
 // UPDATE PROFILE
 //////////////////////////////////////////////////
@@ -6255,453 +7663,293 @@ export interface UpdateProfileInput {
   accentColor?: string;
 }
 ---
-routes/
-file.ts
-import { Router } from "express";
-import { upload } from "../lib/multer.js";
-import { authMiddleware } from "../middleware/auth.middleware.js";
-import { uploadVersionFile } from "../controllers/versionFile.controller.js";
-import { asyncHandler } from "../utils/asyncHandler.js";
+modules/versions/version.controller
+import { Response } from "express";
 
-const router = Router();
+import { asyncHandler } from "../../utils/asyncHandler";
+import { AuthRequest } from "../../middleware/auth.middleware";
 
-router.post(
-  "/:id/files",
-  authMiddleware,
-  upload.single("file"),
-  asyncHandler(uploadVersionFile)
-);
+import { VersionService } from "./version.service";
 
-export default router;
----
-comment.ts
-import { Router } from "express";
+import { createVersionSchema } from "../../validations/version.schema";
 
-import { authMiddleware } from "../middleware/auth.middleware";
+export const createVersion =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
 
-import {
-  getComments,
-  createComment,
-  updateComment,
-  deleteComment,
-  createReply,
-} from "../controllers/comment.controller";
+      const parsed =
+        createVersionSchema.parse(
+          req.body
+        );
 
-const router = Router();
+      const version =
+        await VersionService.createVersion(
+          parsed,
+          req.userId!,
+          Number(req.params.id)
+        );
 
-//////////////////////////////////////////////////
-// GET COMMENTS
-//////////////////////////////////////////////////
+      res.json(version);
 
-router.get(
-  "/mod/:modId",
-  getComments
-);
-
-//////////////////////////////////////////////////
-// CREATE COMMENT
-//////////////////////////////////////////////////
-
-router.post(
-  "/mod/:modId",
-  authMiddleware,
-  createComment
-);
-
-//////////////////////////////////////////////////
-// EDIT COMMENT
-//////////////////////////////////////////////////
-
-router.patch(
-  "/:id",
-  authMiddleware,
-  updateComment
-);
-
-//////////////////////////////////////////////////
-// DELATE COMMENT
-//////////////////////////////////////////////////
-
-router.delete(
-  "/:id",
-  authMiddleware,
-  deleteComment
-);
-
-//////////////////////////////////////////////////
-// 
-//////////////////////////////////////////////////
-
-router.post(
-  "/:id/replies",
-  authMiddleware,
-  createReply
-);
-
-export default router;
----
-download.ts
-import { Router } from "express";
-import { download } from "../controllers/download.controller.js";
-
-const router = Router();
-
-// 🔥 descarga por VERSION (como vos ya venías haciendo)
-router.get("/versions/:versionId/download", download);
-
-export default router;
----
-favorite.ts
-import { Router } from "express";
-import { authMiddleware, AuthRequest } from "../middleware/auth.middleware";
-import {
-  addFavorite,
-  removeFavorite,
-  getFavoriteStatus,
-  getFavoritesByUser,
-} from "../services/favorite.service";
-
-const router = Router();
-
-// ⭐ Agregar a favoritos
-router.post("/:modId", authMiddleware, async (req: AuthRequest, res) => {
-  try {
-    const userId = req.userId!;
-    const modId = Number(req.params.modId);
-
-    const result = await addFavorite(userId, modId);
-
-    if (result.alreadyFavorited) {
-      return res.status(409).json({ message: "Already favorited" });
     }
+  );
 
-    res.json(result);
-  } catch {
-    res.status(500).json({ error: "Error adding favorite" });
-  }
-});
+export const getVersions =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
 
-// ❌ Quitar de favoritos
-router.delete("/:modId", authMiddleware, async (req: AuthRequest, res) => {
-  try {
-    const userId = req.userId!;
-    const modId = Number(req.params.modId);
+      const versions =
+        await VersionService.getVersions(
+          Number(req.params.id)
+        );
 
-    const result = await removeFavorite(userId, modId);
+      res.json(versions);
 
-    res.json(result);
-  } catch {
-    res.status(500).json({ error: "Error removing favorite" });
-  }
-});
+    }
+  );
 
-// 👤 Ver si está en favoritos
-router.get("/:modId/me", authMiddleware, async (req: AuthRequest, res) => {
-  const userId = req.userId!;
-  const modId = Number(req.params.modId);
+export const updateVersion =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
 
-  const result = await getFavoriteStatus(userId, modId);
+      const version =
+        await VersionService.updateVersion(
+          Number(req.params.id),
+          req.userId!,
+          req.body.version
+        );
 
-  res.json(result);
-});
+      res.json(version);
 
-// 📚 Obtener favoritos del usuario
-router.get("/me/list", authMiddleware, async (req: AuthRequest, res) => {
-  const userId = req.userId!;
+    }
+  );
 
-  const result = await getFavoritesByUser(userId);
+export const deleteVersion =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
 
-  res.json(result);
-});
+      const result =
+        await VersionService.deleteVersion(
+          Number(req.params.id),
+          req.userId!
+        );
 
-export default router;
----
-invite.ts
-import { Router } from "express";
-import {
-  createInvite,
-  acceptInvite,
-  rejectInvite,
-} from "../controllers/invite.controller";
-import { authMiddleware } from "../middleware/auth.middleware";
-
-const router = Router();
-
-router.post("/", authMiddleware, createInvite);
-router.post("/accept/:token", authMiddleware, acceptInvite);
-router.post("/reject/:token", authMiddleware, rejectInvite);
-
-export default router;
----
-image.ts
-import { Router } from "express";
-import { upload } from "../lib/multer.js";
-import { authMiddleware } from "../middleware/auth.middleware.js";
-import { createModWithImage } from "../controllers/image.controller.js";
-
-const router = Router();
-
-router.post(
-  "/create",
-  authMiddleware,
-  upload.single("image"), // 👈 UNA imagen
-  async (req, res) => {
-    try {
-      const result = await createModWithImage(req as any);
       res.json(result);
-    } catch (error: any) {
-        console.error("ERROR BACKEND:", error);
-        res.status(400).json({ error: error.message });
+
     }
-  }
-);
-
-export default router;
+  );
 ---
-like.ts
-import { Router, Response } from "express";
-import { LikeController } from "../controllers/like.controller.js";
-import { FavoriteController } from "../controllers/favorite.controller.js";
-import { authMiddleware, AuthRequest } from "../middleware/auth.middleware.js";
-import { asyncHandler } from "../utils/asyncHandler.js";
+version.service.ts
+import { prisma } from "../../lib/prisma";
+import { cacheInvalidate } from "../../lib/cache";
 
-const router = Router();
+import type {
+  CreateVersionInput,
+} from "./version.types";
 
-// ─── LIKES ───────────────────────────────────────────
+import { Scopes } from "../../constants/scopes";
+import { TeamService } from "../teams/team.service";
 
-router.post(
-  "/:modId/like",
-  authMiddleware,
-  asyncHandler(async (req: AuthRequest, res: Response) => {
-    const modId = Number(req.params.modId);
-    const userId = req.userId!;
-
-    if (!modId) return res.status(400).json({ error: "modId inválido" });
-
-    const result = await LikeController.toggleLike(userId, modId);
-    res.json(result);
-  })
-);
-
-router.get(
-  "/:modId/like",
-  authMiddleware,
-  asyncHandler(async (req: AuthRequest, res: Response) => {
-    const modId = Number(req.params.modId);
-    const liked = await LikeController.isLiked(req.userId!, modId);
-    res.json({ liked });
-  })
-);
-
-router.get(
-  "/:modId/likes/count",
-  asyncHandler(async (req: AuthRequest, res: Response) => {
-    const modId = Number(req.params.modId);
-    const count = await LikeController.getLikesCount(modId);
-    res.json({ count });
-  })
-);
-
-// ─── FAVORITOS ───────────────────────────────────────
-
-router.post(
-  "/:modId/favorite",
-  authMiddleware,
-  asyncHandler(async (req: AuthRequest, res: Response) => {
-    const modId = Number(req.params.modId);
-    const userId = req.userId!;
-
-    if (!modId) return res.status(400).json({ error: "modId inválido" });
-
-    const result = await FavoriteController.toggleFavorite(userId, modId);
-    res.json(result);
-  })
-);
-
-router.get(
-  "/:modId/favorite",
-  authMiddleware,
-  asyncHandler(async (req: AuthRequest, res: Response) => {
-    const modId = Number(req.params.modId);
-    const favorited = await FavoriteController.isFavorited(req.userId!, modId);
-    res.json({ favorited });
-  })
-);
-
-export default router;
----
-mod.ts
-import { Router } from "express";
-
-import { authMiddleware } from "../middleware/auth.middleware";
-
-import { upload } from "../lib/multer";
+import { sanitizeRichText } from "../../utils/sanitize";
 
 import {
-  createMod,
-  getMods,
-  getModBySlug,
-  updateMod,
-  deleteMod,
-} from "../controllers/mod.controller";
+  ForbiddenError,
+  NotFoundError,
+} from "../../utils/errors";
 
-const router = Router();
+export class VersionService {
+  static async createVersion(
+    data: CreateVersionInput,
+    userId: number,
+    modId: number
+  ) {
+    const mod = await prisma.mod.findUnique({
+      where: {
+        id: modId,
+      },
+    });
 
-//////////////////////////////////////////////////
-// CREATE
-//////////////////////////////////////////////////
-
-router.post(
-  "/",
-  authMiddleware,
-
-  upload.fields([
-    {
-      name: "icon",
-      maxCount: 1,
-    },
-
-    {
-      name: "gallery",
-      maxCount: 10,
-    },
-  ]),
-
-  createMod
-);
-
-//////////////////////////////////////////////////
-// GET ALL
-//////////////////////////////////////////////////
-
-router.get("/", getMods);
-
-//////////////////////////////////////////////////
-// GET ONE
-//////////////////////////////////////////////////
-
-router.get(
-  "/:slug",
-  authMiddleware,
-  getModBySlug
-);
-
-//////////////////////////////////////////////////
-// UPDATE
-//////////////////////////////////////////////////
-
-router.patch(
-  "/:id",
-  authMiddleware,
-  updateMod
-);
-
-//////////////////////////////////////////////////
-// DELETE
-//////////////////////////////////////////////////
-
-router.delete(
-  "/:id",
-  authMiddleware,
-  deleteMod
-);
-
-export default router;
----
-project.ts
-import { Router } from "express";
-import { authMiddleware } from "../middleware/auth.middleware.js";
-
-import {
-  getProject,
-  updateProject,
-} from "../controllers/project/project.controller.js";
-
-const router = Router();
-
-// 🔥 dashboard
-router.get("/:id", authMiddleware, getProject);
-
-// 🔥 editar básico
-router.patch("/:id", authMiddleware, updateProject);
-
-export default router;
----
-upload.ts
-import { Router } from "express";
-
-import { authMiddleware }
-  from "../middleware/auth.middleware";
-
-import { getPresignedUrl, } from "../modules/uploads/upload.controller";
-
-import {
-  startMultipartUpload,
-  getMultipartPartUrl,
-  completeMultipartUpload,
-} from "../modules/uploads/multipart.controller";
-
-const router = Router();
-
-router.post(
-  "/presigned",
-  authMiddleware,
-  getPresignedUrl
-);
-
-router.post(
-  "/start",
-  authMiddleware,
-  startMultipartUpload
-);
-
-router.post(
-  "/part-url",
-  authMiddleware,
-  getMultipartPartUrl
-);
-
-router.post(
-  "/complete",
-  authMiddleware,
-  completeMultipartUpload
-);
-
-export default router;
----
-user.ts
-import { Router } from "express";
-import { getUserProfile } from "../services/user.service";
-import { AuthRequest, authMiddleware } from "../middleware/auth.middleware";
-
-const router = Router();
-
-// 👤 Perfil público
-router.get("/:username", async (req: AuthRequest, res) => {
-  try {
-    const usernameParam = req.params.username;
-
-    if (Array.isArray(usernameParam)) {
-    return res.status(400).json({ error: "Username inválido" });
+    if (!mod || mod.deletedAt) {
+      throw new NotFoundError(
+        "Mod no encontrado"
+      );
     }
 
-    const username = usernameParam;
-    const userId = req.userId;
+    const allowed = await TeamService.hasScope(
+      userId,
+      mod,
+      Scopes.VERSION_CREATE
+    );
 
-    const profile = await getUserProfile(username, userId);
+    if (!allowed) {
+      throw new ForbiddenError(
+        "No autorizado"
+      );
+    }
 
-    res.json(profile);
-  } catch (err) {
-    res.status(404).json({ error: "Usuario no encontrado" });
+    // ✅ sanitización segura
+    const safeChangelog = sanitizeRichText(
+      data.changelog || ""
+    );
+
+    const version =
+      await prisma.modVersion.create({
+        data: {
+          modId,
+
+          version: data.version,
+
+          minecraftVersion:
+            data.minecraftVersion,
+
+          loader: data.loader,
+
+          changelog: safeChangelog,
+        },
+      });
+
+    // ✅ invalidamos cache si Redis existe
+    await cacheInvalidate("mods:*");
+
+    return version;
   }
-});
 
-export default router;
+  static async getVersions(modId: number) {
+    return prisma.modVersion.findMany({
+      where: {
+        modId,
+      },
+
+      include: {
+        files: true,
+      },
+    });
+  }
+
+  static async updateVersion(
+    versionId: number,
+    userId: number,
+    versionName: string
+  ) {
+
+    const version =
+      await prisma.modVersion.findUnique({
+        where: {
+          id: versionId,
+        },
+        include: {
+          mod: true,
+        },
+      });
+
+    if (!version) {
+      throw new NotFoundError(
+        "No existe"
+      );
+    }
+
+    const allowed =
+      await TeamService.hasScope(
+        userId,
+        version.mod,
+        Scopes.VERSION_CREATE
+      );
+
+    if (!allowed) {
+      throw new ForbiddenError(
+        "No autorizado"
+      );
+    }
+
+    const updated =
+      await prisma.modVersion.update({
+        where: {
+          id: versionId,
+        },
+        data: {
+          version: versionName,
+        },
+      });
+
+    await cacheInvalidate("mods:*");
+
+    return updated;
+  }
+
+  static async deleteVersion(
+    versionId: number,
+    userId: number
+  ) {
+
+    const version =
+      await prisma.modVersion.findUnique({
+        where: {
+          id: versionId,
+        },
+        include: {
+          mod: true,
+        },
+      });
+
+    if (!version) {
+      throw new NotFoundError(
+        "No existe"
+      );
+    }
+
+    const allowed =
+      await TeamService.hasScope(
+        userId,
+        version.mod,
+        Scopes.VERSION_CREATE
+      );
+
+    if (!allowed) {
+      throw new ForbiddenError(
+        "No autorizado"
+      );
+    }
+
+    await prisma.modVersion.delete({
+      where: {
+        id: versionId,
+      },
+    });
+
+    await cacheInvalidate("mods:*");
+
+    return {
+      success: true,
+    };
+  }
+}
 ---
-version.ts
+version.types.ts
+import { Loader } from "@prisma/client";
+
+export interface CreateVersionInput {
+  version: string;
+  minecraftVersion: string;
+  loader?: Loader | null;
+  changelog?: string;
+}
+---
+version.routes.ts
 import { Router } from "express";
-import { authMiddleware } from "../middleware/auth.middleware.js";
-import { createVersion, getVersions, deleteVersion, updateVersion, } from "../controllers/version.controller.js";
+import { authMiddleware } from "../../middleware/auth.middleware";
+import { createVersion, getVersions, deleteVersion, updateVersion, } from "./version.controller";
 
 const router = Router();
 
@@ -6717,1676 +7965,193 @@ router.patch("/:id", authMiddleware, updateVersion);
 
 export default router;
 ---
-versionfile.ts
-import { Router } from "express";
-import { upload } from "../lib/multer.js";
-import { authMiddleware } from "../middleware/auth.middleware.js";
-import { uploadVersionFile } from "../controllers/versionFile.controller.js";
+modules/versions/file/versionfile.controller.ts
+import { Response } from "express";
 
-const router = Router();
+import { AuthRequest } from "../../../middleware/auth.middleware";
+import { asyncHandler } from "../../../utils/asyncHandler";
 
-router.post(
-  "/files",
-  authMiddleware,
-  upload.single("file"),
-  async (req, res) => {
-    try {
-      const result = await uploadVersionFile(req as any);
+import * as VersionFileService from "./versionfiles.service";
+
+export const getFiles =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+
+      const files =
+        await VersionFileService.getFiles(
+          Number(req.params.id)
+        );
+
+      res.json(files);
+
+    }
+  );
+
+export const deleteFile =
+  asyncHandler(
+    async (
+      req: AuthRequest,
+      res: Response
+    ) => {
+
+      const result =
+        await VersionFileService.deleteFile(
+          Number(req.params.fileId),
+          req.userId!
+        );
+
       res.json(result);
-    } catch (err: any) {
-      res.status(400).json({ error: err.message });
-    }
-  }
-);
 
-export default router;
+    }
+  );
 ---
-validations/
-mod.schema.ts
-import { z } from "zod";
-
-export const createModSchema = z.object({
-  title: z.string().min(3),
-  description: z.string().min(3),
-  content: z.string().optional(),
-  platform: z.string(),
-  loader: z.string().optional(),
-  type: z.string(),
-  tags: z.any().optional(),
-});
-
-export const updateModSchema = z.object({
-  title: z.string().min(3).optional(),
-  description: z.string().optional(),
-  content: z.string().optional(),
-  platform: z.string().optional(),
-  loader: z.string().optional(),
-  type: z.string().optional(),
-});
----
-version.schema.ts
-import { z } from "zod";
-
-export const createVersionSchema = z.object({
-  version: z.string(),
-  minecraftVersion: z.string(),
-  loader: z.string().optional(),
-  changelog: z.string().optional(),
-});
----
-file.schema.t
-import { z } from "zod";
-
-export const fileSchema = z.object({
-  versionId: z.number(),
-});
----
-services/comment.service.ts
-import { prisma } from "../lib/prisma";
-
-import {
-  BadRequestError,
-  NotFoundError,
-  ForbiddenError,
-} from "../utils/errors";
-
-import { sanitizeText } from "../utils/sanitize";
-
-export class CommentService {
-  //////////////////////////////////////////////////
-  // GET COMMENTS
-  //////////////////////////////////////////////////
-
-  static async getComments(
-    modId: number
-  ) {
-    const comments =
-      await prisma.comment.findMany({
-        where: {
-          modId,
-          deleted: false,
-          parentId: null,
-        },
-
-        include: {
-          user: {
-            select: {
-              id: true,
-              username: true,
-              avatar: true,
-            },
-          },
-
-          replies: {
-            where: {
-              deleted: false,
-            },
-
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  username: true,
-                  avatar: true,
-                },
-              },
-            },
-
-            orderBy: {
-              createdAt: "asc",
-            },
-          },
-        },
-
-        orderBy: {
-          createdAt: "desc",
-        },
-      });
-
-    return comments;
-  }
-
-  //////////////////////////////////////////////////
-  // CREATE COMMENT
-  //////////////////////////////////////////////////
-
-  static async createComment(
-    modId: number,
-    userId: number,
-    content: string
-  ) {
-    if (!content?.trim()) {
-      throw new BadRequestError(
-        "Comentario vacío"
-      );
-    }
-
-    const mod =
-      await prisma.mod.findUnique({
-        where: {
-          id: modId,
-        },
-      });
-
-    if (!mod) {
-      throw new NotFoundError(
-        "Mod no encontrado"
-      );
-    }
-
-    const comment =
-      await prisma.comment.create({
-        data: {
-          modId,
-          userId,
-
-          content:
-            sanitizeText(
-              content.trim()
-            ),
-        },
-
-        include: {
-          user: {
-            select: {
-              id: true,
-              username: true,
-              avatar: true,
-            },
-          },
-        },
-      });
-
-    return comment;
-  }
-
-  //////////////////////////////////////////////////
-  // EDIT COMMNET
-  //////////////////////////////////////////////////
-
-  static async updateComment(
-    commentId: number,
-    userId: number,
-    content: string
-  ) {
-    const comment =
-      await prisma.comment.findUnique({
-        where: {
-          id: commentId,
-        },
-      });
-
-    if (
-      !comment ||
-      comment.deleted
-    ) {
-      throw new NotFoundError(
-        "Comentario no encontrado"
-      );
-    }
-
-    if (
-      comment.userId !== userId
-    ) {
-      throw new ForbiddenError(
-        "No autorizado"
-      );
-    }
-
-    if (!content?.trim()) {
-      throw new BadRequestError(
-        "Comentario vacío"
-      );
-    }
-
-    return prisma.comment.update({
-      where: {
-        id: commentId,
-      },
-
-      data: {
-        content:
-          sanitizeText(
-            content.trim()
-          ),
-      },
-    });
-  }
-
-  //////////////////////////////////////////////////
-  // DELATE COMMENT
-  //////////////////////////////////////////////////
-
-  static async deleteComment(
-    commentId: number,
-    userId: number
-  ) {
-    const comment =
-      await prisma.comment.findUnique({
-        where: {
-          id: commentId,
-        },
-      });
-
-    if (
-      !comment ||
-      comment.deleted
-    ) {
-      throw new NotFoundError(
-        "Comentario no encontrado"
-      );
-    }
-
-    if (
-      comment.userId !== userId
-    ) {
-      throw new ForbiddenError(
-        "No autorizado"
-      );
-    }
-
-    await prisma.comment.update({
-      where: {
-        id: commentId,
-      },
-
-      data: {
-        deleted: true,
-      },
-    });
-
-    return {
-      success: true,
-    };
-  }
-
-    //////////////////////////////////////////////////
-    // CREATE REPLY
-    //////////////////////////////////////////////////
-
-  static async createReply(
-    parentId: number,
-    userId: number,
-    content: string
-  ) {
-    const parent =
-      await prisma.comment.findUnique({
-        where: {
-          id: parentId,
-        },
-      });
-
-    if (!parent) {
-      throw new NotFoundError(
-        "Comentario no encontrado"
-      );
-    }
-
-    if (
-      parent.parentId !== null
-    ) {
-      throw new BadRequestError(
-        "Solo un nivel de respuestas permitido"
-      );
-    }
-
-    if (!content?.trim()) {
-      throw new BadRequestError(
-        "Comentario vacío"
-      );
-    }
-
-    return prisma.comment.create({
-      data: {
-        modId: parent.modId,
-
-        userId,
-
-        parentId,
-
-        content:
-          sanitizeText(
-            content.trim()
-          ),
-      },
-
-      include: {
-        user: {
-          select: {
-            id: true,
-            username: true,
-            avatar: true,
-          },
-        },
-      },
-    });
-  }
-}
----
-favorite.service.ts
-import { prisma } from "../lib/prisma";
-
-export async function addFavorite(userId: number, modId: number) {
-  const existing = await prisma.favorite.findUnique({
-    where: {
-      userId_modId: { userId, modId },
-    },
-  });
-
-  if (existing) {
-    return { favorited: true, alreadyFavorited: true };
-  }
-
-  await prisma.favorite.create({
-    data: { userId, modId },
-  });
-
-  return { favorited: true };
-}
-
-export async function removeFavorite(userId: number, modId: number) {
-  const existing = await prisma.favorite.findUnique({
-    where: {
-      userId_modId: { userId, modId },
-    },
-  });
-
-  if (!existing) {
-    return { favorited: false };
-  }
-
-  await prisma.favorite.delete({
-    where: {
-      userId_modId: { userId, modId },
-    },
-  });
-
-  return { favorited: false };
-}
-
-export async function getFavoriteStatus(userId: number, modId: number) {
-  const fav = await prisma.favorite.findUnique({
-    where: {
-      userId_modId: { userId, modId },
-    },
-  });
-
-  return { favorited: !!fav };
-}
-
-export async function getFavoritesByUser(userId: number) {
-  return prisma.favorite.findMany({
-    where: { userId },
-    include: {
-      mod: {
-        include: {
-          images: true,
-          _count: {
-            select: { likes: true },
-          },
-        },
-      },
-    },
-  });
-}
----
-invite.service.ts
-import { prisma } from "../lib/prisma";
-import crypto from "crypto";
-
-export class InviteService {
-  static async createInvite(
-    teamId: number,
-    email: string,
-    role: string
-  ) {
-    const token = crypto.randomBytes(32).toString("hex");
-
-    const invite = await prisma.teamInvite.create({
-      data: {
-        teamId,
-        email,
-        role,
-        token,
-        expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24), // 24h
-      },
-    });
-
-    return invite;
-  }
-
-  static async acceptInvite(token: string, userId: number) {
-    const invite = await prisma.teamInvite.findUnique({
-      where: { token },
-    });
-
-    if (!invite) throw new Error("Invitación inválida");
-
-    if (invite.expiresAt < new Date()) {
-      throw new Error("Invitación expirada");
-    }
-
-    await prisma.teamMember.create({
-      data: {
-        teamId: invite.teamId,
-        userId,
-        role: invite.role,
-      },
-    });
-
-    await prisma.teamInvite.delete({
-      where: { id: invite.id },
-    });
-
-    return { success: true };
-  }
-
-  static async rejectInvite(token: string) {
-    await prisma.teamInvite.delete({
-      where: { token },
-    });
-
-    return { success: true };
-  }
-}
----
-permission.service.ts
-import { prisma } from "../lib/prisma";
-
-export class PermissionService {
-  static async getUserScopes(userId: number) {
-    const roles = await prisma.userRole.findMany({
-      where: { userId },
-      include: { role: true },
-    });
-
-    const scopes = new Set<string>();
-
-    for (const r of roles) {
-      for (const s of r.role.scopes) {
-        scopes.add(s);
-      }
-    }
-
-    return Array.from(scopes);
-  }
-
-  static async hasScope(userId: number, scope: string) {
-    const scopes = await this.getUserScopes(userId);
-    return scopes.includes(scope);
-  }
-}
----
-feature.service.ts
-import { prisma } from "../lib/prisma";
-
-export class FeatureService {
-  static async hasFeature(userId: number, key: string) {
-    const feature = await prisma.userFeature.findFirst({
-      where: {
-        userId,
-        feature: {
-          key,
-        },
-      },
-      include: { feature: true },
-    });
-
-    return !!feature;
-  }
-}
----
-
-team.service.ts
-import { prisma } from "../lib/prisma";
-import { RoleScopes } from "../constants/roles";
-
-export class TeamService {
-  static async getMembership(userId: number, teamId: number) {
-    return prisma.teamMember.findFirst({
-      where: { userId, teamId },
-    });
-  }
-
-  static async hasScope(
-    userId: number,
-    mod: any,
-    scope: string
-  ) {
-    // dueño directo (fallback)
-    if (mod.authorId === userId) return true;
-
-    if (!mod.teamId) return false;
-
-    const membership = await this.getMembership(userId, mod.teamId);
-
-    if (!membership) return false;
-
-    const roleScopes = RoleScopes[membership.role] || [];
-
-    // soporte para scopes personalizados (futuro)
-    if (membership.scopes && membership.scopes.length > 0) {
-      return membership.scopes.includes(scope);
-    }
-
-    return roleScopes.includes(scope);
-  }
-}
----
-mod.service.ts
-import { prisma } from "../lib/prisma";
-
-import {
-  cacheGet,
-  cacheInvalidate,
-  cacheSet,
-} from "../lib/cache";
-
-import { TeamService } from "./team.service";
-
-import {
-  sanitizeRichText,
-  sanitizeText,
-} from "../utils/sanitize";
+versionfiles.service.ts
+import { prisma } from "../../../lib/prisma";
 
 import {
   BadRequestError,
   ForbiddenError,
   NotFoundError,
-} from "../utils/errors";
+  UnauthorizedError,
+} from "../../../utils/errors";
 
-import { generateSlug } from "../utils/slug";
+import { AuthRequest } from "../../../middleware/auth.middleware";
 
-import { mapMod } from "../mappers/mod.mapper";
+export async function registerFile(
+  req: AuthRequest
+) {
+  const userId = req.userId;
+  if (!userId) throw new UnauthorizedError("No autorizado");
 
-import { Scopes } from "../constants/scopes";
+  const versionId = Number(req.params.id);
+  const { key, filename, size, type } = req.body;
 
-import {
-  Loader,
-  ModStatus,
-  Platform,
-  ProjectType,
-  Visibility,
-} from "@prisma/client";
+  if (!key || !filename) {
+    throw new BadRequestError("Missing data");
+  }
 
-export class ModService {
-  //////////////////////////////////////////////////
-  // CREATE MOD
-  //////////////////////////////////////////////////
+  const version = await prisma.modVersion.findUnique({
+    where: { id: versionId },
+    include: { mod: true },
+  });
 
-  static async createMod(
-    data: any,
-    files: any,
-    userId: number
-  ) {
-    //////////////////////////////////////////////////
-    // USER
-    //////////////////////////////////////////////////
+  if (!version) throw new NotFoundError("Version not found");
 
-    const user =
-      await prisma.user.findUnique({
-        where: {
-          id: userId,
-        },
-      });
+  if (version.mod.authorId !== userId) {
+    throw new ForbiddenError("Unauthorized");
+  }
 
-    if (!user) {
-      throw new NotFoundError(
-        "Usuario no encontrado"
-      );
-    }
+  // 🔥 solo un primary
+  await prisma.modFile.updateMany({
+    where: {
+      modVersionId: versionId,
+      isPrimary: true,
+    },
+    data: {
+      isPrimary: false,
+    },
+  });
 
-    //////////////////////////////////////////////////
-    // EXTRACT DATA
-    //////////////////////////////////////////////////
+  const publicUrl = `${process.env.R2_PUBLIC_URL}/${key}`;
 
-    const {
-      title,
-      summary,
-      description,
-      content,
-      license,
-
-      sourceUrl,
-      issuesUrl,
-      discordUrl,
-      websiteUrl,
-      wikiUrl,
-      donationUrl,
-
-      platform,
+  const file = await prisma.modFile.create({
+    data: {
+      modVersionId: versionId,
+      filename,
+      displayName: filename,
+      url: publicUrl, // 🔥 ya no /uploads
+      size,
       type,
-      loader,
-      visibility,
-    } = data;
-
-    //////////////////////////////////////////////////
-    // PARSE ARRAYS
-    //////////////////////////////////////////////////
-
-    const categories =
-      typeof data.categories ===
-      "string"
-        ? JSON.parse(
-            data.categories || "[]"
-          )
-        : data.categories || [];
-
-    const tags =
-      typeof data.tags === "string"
-        ? JSON.parse(
-            data.tags || "[]"
-          )
-        : data.tags || [];
-
-    //////////////////////////////////////////////////
-    // VALIDATION
-    //////////////////////////////////////////////////
-
-    if (!title) {
-      throw new BadRequestError(
-        "Title requerido"
-      );
-    }
-
-    if (!description) {
-      throw new BadRequestError(
-        "Description requerida"
-      );
-    }
-
-    if (!platform) {
-      throw new BadRequestError(
-        "Platform requerida"
-      );
-    }
-
-    if (!type) {
-      throw new BadRequestError(
-        "Type requerido"
-      );
-    }
-
-    //////////////////////////////////////////////////
-    // SANITIZE
-    //////////////////////////////////////////////////
-
-    const safeTitle =
-      sanitizeText(title);
-
-    const safeSummary =
-      sanitizeText(summary || "");
-
-    const safeDescription =
-      sanitizeText(description);
-
-    const safeContent =
-      sanitizeRichText(
-        content || ""
-      );
-
-    //////////////////////////////////////////////////
-    // FILES
-    //////////////////////////////////////////////////
-
-    const icon =
-      files?.icon?.[0];
-
-    const gallery =
-      files?.gallery || [];
-
-    //////////////////////////////////////////////////
-    // SLUG
-    //////////////////////////////////////////////////
-
-    let slug =
-      generateSlug(
-        user.username,
-        safeTitle
-      );
-
-    let counter = 1;
-
-    while (
-      await prisma.mod.findUnique({
-        where: { slug },
-      })
-    ) {
-      slug =
-        generateSlug(
-          user.username,
-          safeTitle
-        ) +
-        "-" +
-        counter;
-
-      counter++;
-    }
-
-    //////////////////////////////////////////////////
-    // ICON URL
-    //////////////////////////////////////////////////
-
-    const iconUrl = icon
-      ? `/uploads/mods/${icon.filename}`
-      : null;
-
-    //////////////////////////////////////////////////
-    // CREATE MOD
-    //////////////////////////////////////////////////
-
-    const mod =
-      await prisma.mod.create({
-        data: {
-          //////////////////////////////////////////////////
-          // BASIC
-          //////////////////////////////////////////////////
-
-          title: safeTitle,
-
-          slug,
-
-          summary:
-            safeSummary || null,
-
-          description:
-            safeDescription,
-
-          content:
-            safeContent || null,
-
-          license:
-            license || null,
-
-          //////////////////////////////////////////////////
-          // LINKS
-          //////////////////////////////////////////////////
-
-          sourceUrl:
-            sourceUrl || null,
-
-          issuesUrl:
-            issuesUrl || null,
-
-          discordUrl:
-            discordUrl || null,
-
-          websiteUrl:
-            websiteUrl || null,
-
-          wikiUrl:
-            wikiUrl || null,
-
-          donationUrl:
-            donationUrl || null,
-
-          //////////////////////////////////////////////////
-          // META
-          //////////////////////////////////////////////////
-
-          platform:
-            platform as Platform,
-
-          type:
-            type as ProjectType,
-
-          loader:
-            loader
-              ? (loader as Loader)
-              : null,
-
-          visibility:
-            (visibility as Visibility) ||
-            Visibility.PUBLIC,
-
-          status:
-            ModStatus.DRAFT,
-
-          categories,
-
-          //////////////////////////////////////////////////
-          // ICON
-          //////////////////////////////////////////////////
-
-          icon: iconUrl,
-
-          //////////////////////////////////////////////////
-          // AUTHOR
-          //////////////////////////////////////////////////
-
-          authorId: userId,
-
-          //////////////////////////////////////////////////
-          // TAGS
-          //////////////////////////////////////////////////
-
-          tags: {
-            create: tags.map(
-              (tagName: string) => ({
-                tag: {
-                  connectOrCreate:
-                    {
-                      where: {
-                        name: tagName,
-                      },
-
-                      create: {
-                        name: tagName,
-                      },
-                    },
-                },
-              })
-            ),
-          },
-
-          //////////////////////////////////////////////////
-          // GALLERY
-          //////////////////////////////////////////////////
-
-          images: {
-            create: gallery.map(
-              (
-                file: Express.Multer.File
-              ) => ({
-                url: `/uploads/mods/${file.filename}`,
-
-                thumb: `/uploads/mods/${file.filename}`,
-
-                isCover: false,
-              })
-            ),
-          },
-        },
-
-        include: {
-          //////////////////////////////////////////////////
-          // RELATIONS
-          //////////////////////////////////////////////////
-
-          images: true,
-
-          tags: {
-            include: {
-              tag: true,
-            },
-          },
-
-          author: {
-            select: {
-              id: true,
-              username: true,
-              profile: {
-                select: {
-                  avatarUrl: true,
-                },
-              },
-            },
-          },
-        },
-      });
-
-    //////////////////////////////////////////////////
-    // CACHE
-    //////////////////////////////////////////////////
-
-    await cacheInvalidate(
-      "mods:*"
-    );
-
-    //////////////////////////////////////////////////
-    // RESPONSE
-    //////////////////////////////////////////////////
-
-    return mapMod(mod);
-  }
-
-  //////////////////////////////////////////////////
-  // GET MODS
-  //////////////////////////////////////////////////
-
-  static async getMods(
-    query: any
-  ) {
-    const page =
-      Number(query.page) || 1;
-
-    const limit =
-      Number(query.limit) || 12;
-
-    const search =
-      query.query?.trim() || "";
-
-    const platform =
-      query.platform || undefined;
-
-    const loader =
-      query.loader || undefined;
-
-    const type =
-      query.type || undefined;
-
-    const category =
-      query.category ||
-      undefined;
-
-    const version =
-      query.version ||
-      undefined;
-
-    const sort =
-      query.sort || "newest";
-
-    if (page < 1) {
-      throw new BadRequestError(
-        "page inválida"
-      );
-    }
-
-    if (
-      limit < 1 ||
-      limit > 50
-    ) {
-      throw new BadRequestError(
-        "limit inválido"
-      );
-    }
-
-    const where: any = {
-      deletedAt: null,
-    };
-
-    if (search) {
-      where.OR = [
-        {
-          title: {
-            contains: search,
-            mode: "insensitive",
-          },
-        },
-
-        {
-          description: {
-            contains: search,
-            mode: "insensitive",
-          },
-        },
-
-        {
-          tags: {
-            some: {
-              tag: {
-                name: {
-                  contains: search,
-                  mode: "insensitive",
-                },
-              },
-            },
-          },
-        },
-      ];
-    }
-
-    if (platform) {
-      where.platform = platform;
-    }
-
-    if (query.authorId) {
-      where.authorId = Number(query.authorId);
-    }
-
-    if (loader) {
-      where.loader = loader;
-    }
-
-    if (type) {
-      where.type = type;
-    }
-
-    if (category) {
-      where.categories = {
-        has: category,
-      };
-    }
-
-    if (version) {
-      where.versions = {
-        some: {
-          minecraftVersion:
-            version,
-        },
-      };
-    }
-
-    const orderBy =
-      sort === "popular"
-        ? {
-            likesCount: "desc" as const,
-          }
-        : sort === "downloads"
-        ? {
-            downloads: "desc" as const,
-          }
-        : {
-            createdAt: "desc" as const,
-          };
-
-    const cacheKey = `
-mods:list:
-page=${page}:
-limit=${limit}:
-query=${search}:
-platform=${platform}:
-loader=${loader}:
-type=${type}:
-category=${category}:
-version=${version}:
-sort=${sort}
-`;
-
-    const cached =
-      await cacheGet(cacheKey);
-
-    if (cached) {
-      return cached;
-    }
-
-    const skip =
-      (page - 1) * limit;
-
-    const [mods, total] =
-      await Promise.all([
-        prisma.mod.findMany({
-          where,
-
-          skip,
-
-          take: limit,
-
-          orderBy,
-
-          include: {
-            images: true,
-
-            tags: {
-              include: {
-                tag: true,
-              },
-            },
-
-            author: {
-              select: {
-                id: true,
-                username: true,
-                profile: {
-                  select: {
-                    avatarUrl: true,
-                  },
-                },
-              },
-            },
-          },
-        }),
-
-        prisma.mod.count({
-          where,
-        }),
-      ]);
-
-    const result = {
-      data: mods.map((mod) =>
-        mapMod(mod)
-      ),
-
-      meta: {
-        total,
-
-        page,
-
-        limit,
-
-        totalPages:
-          Math.ceil(
-            total / limit
-          ),
-      },
-    };
-
-    await cacheSet(
-      cacheKey,
-      result
-    );
-
-    return result;
-  }
-
-  //////////////////////////////////////////////////
-  // GET MOD
-  //////////////////////////////////////////////////
-
-  static async getModBySlug(
-    slug: string,
-    userId?: number,
-    reqIp?: string
-  ) {
-    const mod =
-      await prisma.mod.findFirst({
-        where: {
-          slug,
-          deletedAt: null,
-        },
-
-        include: {
-          images: true,
-
-          versions: {
-            include: {
-              files: true,
-            },
-
-            orderBy: {
-              createdAt: "desc",
-            },
-          },
-
-          tags: {
-            include: {
-              tag: true,
-            },
-          },
-
-          author: {
-            select: {
-              id: true,
-              username: true,
-              profile: {
-                select: {
-                  avatarUrl: true,
-                },
-              },
-            },
-          },
-
-          _count: {
-            select: {
-              comments: {
-                where: {
-                  deleted: false,
-                },
-              },
-            },
-          },
-        },
-      });
-
-    if (!mod) {
-      throw new NotFoundError(
-        "Mod no encontrado"
-      );
-    }
-
-    const viewKey = `
-    mod:view:
-    ${mod.id}:
-    ${userId || reqIp}
-    `;
-
-    const alreadyViewed =
-      await cacheGet(viewKey);
-
-    if (!alreadyViewed) {
-      await prisma.mod.update({
-        where: {
-          id: mod.id,
-        },
-
-        data: {
-          views: {
-            increment: 1,
-          },
-        },
-      });
-
-      await cacheSet(
-        viewKey,
-        true,
-        60 * 30 // 30 min
-      );
-    }
-
-    return mapMod(
-      {
-        ...mod,
-
-        views: mod.views + 1,
-      },
-      userId
-    );
-  }
-
-  //////////////////////////////////////////////////
-  // UPDATE
-  //////////////////////////////////////////////////
-
-  static async updateMod(
-    id: number,
-    data: any,
-    userId: number
-  ) {
-    const mod =
-      await prisma.mod.findUnique({
-        where: { id },
-      });
-
-    if (
-      !mod ||
-      mod.deletedAt
-    ) {
-      throw new NotFoundError(
-        "Mod no encontrado"
-      );
-    }
-
-    const allowed =
-      await TeamService.hasScope(
-        userId,
-        mod,
-        Scopes.MOD_UPDATE
-      );
-
-    if (!allowed) {
-      throw new ForbiddenError(
-        "No autorizado"
-      );
-    }
-
-    const updated =
-      await prisma.mod.update({
-        where: { id },
-
-        data,
-      });
-
-    await cacheInvalidate(
-      "mods:*"
-    );
-
-    return updated;
-  }
-
-  //////////////////////////////////////////////////
-  // DELETE
-  //////////////////////////////////////////////////
-
-  static async deleteMod(
-    id: number,
-    userId: number
-  ) {
-    const mod =
-      await prisma.mod.findUnique({
-        where: { id },
-      });
-
-    if (
-      !mod ||
-      mod.deletedAt
-    ) {
-      throw new NotFoundError(
-        "Mod no encontrado"
-      );
-    }
-
-    const allowed =
-      await TeamService.hasScope(
-        userId,
-        mod,
-        Scopes.MOD_DELETE
-      );
-
-    if (!allowed) {
-      throw new ForbiddenError(
-        "No autorizado"
-      );
-    }
-
-    await prisma.mod.update({
-      where: { id },
-
-      data: {
-        deletedAt:
-          new Date(),
-      },
-    });
-
-    await cacheInvalidate(
-      "mods:*"
-    );
-
-    return {
-      success: true,
-    };
-  }
-}
----
-like.service.ts
-import { prisma } from "../lib/prisma";
-
-export async function likeMod(userId: number, modId: number) {
-  // verificar si ya existe
-  const existing = await prisma.modLike.findUnique({
-    where: {
-      userId_modId: { userId, modId },
+      isPrimary: true,
+      releaseType: "release",
     },
   });
 
-  if (existing) {
-    // 👈 importante: avisar que ya estaba
-    return { liked: true, alreadyLiked: true };
-  }
-
-  await prisma.$transaction([
-    prisma.modLike.create({
-      data: { userId, modId },
-    }),
-    prisma.mod.update({
-      where: { id: modId },
-      data: {
-        likesCount: { increment: 1 },
-      },
-    }),
-  ]);
-
-  return { liked: true };
+  return file;
 }
 
-export async function unlikeMod(userId: number, modId: number) {
-  const existing = await prisma.modLike.findUnique({
+export async function getFiles(
+  modId: number
+) {
+
+  return prisma.modFile.findMany({
     where: {
-      userId_modId: { userId, modId },
-    },
-  });
-
-  if (!existing) {
-    return { liked: false };
-  }
-
-  await prisma.$transaction([
-    prisma.modLike.delete({
-      where: {
-        userId_modId: { userId, modId },
-      },
-    }),
-    prisma.mod.update({
-      where: { id: modId },
-      data: {
-        likesCount: { decrement: 1 },
-      },
-    }),
-  ]);
-
-  return { liked: false };
-}
-
-export async function getLikesCount(modId: number) {
-  const count = await prisma.modLike.count({
-    where: { modId },
-  });
-
-  return { count };
-}
-
-export async function getLikeStatus(userId: number, modId: number) {
-  const like = await prisma.modLike.findUnique({
-    where: {
-      userId_modId: { userId, modId },
-    },
-  });
-
-  return { liked: !!like };
-}
----
-version.service.ts
-import { prisma } from "../lib/prisma";
-import { redis } from "../lib/redis";
-import { Scopes } from "../constants/scopes";
-import { TeamService } from "./team.service";
-import { sanitizeRichText } from "../utils/sanitize";
-import { ForbiddenError, NotFoundError } from "../utils/errors";
-
-async function invalidate(pattern: string) {
-  const stream = redis.scanStream({ match: pattern });
-
-  return new Promise<void>((resolve) => {
-    stream.on("data", async (keys: string[]) => {
-      if (keys.length) await redis.del(...keys);
-    });
-
-    stream.on("end", () => resolve());
-  });
-}
-
-export class VersionService {
-  static async createVersion(
-    data: any,
-    userId: number,
-    modId: number
-  ) {
-    const mod = await prisma.mod.findUnique({
-      where: { id: modId },
-    });
-
-    if (!mod || mod.deletedAt) {
-      throw new NotFoundError("Mod no encontrado");
-    }
-
-    const allowed = await TeamService.hasScope(
-      userId,
-      mod,
-      Scopes.VERSION_CREATE
-    );
-
-    if (!allowed) {
-      throw new ForbiddenError("No autorizado");
-    }
-
-    // ✅ SANITIZACIÓN CORRECTA
-    const safeChangelog = sanitizeRichText(data.changelog || "");
-
-    const version = await prisma.modVersion.create({
-      data: {
+      modVersion: {
         modId,
-        version: data.version,
-        minecraftVersion: data.minecraftVersion,
-        loader: data.loader,
-        changelog: safeChangelog, // 👈 usamos el valor seguro
-      },
-    });
-
-    await invalidate("mods:*");
-
-    return version;
-  }
-
-  static async getVersions(modId: number) {
-    return prisma.modVersion.findMany({
-      where: { modId },
-      include: { files: true },
-    });
-  }
-}
----
-file.service.ts
-import { prisma } from "../lib/prisma";
-import { getRedis } from "../lib/redis";
-
-async function invalidate(pattern: string) {
-
-  const redis = getRedis();
-
-  if (!redis) {
-    return;
-  }
-
-  try {
-    const stream = redis.scanStream({
-      match: pattern,
-    });
-
-    stream.on(
-      "data",
-      async (keys: string[]) => {
-        try {
-          if (keys.length) {
-            await redis.del(...keys);
-          }
-        } catch {}
-      }
-    );
-
-  } catch {}
-}
-
-export class FileService {
-  static async uploadFile(
-    file: any,
-    versionId: number,
-    userId: number
-  ) {
-
-    const version =
-      await prisma.modVersion.findUnique({
-        where: {
-          id: versionId,
-        },
-
-        include: {
-          mod: true,
-        },
-      });
-
-    if (
-      !version ||
-      version.mod.authorId !== userId
-    ) {
-      throw new Error("No autorizado");
-    }
-
-    const newFile =
-      await prisma.modFile.create({
-        data: {
-          modVersionId: versionId,
-
-          filename: file.filename,
-
-          displayName:
-            file.originalname,
-
-          url:
-            `/uploads/files/${file.filename}`,
-
-          size: file.size,
-
-          type: file.mimetype,
-
-          releaseType: "release",
-
-          isPrimary: true,
-        },
-      });
-
-    await invalidate("mods:*");
-
-    return newFile;
-  }
-}
----
-user.service.ts
-import { prisma } from "../lib/prisma";
-
-export async function getUserProfile(username: string, currentUserId?: number) {
-  const user = await prisma.user.findUnique({
-    where: { username },
-    include: {
-      mods: {
-        include: {
-          images: true,
-          _count: {
-            select: { likes: true },
-          },
-        },
-      },
-      favorites: {
-        include: {
-          mod: {
-            include: {
-              images: true,
-              _count: {
-                select: { likes: true },
-              },
-            },
-          },
-        },
       },
     },
   });
 
-  if (!user) throw new Error("Usuario no encontrado");
+}
 
-  // 📊 stats
-  const totalLikes = user.mods.reduce(
-    (acc, mod) => acc + mod._count.likes,
-    0
-  );
+export async function deleteFile(
+  fileId: number,
+  userId: number
+) {
 
-  const totalViews = user.mods.reduce(
-    (acc, mod) => acc + mod.views,
-    0
-  );
+  const file =
+    await prisma.modFile.findUnique({
+      where: {
+        id: fileId,
+      },
+      include: {
+        modVersion: {
+          include: {
+            mod: true,
+          },
+        },
+      },
+    });
+
+  if (!file) {
+    throw new NotFoundError(
+      "No existe"
+    );
+  }
+
+  if (
+    file.modVersion.mod.authorId !==
+    userId
+  ) {
+    throw new ForbiddenError(
+      "No autorizado"
+    );
+  }
+
+  await prisma.modFile.delete({
+    where: {
+      id: fileId,
+    },
+  });
 
   return {
-    id: user.id,
-    username: user.username,
-    role: user.role,
-
-    stats: {
-      mods: user.mods.length,
-      favorites: user.favorites.length,
-      totalLikes,
-      totalViews,
-    },
-
-    mods: user.mods,
-
-    favorites: user.favorites.map((f) => f.mod),
+    success: true,
   };
 }
 ---
-utils/¨
-image.ts
-import sharp from "sharp";
-import fs from "fs";
+asyncHandler.ts
+import {
+  NextFunction,
+  Request,
+  RequestHandler,
+  Response,
+} from "express";
 
-export async function cropToSquare(filePath: string) {
-  const image = sharp(filePath);
-  const metadata = await image.metadata();
-
-  if (!metadata.width || !metadata.height) return filePath;
-
-  const size = Math.min(metadata.width, metadata.height);
-
-  const left = Math.floor((metadata.width - size) / 2);
-  const top = Math.floor((metadata.height - size) / 2);
-
-  const newPath = filePath.replace(/(\.\w+)$/, "-processed$1");
-
-  await image
-    .extract({ width: size, height: size, left, top })
-    .resize(500, 500)
-    .toFile(newPath);
-
-  // ❌ borrar original
-  await fs.promises.unlink(filePath);
-
-  return newPath;
+export function asyncHandler(
+  fn: RequestHandler
+): RequestHandler {
+  return (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
+    Promise.resolve(
+      fn(req, res, next)
+    ).catch(next);
+  };
 }
 ---
 errors.ts
@@ -8427,63 +8192,6 @@ export class NotFoundError extends AppError {
   }
 }
 ---
-sanitize.ts
-import sanitizeHtml from "sanitize-html";
-
-export function sanitizeText(input: string): string {
-  return sanitizeHtml(input, {
-    allowedTags: [], // ❌ elimina todo HTML
-    allowedAttributes: {},
-  });
-}
-
-// opcional: si querés permitir HTML básico en el futuro
-export function sanitizeRichText(input: string): string {
-  return sanitizeHtml(input, {
-    allowedTags: ["b", "i", "em", "strong", "a", "ul", "li", "p", "br"],
-    allowedAttributes: {
-      a: ["href"],
-    },
-  });
-}
----
-errorHandler.middleware.ts
-import { Request, Response, NextFunction } from "express";
-import { AppError } from "../utils/errors";
-
-export function errorHandler(
-  err: any,
-  req: Request,
-  res: Response,
-  next: NextFunction
-) {
-  console.error("🔥 ERROR:", err);
-
-  if (err instanceof AppError) {
-    return res.status(err.statusCode).json({
-      error: err.name,
-      message: err.message,
-      status: err.statusCode,
-    });
-  }
-
-  // errores de Zod
-  if (err.name === "ZodError") {
-    return res.status(400).json({
-      error: "ValidationError",
-      message: err.errors.map((e: any) => e.message),
-      status: 400,
-    });
-  }
-
-  // fallback
-  return res.status(500).json({
-    error: "InternalServerError",
-    message: "Algo salió mal",
-    status: 500,
-  });
-}
----
 fileValidation.ts
 import { BadRequestError } from "./errors";
 
@@ -8508,6 +8216,34 @@ export async function validateFileBuffer(buffer: Buffer) {
   }
 
   return type;
+}
+---
+image.ts
+import sharp from "sharp";
+import fs from "fs";
+
+export async function cropToSquare(filePath: string) {
+  const image = sharp(filePath);
+  const metadata = await image.metadata();
+
+  if (!metadata.width || !metadata.height) return filePath;
+
+  const size = Math.min(metadata.width, metadata.height);
+
+  const left = Math.floor((metadata.width - size) / 2);
+  const top = Math.floor((metadata.height - size) / 2);
+
+  const newPath = filePath.replace(/(\.\w+)$/, "-processed$1");
+
+  await image
+    .extract({ width: size, height: size, left, top })
+    .resize(500, 500)
+    .toFile(newPath);
+
+  // ❌ borrar original
+  await fs.promises.unlink(filePath);
+
+  return newPath;
 }
 ---
 imageProcessor.ts
@@ -8552,6 +8288,26 @@ export async function processImage(file: Express.Multer.File) {
     url: `/uploads/mods/webp/${hash}.webp`,
     thumb: `/uploads/mods/thumb/${hash}.webp`,
   };
+}
+---
+sanitize.ts
+import sanitizeHtml from "sanitize-html";
+
+export function sanitizeText(input: string): string {
+  return sanitizeHtml(input, {
+    allowedTags: [], // ❌ elimina todo HTML
+    allowedAttributes: {},
+  });
+}
+
+// opcional: si querés permitir HTML básico en el futuro
+export function sanitizeRichText(input: string): string {
+  return sanitizeHtml(input, {
+    allowedTags: ["b", "i", "em", "strong", "a", "ul", "li", "p", "br"],
+    allowedAttributes: {
+      a: ["href"],
+    },
+  });
 }
 ---
 selectBestFile.ts
@@ -8621,7 +8377,46 @@ export function generateSlug(username: string, title: string) {
 
   return `${username}-${cleanTitle}`;
 }
+---
+validations/file.schema.ts
+import { z } from "zod";
 
+export const fileSchema = z.object({
+  versionId: z.number(),
+});
+---
+mod.schema.ts
+import { z } from "zod";
+
+export const createModSchema = z.object({
+  title: z.string().min(3),
+  description: z.string().min(3),
+  content: z.string().optional(),
+  platform: z.string(),
+  loader: z.string().optional(),
+  type: z.string(),
+  tags: z.any().optional(),
+});
+
+export const updateModSchema = z.object({
+  title: z.string().min(3).optional(),
+  description: z.string().optional(),
+  content: z.string().optional(),
+  platform: z.string().optional(),
+  loader: z.string().optional(),
+  type: z.string().optional(),
+});
+---
+version.schema.ts
+import { z } from "zod";
+import { Loader } from "@prisma/client";
+
+export const createVersionSchema = z.object({
+  version: z.string(),
+  minecraftVersion: z.string(),
+  loader: z.nativeEnum(Loader).nullable().optional(),
+  changelog: z.string().optional(),
+});
 ---
 
 GET    /project/:id           → dashboard general
@@ -8649,3 +8444,4 @@ DELETE /project/:id/team/:userId
 
 GET    /project/:id/comments
 DELETE /project/comments/:id
+

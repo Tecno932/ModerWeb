@@ -1,13 +1,16 @@
 import { Request, Response } from "express";
 
 import {
+  CompleteMultipartUploadCommand,
   CreateMultipartUploadCommand,
   UploadPartCommand,
-  CompleteMultipartUploadCommand,
 } from "@aws-sdk/client-s3";
 
 import { getSignedUrl }
   from "@aws-sdk/s3-request-presigner";
+
+import { asyncHandler }
+  from "../../utils/asyncHandler";
 
 import { s3 }
   from "../../lib/s3";
@@ -16,139 +19,126 @@ import { s3 }
 // START MULTIPART
 ////////////////////////////////////////////////////////
 
-export async function startMultipartUpload(
-  req: Request,
-  res: Response
-) {
-  try {
-    const { filename, type } =
-      req.body;
+export const startMultipartUpload =
+  asyncHandler(
+    async (
+      req: Request,
+      res: Response
+    ) => {
 
-    const key =
-      `mods/${Date.now()}-${filename}`;
+      const {
+        filename,
+        type,
+      } = req.body;
 
-    const command =
-      new CreateMultipartUploadCommand({
-        Bucket:
-          process.env.R2_BUCKET!,
+      const key =
+        `mods/${Date.now()}-${filename}`;
 
-        Key: key,
+      const command =
+        new CreateMultipartUploadCommand({
+          Bucket:
+            process.env.R2_BUCKET!,
 
-        ContentType: type,
+          Key: key,
+
+          ContentType: type,
+        });
+
+      const response =
+        await s3.send(command);
+
+      res.json({
+        uploadId:
+          response.UploadId,
+
+        key,
       });
-
-    const response =
-      await s3.send(command);
-
-    return res.json({
-      uploadId:
-        response.UploadId,
-
-      key,
-    });
-  } catch (err) {
-    console.error(err);
-
-    return res.status(500).json({
-      error:
-        "Error starting multipart upload",
-    });
-  }
-}
+    }
+  );
 
 ////////////////////////////////////////////////////////
 // GET PART URL
 ////////////////////////////////////////////////////////
 
-export async function getMultipartPartUrl(
-  req: Request,
-  res: Response
-) {
-  try {
-    const {
-      uploadId,
-      key,
-      partNumber,
-    } = req.body;
+export const getMultipartPartUrl =
+  asyncHandler(
+    async (
+      req: Request,
+      res: Response
+    ) => {
 
-    const command =
-      new UploadPartCommand({
-        Bucket:
-          process.env.R2_BUCKET!,
+      const {
+        uploadId,
+        key,
+        partNumber,
+      } = req.body;
 
-        Key: key,
+      const command =
+        new UploadPartCommand({
+          Bucket:
+            process.env.R2_BUCKET!,
 
-        UploadId: uploadId,
+          Key: key,
 
-        PartNumber: partNumber,
+          UploadId: uploadId,
+
+          PartNumber: partNumber,
+        });
+
+      const url =
+        await getSignedUrl(
+          s3,
+          command,
+          {
+            expiresIn: 3600,
+          }
+        );
+
+      res.json({
+        url,
       });
-
-    const url =
-      await getSignedUrl(
-        s3,
-        command,
-        {
-          expiresIn: 3600,
-        }
-      );
-
-    return res.json({
-      url,
-    });
-  } catch (err) {
-    console.error(err);
-
-    return res.status(500).json({
-      error:
-        "Error generating part url",
-    });
-  }
-}
+    }
+  );
 
 ////////////////////////////////////////////////////////
 // COMPLETE MULTIPART
 ////////////////////////////////////////////////////////
 
-export async function completeMultipartUpload(
-  req: Request,
-  res: Response
-) {
-  try {
-    const {
-      uploadId,
-      key,
-      parts,
-    } = req.body;
+export const completeMultipartUpload =
+  asyncHandler(
+    async (
+      req: Request,
+      res: Response
+    ) => {
 
-    const command =
-      new CompleteMultipartUploadCommand({
-        Bucket:
-          process.env.R2_BUCKET!,
+      const {
+        uploadId,
+        key,
+        parts,
+      } = req.body;
 
-        Key: key,
+      const command =
+        new CompleteMultipartUploadCommand({
+          Bucket:
+            process.env.R2_BUCKET!,
 
-        UploadId: uploadId,
+          Key: key,
 
-        MultipartUpload: {
-          Parts: parts,
-        },
+          UploadId: uploadId,
+
+          MultipartUpload: {
+            Parts: parts,
+          },
+        });
+
+      const response =
+        await s3.send(command);
+
+      res.json({
+        success: true,
+
+        location:
+          response.Location,
       });
-
-    const response =
-      await s3.send(command);
-
-    return res.json({
-      success: true,
-
-      location:
-        response.Location,
-    });
-  } catch (err) {
-    console.error(err);
-
-    return res.status(500).json({
-      error:
-        "Error completing multipart upload",
-    });
-  }
-}
+    }
+  );
